@@ -1,0 +1,216 @@
+---
+title: "Travail pratique : Plateforme de sélection de places"
+description: "Concevoir en PHP une plateforme de billetterie en trois pages (accueil, configuration de salle, réservation) : présenter les pièces à l'affiche, configurer une salle et ses tarifs, afficher le plan d'une représentation et réserver une place via un formulaire validé."
+sidebar:
+  order: 7
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+
+Ce travail réunit tout ce que nous avons appris depuis le début du cours :
+**tableaux et fonctions** pour modéliser une salle, **navigation et composition**
+pour assembler les pages, et **formulaires, validation et échappement** pour soumettre de l'information.
+
+Vous construisez une petite **plateforme de billetterie** qui émule la sélection de places pour les représentations à l'affiche.
+Les réservations vivent le temps de la session de travail. La persistance durable (base de données) n'est pas attendu ici.
+
+## Le mandat
+
+Le **Théâtre de l'Érablière** veut un outil web pour présenter ses pièces à l'affiche, visualiser le plan de sa salle et réserver des places pour une **représentation choisie**. Vous livrez une plateforme PHP composée **minimalement de trois pages principales** :
+
+- **`index.php`** (accueil) : présente les **pièces à l'affiche** ; chaque représentation mène à sa réservation ;
+- **`config.php`** (configuration de salles) : **configure une salle** (sections, rangées, places) et fixe le **prix par section** ;
+- **`reserve.php`** (réservation) : pour une **représentation choisie**, affiche le **plan de sa salle** et permet de **réserver une place** par un formulaire validé.
+
+Au-delà de ces trois pages, des fichiers auxiliaires (parties communes, fonctions, données) complètent le projet.
+
+## Fonctionnalités à réaliser
+
+Les fonctionnalités sont regroupées **par page**. Les données de la plateforme (la configuration, les places, leur état) sont communmunes et partagées par toutes les pages via les fichiers auxiliaires.
+
+### `index.php` : accueil et pièces à l'affiche
+
+La page d'accueil **présente les pièces à l'affiche** et constitue le point d'entrée de la plateforme. C'est elle qui **choisit la représentation** pour laquelle on réservera.
+
+- Présenter les représentations à l'affiche : pour chacune, un titre, une courte description, sa date et la salle concernée.
+- Pour chaque représentation, offrir un lien **« Réserver une place »** vers `reserve.php`, en transportant l'identifiant de la représentation :
+
+  ```html
+  <a href="reserve.php?representation=erabliere-2026-05-01">Réserver une place</a>
+  ```
+
+<MarginNote type="astuce">
+Les représentations à l'affiche peuvent vivre dans `data/affiche.php` (titre, date, salle), au même titre que la configuration de la salle dans `data/salle.php`.
+</MarginNote>
+
+### `config.php` : configuration de la salle
+
+La salle est décrite par une **configuration** : pour chaque section, un nom, un nombre de rangées et un nombre de places par rangée, ainsi qu'un **prix**. À partir de cette configuration, une fonction **génère l'ensemble des places**.
+
+```php
+<?php
+// Exemple de configuration (à adapter, ex. dans data/salle.php)
+$config = [
+  "Parterre"  => ["rangees" => 5, "placesParRangee" => 12, "prix" => 75.00],
+  "Mezzanine" => ["rangees" => 3, "placesParRangee" => 10, "prix" => 50.00],
+];
+```
+
+Chaque place générée porte au minimum un **identifiant** (par exemple `Parterre-A-12`), sa **section** et un **état** (`libre` ou `reserve`).
+
+```php
+<?php
+$place = [
+  "id"      => "Parterre-A-12",
+  "section" => "Parterre",
+  "etat"    => "libre",   // "libre" ou "reserve"
+  "nom"     => null,       // nom du détenteur, une fois réservée
+];
+```
+
+<Highlight>Écrivez une fonction `genererPlaces($config)` qui retourne le tableau de toutes les places.</Highlight> C'est le cœur du modèle : tout le reste s'appuie dessus.
+
+**Tarification par section.** Le **prix dépend de la section**, pas de la place individuelle. Une place du Parterre coûte le prix du Parterre. Prévoyez de **récupérer le prix d'une place** à partir de sa section (par exemple une fonction `prixDeLaPlace($place, $config)`).
+
+### `reserve.php` : plan de salle et réservation
+
+Cette page travaille toujours sur une **représentation reçue en paramètre** (`?representation=...`). Elle affiche le **plan de la salle** de cette représentation avec ses disponibilités, et réserve une place **pour elle**.
+
+<Aside type="attention" title="Une représentation valide d'abord">
+Avant tout, validez que l'identifiant de représentation reçu **existe**. Sans représentation valide, on ne montre pas de plan : on renvoie vers l'accueil. La réservation n'a de sens que rattachée à une représentation précise.
+</Aside>
+
+**Plan de salle et sélection.** La page affiche le plan : les places, regroupées par section et par rangée, avec une distinction visuelle claire entre **libre** et **réservée**.
+
+<Steps>
+
+1. Une place **libre** est **cliquable** et affiche le formulaire de réservation pour la **représentation** et l'**identifiant de la place**.
+
+2. Une place **réservée** n'est pas cliquable (affichez-la grisée, désactivée).
+
+</Steps>
+
+Le formulaire demande au moins le **nom** et le **courriel** de la personne.
+
+**Validation, réservation et mise à jour des disponibilités.** À la **soumission** (`POST`), vous **validez côté serveur** : champs obligatoires non vides, courriel valide, place toujours libre.
+
+<Steps>
+
+1. **Si des erreurs existent**, réaffichez le formulaire avec les messages, en **conservant** la saisie (échappée avec `htmlspecialchars`).
+
+2. **Si tout est valide**, marquez la place comme `reserve` dans cette représentation, enregistrez le nom, **mettez à jour l'état**, puis affichez une **confirmation**. Le plan de salle doit refléter la nouvelle disponibilité.
+
+</Steps>
+
+### Parties communes : navigation et composition
+
+Les pages partagent **le même en-tête, le même pied de page et la même barre de navigation**, assemblés par `include`. La navigation relie l'accueil, la configuration et la réservation.
+
+## Structure recommandée
+
+Une organisation de fichiers possible, à adapter :
+
+```text
+theatre-erabliere/
+├── index.php            // accueil : pièces à l'affiche
+├── config.php           // configuration de la salle (sections, prix)
+├── reserve.php          // plan de salle + réservation d'une représentation
+├── includes/
+│   ├── header.php       // <head>, ouverture du <body>, navigation
+│   └── footer.php       // fermeture de la page
+└── data/
+    ├── affiche.php      // les représentations à l'affiche (return [...])
+    └── salle.php        // configuration par défaut (return [...])
+```
+
+{/* <MarginNote type="rappel" titre="L'état par représentation">
+Au premier accès à une représentation, générez ses places et rangez-les dans `$_SESSION` sous l'identifiant de la représentation. Aux requêtes suivantes, **relisez** cet état plutôt que de tout régénérer, sinon chaque rafraîchissement effacerait les réservations. Chaque représentation a ses propres disponibilités.
+</MarginNote> */}
+
+{/* ## Étapes suggérées
+
+<Steps>
+
+1. **Modéliser** : définir la configuration et écrire `genererPlaces`. Tester en affichant le nombre de places obtenues.
+
+2. **Configurer** : la page `config.php` (sections, rangées, places, prix par section).
+
+3. **Afficher l'affiche** : `index.php` liste les représentations, chacune liée à `reserve.php?representation=...`.
+
+4. **Afficher le plan** : `reserve.php` montre le plan de la représentation reçue (sections, rangées, état) avec un `foreach`.
+
+5. **Sélectionner** : rendre les places libres cliquables vers `reserve.php?representation=...&place=...`.
+
+6. **Réserver** : formulaire dynamique, validation serveur, mise à jour de l'état de la représentation dans la session, confirmation.
+
+7. **Composer** : extraire l'en-tête et le pied de page, brancher la navigation commune.
+
+8. **Finir** : échappement partout, messages clairs, un peu de style pour distinguer libre et réservé.
+
+</Steps> */}
+
+{/* ## Grille d'évaluation
+
+<table>
+  <thead>
+    <tr>
+      <th>Critère</th>
+      <th>Points</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Configuration de la salle et génération des places (fonctions, tableaux)</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Tarification par section</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Accueil et lien affiche vers réservation (représentation transmise)</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Plan de salle et sélection d&apos;une place</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Formulaire de réservation dynamique</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Validation côté serveur et échappement (htmlspecialchars)</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Mise à jour de l&apos;état et des disponibilités (par représentation)</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Navigation, composition (gabarit) et qualité du code</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td><strong>Total</strong></td>
+      <td><strong>100</strong></td>
+    </tr>
+  </tbody>
+</table> */}
+
+## Livrables
+
+<Steps>
+
+1. Une **archive** (`.zip`) du dossier du projet, prête à déposer dans `htdocs`.
+
+2. Un fichier **`README.md`** : comment lancer le projet, la configuration de salle par défaut, et l'état des fonctionnalités réalisées.
+
+3. Un projet **fonctionnel sur XAMPP**, sans erreur PHP visible à l'écran.
+
+4. Une démonstration du projet en classe.
+
+</Steps>

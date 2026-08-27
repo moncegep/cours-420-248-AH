@@ -1,0 +1,372 @@
+---
+title: Préserver les données
+description: "Deux mécanismes pour conserver des données au-delà d'une seule requête : les sessions PHP, puis les bases de données relationnelles avec MySQL, phpMyAdmin et une connexion en PDO."
+sidebar: 
+  order: 8
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import FluxSequence from '../../../components/react/FluxSequence.jsx';
+import SchemaBD from '../../../components/react/SchemaBD.jsx';
+
+Jusqu'ici, chaque requête que nous effectuons au serveur repartait de zéro, sans préserver nos données soumises (via formulaire) ou changements d'états. 
+On a pu observer cette limite au travail pratique : sans mécanisme de conservation, une réservation disparaît au rafraîchissement suivant.
+
+Ce chapitre présente deux façons de conserver des données au-delà d'une requête : les **sessions**, propres à un visiteur et de courte durée, puis les **bases de données**, durables et partagées par tous.
+
+<Aside type="prerequis" title="Avant de commencer">
+On s'appuie dans ce chapitre sur les [superglobales](/cours/06-superglobals), où la superglobale `$_SESSION` 
+avait été brièvement introduit et sur l'exploitation des [formulaires](/cours/05-formulaires). 
+La partie sur le relationnel suppose des notions de base de données relationnelles et du langage SQL, revues ici en rappel.
+</Aside>
+
+## Le problème : une requête HTTP ne retient rien
+
+Le protocole HTTP est **sans état** : le serveur traite chaque requête indépendamment, sans conserver en mémoire les données transmises ou modifiées par la précédente. 
+Deux requêtes du même visiteur (utilisateur) sont considérées comme deux exécutions séparées qui ne partagent aucune variable.
+
+Pour qu'une donnée survive d'une requête à l'autre, il faut la ranger quelque part de persistant, puis la relire. C'est le rôle des mécanismes de préservation.
+
+## Conserver l'état dans l'URL
+ 
+Le moyen le plus simple, déjà à votre portée, consiste à faire voyager l'état dans l'**URL**, via les requêtes de paramètre (placées après `?`).
+Chaque lien ou formulaire transporte les valeurs à conserver dans la chaîne de requête, que la page suivante récupère dans `$_GET`.
+ 
+```php
+<?php
+// Le tri courant est transmis d'une page à l'autre par les liens.
+$tri = $_GET['tri'] ?? 'nom';
+ 
+echo '<a href="produits.php?tri=nom">Par nom</a> ';
+echo '<a href="produits.php?tri=prix">Par prix</a>';
+```
+ 
+<Aside type="astuce" title="Utile et pratique, mais limité">
+Passer l'état dans l'URL ne demande aucun stockage et convient à un tri, un filtre ou la page courante. Ses limites tiennent à sa nature : la valeur est visible et modifiable par le visiteur, sa taille est restreinte, elle se perd dès qu'on quitte vos liens, et elle ne protège aucune donnée privée. Pour un panier ou une identification, il faut mieux : une session.
+</Aside>
+
+## Les sessions
+
+Une **session** est un espace de stockage sur le serveur, associé à un visiteur particulier. 
+Les données y restent disponibles d'une requête à l'autre, pendant toute la durée de la visite.
+
+### Démarrer une session, lire et écrire
+
+`session_start()` ouvre ou reprend la session du visiteur. 
+Elle doit être appelée sur chaque page qui utilise la session, **avant toute sortie HTML**. 
+Ensuite, la superglobale `$_SESSION` se manipule comme un tableau associatif.
+
+```php
+<?php
+session_start(); // toujours avant toute sortie
+
+// Au premier passage, la clé n'existe pas : on part de 0.
+$_SESSION['visites'] = ($_SESSION['visites'] ?? 0) + 1;
+
+echo 'Vous avez consulté cette page ' . $_SESSION['visites'] . ' fois.';
+```
+
+À chaque rechargement, le compteur augmente : la valeur a bien été conservée entre les requêtes. 
+On préserve de la même façon des données plus utiles, comme par exemple, un panier d'achat.
+
+```php
+<?php
+session_start();
+
+// Ajouter un produit au panier.
+$_SESSION['panier'][] = "Sirop d'érable 540 ml";
+
+// Afficher le panier.
+foreach ($_SESSION['panier'] ?? [] as $article) {
+    echo htmlspecialchars($article) . '<br>';
+}
+```
+
+### Comment une session fonctionne
+ 
+Les données de session vivent sur le serveur. Pour savoir à quel visiteur elles appartiennent, PHP dépose dans le navigateur un témoin nommé `PHPSESSID`, qui contient seulement un identifiant. À la requête suivante, le navigateur renvoie ce témoin, et PHP retrouve les données correspondantes.
+ 
+<FluxSequence
+  client:visible
+  titre="Deux requêtes reliées par le témoin de session"
+  acteurs={[
+    { key: "nav", label: "Navigateur", icone: "laptop" },
+    { key: "serveur", label: "Serveur PHP", icone: "server" },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: "1re requête", note: "aucun témoin encore" },
+    { de: 1, vers: 0, texte: "Réponse et dépôt du témoin PHPSESSID", statut: 200 },
+    { de: 0, vers: 1, texte: "2e requête", note: "renvoie PHPSESSID" },
+    { de: 1, vers: 1, texte: "PHP retrouve $_SESSION à partir de l'identifiant" },
+    { de: 1, vers: 0, texte: "Réponse : les données sont conservées", statut: 200 },
+  ]}
+/>
+ 
+#### Où sont concrètement stockées ces données ?
+
+Sur le serveur, PHP les écrit dans un **fichier temporaire**, un par session, nommé d'après l'identifiant (par exemple `sess_a1b2c3d4...`).  
+À `session_start()`, PHP lit l'identifiant dans le témoin, ouvre le fichier correspondant, et reconstitue le tableau `$_SESSION`.  
+À la fin du script, il réécrit ce tableau dans le fichier. `$_SESSION` n'est donc qu'une image en mémoire du contenu de ce fichier, le temps d'une requête.
+ 
+<Aside type="caution" title="Ces fichiers ne vivent pas indéfiniment">
+Après un délai d'inactivité, PHP efface les fichiers de session  (le ramassage, réglé par `session.gc_maxlifetime`), 
+et le témoin de session disparaît à la fermeture du navigateur. 
+Une session finit donc par expirer d'elle-même, même sans appel à `session_destroy`.
+</Aside>
+
+ 
+<Aside type="definition" title="Session ou témoin (cookie) ?">
+Une **session** conserve les données sur le serveur ; le navigateur ne reçoit qu'un identifiant. Un **témoin** (`$_COOKIE`) conserve au contraire les données dans le navigateur. Pour une information sensible, la session est préférable, car le client ne voit jamais que l'identifiant.
+</Aside>
+
+{/* Ce fonctionnement éclaire les limites d'une session :
+ 
+- elle est **temporaire** : le fichier est effacé après un délai, et le témoin tombe à la fermeture du navigateur ;
+- elle est **liée à un serveur** : les fichiers résident sur une machine précise, ce qui complique la répartition sur plusieurs serveurs ;
+- elle repose sur l'**identifiant du témoin** : quiconque l'obtient peut se faire passer pour le visiteur, d'où l'importance d'une connexion chiffrée (HTTPS) ;
+- elle ne convient ni aux **grandes quantités** de données, ni aux données à **conserver durablement**. */}
+
+
+{/* ### Comment PHP relie les requêtes
+
+Les données de session vivent sur le serveur. Pour savoir à quel visiteur elles appartiennent, PHP dépose dans le navigateur un témoin nommé `PHPSESSID`, qui contient seulement un identifiant. À la requête suivante, le navigateur renvoie ce témoin, et PHP retrouve les données correspondantes.
+
+<FluxSequence
+  client:visible
+  titre="Deux requêtes reliées par le témoin de session"
+  acteurs={[
+    { key: "nav", label: "Navigateur", icone: "laptop" },
+    { key: "serveur", label: "Serveur PHP", icone: "server" },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: "1re requête", note: "aucun témoin encore" },
+    { de: 1, vers: 0, texte: "Réponse et dépôt du témoin PHPSESSID", statut: 200 },
+    { de: 0, vers: 1, texte: "2e requête", note: "renvoie PHPSESSID" },
+    { de: 1, vers: 1, texte: "PHP retrouve $_SESSION à partir de l'identifiant" },
+    { de: 1, vers: 0, texte: "Réponse : les données sont conservées", statut: 200 },
+  ]}
+/>
+
+<Aside type="definition" title="Session ou témoin ?">
+Une **session** conserve les données sur le serveur ; le navigateur ne reçoit qu'un identifiant. Un **témoin** (`$_COOKIE`) conserve au contraire les données dans le navigateur. Pour une information sensible, la session est préférable, car le client ne voit jamais que l'identifiant.
+</Aside> */}
+
+### Fermer une session
+
+On retire une donnée avec `unset`, et on termine la session avec `session_destroy`.
+
+```php
+<?php
+session_start();
+
+unset($_SESSION['panier']); // retirer une seule donnée
+session_destroy();          // terminer toute la session
+```
+
+Une session se termine aussi d'elle-même après un délai d'inactivité ou à la fermeture du navigateur.
+
+<Highlight couleur="ambre">Une session est **temporaire** : elle dure le temps d'une visite et n'appartient qu'à un visiteur. Pour conserver des données durablement, et les partager entre tous les visiteurs, il faut une base de données.</Highlight>
+
+## Les bases de données relationnelles
+
+Un fichier de données en PHP convient à un petit catalogue fixe. Dès que les données changent souvent, grossissent, ou doivent être interrogées de multiples façons, on utilise une **base de données**.
+
+### Rappel : tables, clés et SQL
+
+Une base de données relationnelle organise l'information en **tables**. 
+Chaque table a des **colonnes** (les champs) et des **lignes** (les enregistrements). 
+Voici une table `produits` :
+
+<table>
+  <thead>
+    <tr>
+      <th>id</th>
+      <th>nom</th>
+      <th>prix</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Sirop d'érable 540 ml</td>
+      <td>14.50</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Beurre d'érable 250 g</td>
+      <td>9.95</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Tire sur la neige</td>
+      <td>6.00</td>
+    </tr>
+  </tbody>
+</table>
+
+Trois notions à retenir :
+
+- une **clé primaire** identifie chaque ligne de façon unique (ici la colonne `id`) ;
+- une **clé étrangère** relie une table à une autre (par exemple une table `commandes` qui référence l'`id` d'un produit) ;
+- le langage **SQL** sert à interroger et modifier les données, avec quatre opérations principales : `SELECT` (lire), `INSERT` (ajouter), `UPDATE` (modifier) et `DELETE` (supprimer).
+
+<MarginNote type="rappel" titre="Par rapport à un fichier de données">
+Le fichier `data/produits.php` retournait un tableau figé, régénéré à chaque requête. Une table de base de données est durable, partagée par tous les visiteurs, et interrogeable (filtrer, trier, joindre) sans tout charger en mémoire.
+</MarginNote>
+
+Le schéma ci-dessous illustre ces relations. 
+Une table `commandes` et une table `produits` sont reliées par une table intermédiaire, `lignes_commande`.
+ 
+<SchemaBD client:visible />
+
+### MySQL et phpMyAdmin
+
+**MySQL** est un système de gestion de base de données relationnelle : un serveur qui stocke les bases et exécute les requêtes SQL. XAMPP en fournit une version compatible, **MariaDB**, qui s'utilise de la même façon.
+
+**phpMyAdmin** est un outil web, inclus dans XAMPP, pour gérer MySQL depuis le navigateur : créer des bases et des tables, écrire du SQL, parcourir les données.
+
+<Steps>
+
+1. Dans le panneau de contrôle de XAMPP, démarrez **MySQL** en plus d'Apache.
+2. Ouvrez `http://localhost/phpmyadmin` dans le navigateur.
+3. Onglet « Bases de données » : créez une BD nommée `erabliere`.
+4. Sélectionnez cette base, puis l'onglet « SQL », et exécutez le code ci-dessous.
+5. Onglet « Parcourir » : les trois produits doivent apparaître.
+
+</Steps>
+
+```sql
+CREATE TABLE produits (
+    id   INT AUTO_INCREMENT PRIMARY KEY,
+    nom  VARCHAR(100)  NOT NULL,
+    prix DECIMAL(6, 2) NOT NULL
+);
+
+INSERT INTO produits (nom, prix) VALUES
+    ('Sirop d''érable 540 ml', 14.50),
+    ('Beurre d''érable 250 g', 9.95),
+    ('Tire sur la neige', 6.00);
+```
+
+<Aside type="syntaxe" title="L'apostrophe en SQL">
+En SQL, les chaînes sont entre apostrophes simples. Pour insérer une apostrophe dans le texte, on la double : `'Sirop d''érable'`. C'est l'équivalent de l'échappement vu pour le HTML.
+</Aside>
+
+### Se connecter depuis PHP avec PDO
+
+PHP communique avec la BD à l'aide de **PDO** (PHP Data Objects), une interface commune à plusieurs systèmes de base de données. 
+**On ouvre la connexion une fois, en précisant l'hôte, le nom de la BD et l'encodage.**
+
+```php
+<?php
+$dsn = 'mysql:host=localhost;dbname=erabliere;charset=utf8mb4';
+$utilisateur = 'root';
+$motDePasse = '';
+
+try {
+    $pdo = new PDO($dsn, $utilisateur, $motDePasse);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    exit('Connexion impossible : ' . $e->getMessage());
+}
+```
+
+<MarginNote type="astuce" titre="Identifiants par défaut de XAMPP">
+En local, XAMPP utilise l'utilisateur `root` sans mot de passe. 
+Ces valeurs conviennent au développement, mais jamais à un site en production. 
+On garde aussi le fichier de connexion hors du dépôt de code.
+</MarginNote>
+
+La connexion en main, on interroge la base. Une simple lecture de tous les produits :
+
+```php
+<?php
+$requete = $pdo->query('SELECT id, nom, prix FROM produits');
+$produits = $requete->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($produits as $produit) {
+    echo htmlspecialchars($produit['nom']) . ' : '
+        . number_format($produit['prix'], 2, ',', ' ') . ' $<br>';
+}
+```
+
+Dès qu'une valeur vient du client, on n'assemble jamais la requête par concaténation. On utilise une **requête préparée** : la valeur voyage à part, ce qui empêche l'injection SQL.
+
+```php
+<?php
+$requete = $pdo->prepare('SELECT id, nom, prix FROM produits WHERE prix <= :max');
+$requete->execute(['max' => 10]);
+$abordables = $requete->fetchAll(PDO::FETCH_ASSOC);
+```
+
+<Highlight couleur="ambre">Les requêtes préparées protègent l'entrée vers la BD comme `htmlspecialchars` protège la sortie vers le HTML. Toute donnée venue du client passe par un paramètre (`:max`), jamais par concaténation dans la chaîne SQL.</Highlight>
+
+<Checkpoint question="Pourquoi une session ne suffit-elle pas à conserver le catalogue de produits d'une boutique ?">
+Une session est propre à un visiteur et temporaire : chaque personne aurait son propre catalogue, qui disparaîtrait à la fin de sa visite. Le catalogue doit être unique, durable et partagé par tous : c'est le rôle d'une base de données. La session convient plutôt à des données propres à la visite en cours, comme le panier.
+</Checkpoint>
+
+## Récapitulatif
+
+- HTTP est sans état : sans mécanisme de préservation, chaque requête oublie la précédente.
+- Une **session** (`session_start`, `$_SESSION`) conserve des données sur le serveur pour un visiteur, le temps de sa visite ; le navigateur ne garde que l'identifiant `PHPSESSID`.
+- Une session est temporaire et individuelle ; pour des données durables et partagées, on utilise une **base de données relationnelle** (tables, clés primaires et étrangères, SQL).
+- **MySQL** stocke les données ; **phpMyAdmin** permet de les gérer depuis le navigateur.
+- PHP se connecte avec **PDO**, et interroge la base de données par des **requêtes préparées** pour se prémunir contre l'injection SQL.
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Où sont conservées les données d'une session ?"
+  options={[
+    { texte: "Dans le navigateur, avec le témoin PHPSESSID", correct: false },
+    { texte: "Sur le serveur ; le navigateur ne garde que l'identifiant", correct: true },
+    { texte: "Dans la chaîne de requête de l'URL", correct: false },
+  ]}
+  retour="Les données restent sur le serveur. Le navigateur ne reçoit qu'un identifiant (PHPSESSID) qui permet à PHP de les retrouver."
+/>
+
+<Quiz
+  client:visible
+  question="Quel appel doit précéder toute sortie HTML pour utiliser une session ?"
+  options={[
+    { texte: "session_destroy()", correct: false },
+    { texte: "session_start()", correct: true },
+    { texte: "header('Session')", correct: false },
+  ]}
+  retour="session_start() ouvre ou reprend la session, et doit être appelée avant tout affichage, sur chaque page qui utilise $_SESSION."
+/>
+
+<Quiz
+  client:visible
+  question="Dans une table relationnelle, à quoi sert la clé primaire ?"
+  options={[
+    { texte: "À trier les lignes par ordre alphabétique", correct: false },
+    { texte: "À identifier chaque ligne de façon unique", correct: true },
+    { texte: "À chiffrer les données de la table", correct: false },
+  ]}
+  retour="La clé primaire (souvent une colonne id) identifie chaque ligne de manière unique. Une clé étrangère, elle, relie une table à une autre."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi utiliser une requête préparée quand une valeur vient du client ?"
+  options={[
+    { texte: "Pour accélérer l'affichage de la page", correct: false },
+    { texte: "Pour éviter l'injection SQL en séparant la valeur de la requête", correct: true },
+    { texte: "Pour convertir automatiquement les prix en dollars", correct: false },
+  ]}
+  retour="La requête préparée fait voyager la valeur à part, par un paramètre. La donnée du client ne peut donc pas modifier la structure de la requête SQL."
+/>
+
+## Références
+
+- [php.net : les sessions](https://www.php.net/manual/fr/book.session.php)
+- [php.net : PDO](https://www.php.net/manual/fr/book.pdo.php)
+- [php.net : requêtes préparées avec PDO](https://www.php.net/manual/fr/pdo.prepared-statements.php)
+- [Documentation de phpMyAdmin](https://www.phpmyadmin.net/docs/)

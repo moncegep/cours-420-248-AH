@@ -1,0 +1,695 @@
+---
+title: Exercices — Préserver les données
+description: Pratiquer les sessions à travers une boutique, un rappel de la programmation orientée objet, une page d'administration CRUD, puis une synthèse qui ajoute une base de données au premier travail pratique.
+sidebar:
+  order: 11
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import CarteProduit from '../../../components/react/CarteProduit.jsx';
+import TableProduitsAdmin from '../../../components/react/TableProduitsAdmin.jsx';
+
+Quatre parties : manipuler les sessions à travers une boutique, un rappel de la programmation orientée objet, une page d'administration pour gérer les produits, puis une synthèse qui rend le TP1 durable avec une base de données.
+
+<Aside type="prerequis" title="Avant de commencer">
+Cette série s'appuie sur le chapitre [Préserver les données](/cours/07-preservation) (`$_SESSION`, PDO), sur les [formulaires](/cours/05-formulaires) et sur le [travail pratique](/tps/01-selecteur-place). Testez chaque réponse dans un dossier de `htdocs`.
+</Aside>
+
+## Partie 1 : Utilisation de session
+
+### Exercice 1 &ndash; Un compteur de visites
+
+Créez une page (par exemple `accueil.php`) qui compte combien de fois le visiteur l'a chargée pendant sa session, et affiche un message d'accueil personnalisé selon des paliers de visite.
+
+#### Exemple de paliers
+
+<table>
+  <thead>
+    <tr>
+      <th>Visites</th>
+      <th>Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Bienvenue !</td>
+    </tr>
+    <tr>
+      <td>2 à 4</td>
+      <td>Bon retour !</td>
+    </tr>
+    <tr>
+      <td>5 à 9</td>
+      <td>Te revoilà !</td>
+    </tr>
+    <tr>
+      <td>10 et plus</td>
+      <td>Coucou, habitué !</td>
+    </tr>
+  </tbody>
+</table>
+
+<Checkpoint question="Indice">
+Appelez `session_start()` avant toute sortie. Au premier passage, la clé n'existe pas encore : `$_SESSION['visites'] ?? 0` donne la valeur de départ (0), à laquelle on ajoute 1. Après cet ajout, la première visite vaut donc 1, ce qui déclenche le premier palier.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+session_start();
+
+$_SESSION['visites'] = ($_SESSION['visites'] ?? 0) + 1;
+
+if ($_SESSION['visites'] === 1) {
+    $message = 'Bienvenue !';
+} elseif ($_SESSION['visites'] < 5) {
+    $message = 'Bon retour !';
+} elseif ($_SESSION['visites'] < 10) {
+    $message = 'Te revoilà !';
+} else {
+    $message = 'Coucou, habitué !';
+}
+
+echo $message . ' (visite numéro ' . $_SESSION['visites'] . ')';
+```
+
+</Checkpoint> */}
+
+### Exercice 2 &ndash; Un panier en session
+
+Créez une page `boutique.php`, qui présente cette liste de produits :
+
+<table>
+  <thead>
+    <tr>
+      <th>id</th>
+      <th>nom</th>
+      <th>prix</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Sirop d'érable 540 ml</td>
+      <td>14,50 $</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Beurre d'érable 250 g</td>
+      <td>9,95 $</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Tire sur la neige</td>
+      <td>6,00 $</td>
+    </tr>
+  </tbody>
+</table>
+
+Chaque produit s'affiche dans une **carte** présentant son image, son nom, son prix et un bouton « Ajouter au panier » (`?ajouter=<id>`) qui l'ajoute au panier conservé en session. 
+
+Les cartes pourraient ressembler à ceci :
+
+<CarteProduit client:visible />
+
+Une page `panier.php` affiche les produits du panier et le total:
+
+- chaque ligne a un lien « Supprimer » permettant de supprimer le produit du panier,
+- Un lien « Vider » (`?vider=1`) retire tout du panier.
+
+<Checkpoint question="Indice">
+Rangez les produits dans un fichier de données commun aux deux pages, indexé par `id`. Le panier ne conserve que des `id` dans `$_SESSION['panier']` ; le total se calcule en retrouvant chaque prix. Pour supprimer un article, `array_splice` retire l'élément à une position donnée. Échappez tout affichage avec `htmlspecialchars`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// data/produits.php
+return [
+    1 => ['nom' => "Sirop d'érable 540 ml", 'prix' => 14.50],
+    2 => ['nom' => "Beurre d'érable 250 g", 'prix' => 9.95],
+    3 => ['nom' => 'Tire sur la neige',      'prix' => 6.00],
+];
+```
+
+```php
+<?php
+// boutique.php
+session_start();
+$produits = require 'data/produits.php';
+
+$id = (int) ($_GET['ajouter'] ?? 0);
+if (isset($produits[$id])) {
+    $_SESSION['panier'][] = $id;
+}
+?>
+<h1>Boutique</h1>
+<div class="produits">
+<?php foreach ($produits as $cle => $p): ?>
+    <div class="carte">
+        <h3><?= htmlspecialchars($p['nom']) ?></h3>
+        <p><?= number_format($p['prix'], 2, ',', ' ') ?> $</p>
+        <a href="boutique.php?ajouter=<?= $cle ?>">Ajouter au panier</a>
+    </div>
+<?php endforeach; ?>
+</div>
+<a href="panier.php">Voir le panier (<?= count($_SESSION['panier'] ?? []) ?>)</a>
+```
+
+```php
+<?php
+// panier.php
+session_start();
+$produits = require 'data/produits.php';
+
+if (isset($_GET['vider'])) {
+    unset($_SESSION['panier']);
+}
+
+if (isset($_GET['supprimer'])) {
+    $i = (int) $_GET['supprimer'];
+    if (isset($_SESSION['panier'][$i])) {
+        array_splice($_SESSION['panier'], $i, 1);
+    }
+}
+
+$panier = $_SESSION['panier'] ?? [];
+$total = 0;
+?>
+<h1>Votre panier</h1>
+<ul>
+<?php foreach ($panier as $i => $id): ?>
+    <?php if (!isset($produits[$id])) continue; ?>
+    <?php $total += $produits[$id]['prix']; ?>
+    <li>
+        <?= htmlspecialchars($produits[$id]['nom']) ?>
+        (<?= number_format($produits[$id]['prix'], 2, ',', ' ') ?> $)
+        <a href="panier.php?supprimer=<?= $i ?>">Supprimer</a>
+    </li>
+<?php endforeach; ?>
+</ul>
+<p>Total : <?= number_format($total, 2, ',', ' ') ?> $</p>
+<a href="panier.php?vider=1">Vider le panier</a>
+<a href="boutique.php">Continuer les achats</a>
+```
+
+</Checkpoint> */}
+
+### Exercice 3 &ndash; Ajouter une base de données
+
+Placez la liste des produits dans une base de données et servez-la dans la boutique de l'exercice précédent, à la place du fichier de données.
+
+<Checkpoint question="Indice 1">
+Créez une table `produits` (`id` en `AUTO_INCREMENT`, `nom`, `prix`) et remplissez-la. Puis réécrivez `data/produits.php` : au lieu de `return [...]`, il ouvre une connexion PDO, fait un `SELECT`, et reconstruit le même tableau `id => produit` avant de le retourner. La boutique et le panier n'ont alors rien à changer.
+</Checkpoint>
+
+<Checkpoint question="Indice 2">
+Script de création de table et pour l'insertion de données
+
+```sql
+CREATE TABLE produits (
+    id   INT AUTO_INCREMENT PRIMARY KEY,
+    nom  VARCHAR(100)  NOT NULL,
+    prix DECIMAL(6, 2) NOT NULL
+);
+
+INSERT INTO produits (nom, prix) VALUES
+    ('Sirop d''érable 540 ml', 14.50),
+    ('Beurre d''érable 250 g', 9.95),
+    ('Tire sur la neige',      6.00);
+```
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+
+
+```php
+<?php
+// data/produits.php (version base de données)
+$pdo = new PDO('mysql:host=localhost;dbname=boutique;charset=utf8mb4', 'root', '');
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+$lignes = $pdo->query('SELECT id, nom, prix FROM produits')->fetchAll(PDO::FETCH_ASSOC);
+
+// Reconstruire le tableau « id => produit » attendu par la boutique.
+$produits = [];
+foreach ($lignes as $ligne) {
+    $produits[(int) $ligne['id']] = [
+        'nom'  => $ligne['nom'],
+        'prix' => (float) $ligne['prix'],
+    ];
+}
+return $produits;
+```
+
+</Checkpoint> */}
+
+## Partie 2 : Premiers pas en programmation orientée objet
+
+Jusqu'ici, les données vivaient dans des tableaux et le comportement dans des fonctions. 
+La programmation orientée objet réunit les deux : 
+
+1. une **classe** est un modèle qui décrit des **attributs** (les données) et des **méthodes** (le comportement) ; 
+2. un **objet** est une instance concrète créée à partir de ce modèle avec `new`.
+
+<MarginNote type="rappel" titre="Vous en utilisez déjà">
+`PDO` vu cette semaine pour la connexion à la base de données, est une classe.  
+`new PDO(...)` crée un objet, et `$pdo->query(...)` appelle une de ses méthodes.
+</MarginNote>
+
+Une classe en PHP réunit quatre éléments : le mot-clé `class`, des attributs, un constructeur et des méthodes.
+
+```php
+<?php
+class CompteBancaire                 // 1. le mot-clé class et un nom
+{
+    private float $solde;            // 2. un attribut (donnée), ici privé
+
+    public function __construct(float $depart)   // 3. le constructeur
+    {
+        $this->solde = $depart;      //    $this désigne l'objet courant
+    }
+
+    public function deposer(float $montant): void  // 4. une méthode (comportement)
+    {
+        $this->solde += $montant;
+    }
+
+    public function solde(): float
+    {
+        return $this->solde;
+    }
+}
+
+$compte = new CompteBancaire(100);   // créer un objet avec new
+$compte->deposer(50);                // appeler une méthode avec ->
+echo $compte->solde();               // 150
+```
+
+La visibilité `public` ou `private` contrôle l'accès : un attribut `private` ne se manipule que par les méthodes de la classe. On parle d'**encapsulation** : l'objet protège ses données et n'expose que ce qu'il choisit.
+
+### Exercice 4 &ndash; Une première classe : Produit
+
+Écrivez une classe `Produit` avec deux attributs, `nom` et `prix`, un constructeur qui les reçoit, et une méthode `prixFormate()` qui retourne le prix à la québécoise. Créez ensuite un produit et affichez-le.
+
+<Checkpoint question="Indice">
+Le constructeur `__construct` reçoit les valeurs et les range dans l'objet courant avec `$this->nom = $nom`. Une méthode est une fonction déclarée dans la classe ; elle accède aux attributs par `$this->`. On instancie avec `new Produit(...)` et on appelle avec la flèche `->`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+class Produit
+{
+    public string $nom;
+    public float $prix;
+
+    public function __construct(string $nom, float $prix)
+    {
+        $this->nom = $nom;
+        $this->prix = $prix;
+    }
+
+    public function prixFormate(): string
+    {
+        return number_format($this->prix, 2, ',', ' ') . ' $';
+    }
+}
+
+$sirop = new Produit("Sirop d'érable 540 ml", 14.50);
+echo htmlspecialchars($sirop->nom) . ' : ' . $sirop->prixFormate();
+```
+
+</Checkpoint> */}
+
+### Exercice 5 &ndash; Une classe avec comportement : Panier
+
+Écrivez une classe `Panier` qui contient une liste de produits dans un attribut privé. Ajoutez trois méthodes : `ajouter(Produit $produit)`, `nombre()` qui retourne le nombre d'articles, et `total()` qui retourne la somme des prix.
+
+<Checkpoint question="Indice">
+Déclarez l'attribut `private array $articles = [];`. Étant privé, il ne se manipule que par les méthodes de la classe. `ajouter` ajoute au tableau, `nombre` renvoie `count(...)`, et `total` parcourt les produits en additionnant leur `prix`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+class Panier
+{
+    private array $articles = [];
+
+    public function ajouter(Produit $produit): void
+    {
+        $this->articles[] = $produit;
+    }
+
+    public function nombre(): int
+    {
+        return count($this->articles);
+    }
+
+    public function total(): float
+    {
+        $total = 0;
+        foreach ($this->articles as $produit) {
+            $total += $produit->prix;
+        }
+        return $total;
+    }
+}
+
+$panier = new Panier();
+$panier->ajouter(new Produit("Sirop d'érable 540 ml", 14.50));
+$panier->ajouter(new Produit('Tire sur la neige', 6.00));
+
+echo $panier->nombre() . ' articles, total : '
+    . number_format($panier->total(), 2, ',', ' ') . ' $';
+```
+
+</Checkpoint> */}
+
+## Partie 3 : Une page d'administration (CRUD)
+
+Les produits sont maintenant en base de données (partie 1, exercice 3). Une page d'administration permet de les gérer directement, sans passer par phpMyAdmin. Elle réunit les quatre opérations de base, résumées par l'acronyme **CRUD** : créer (Create), lire (Read), modifier (Update) et supprimer (Delete).
+
+Voici à quoi la liste d'administration pourrait ressembler :
+
+<TableProduitsAdmin client:visible />
+
+<Aside type="prerequis" title="Point de départ">
+Ces exercices reprennent la table `produits` de l'exercice 3 et une connexion PDO à la base `boutique`. En pratique, ces pages seraient réservées à un administrateur ; 
+la gestion des accès dépasse le cadre de cette série d'exercice.
+</Aside>
+
+### Exercice 6 &ndash; Lister les produits (Read)
+
+Créez `admin/produits.php` : la page liste tous les produits dans un tableau, avec un lien « Modifier » et « Supprimer » par ligne, et un lien pour ajouter un produit.
+
+<Checkpoint question="Indice">
+Placez la connexion PDO dans un `db.php` que toutes les pages d'administration incluront. La lecture est un simple `SELECT ... FROM produits`. Chaque lien d'action transporte l'`id` de la ligne : `modifier.php?id=...` et `supprimer.php?id=...`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// db.php
+$pdo = new PDO('mysql:host=localhost;dbname=boutique;charset=utf8mb4', 'root', '');
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+```
+
+```php
+<?php
+// admin/produits.php
+require 'db.php';
+$produits = $pdo->query('SELECT id, nom, prix FROM produits ORDER BY nom')->fetchAll(PDO::FETCH_ASSOC);
+?>
+<h1>Produits</h1>
+<a href="ajouter.php">Ajouter un produit</a>
+<table>
+    <tr><th>Nom</th><th>Prix</th><th>Actions</th></tr>
+<?php foreach ($produits as $p): ?>
+    <tr>
+        <td><?= htmlspecialchars($p['nom']) ?></td>
+        <td><?= number_format($p['prix'], 2, ',', ' ') ?> $</td>
+        <td>
+            <a href="modifier.php?id=<?= $p['id'] ?>">Modifier</a>
+            <a href="supprimer.php?id=<?= $p['id'] ?>">Supprimer</a>
+        </td>
+    </tr>
+<?php endforeach; ?>
+</table>
+```
+
+</Checkpoint> */}
+
+### Exercice 7 &ndash; Ajouter un produit (Create)
+
+Créez `admin/ajouter.php` : un formulaire (nom et prix) qui, à l'envoi, valide les données et insère le produit, puis redirige vers la liste.
+
+<Checkpoint question="Indice">
+Sur `POST`, validez le nom (non vide) et le prix (nombre positif), puis exécutez un `INSERT` préparé. Après l'insertion, `header('Location: produits.php')` renvoie vers la liste, suivi de `exit`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// admin/ajouter.php
+require 'db.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nom = trim($_POST['nom'] ?? '');
+    $prix = (float) str_replace(',', '.', $_POST['prix'] ?? '');
+
+    if ($nom !== '' && $prix >= 0) {
+        $requete = $pdo->prepare('INSERT INTO produits (nom, prix) VALUES (:nom, :prix)');
+        $requete->execute(['nom' => $nom, 'prix' => $prix]);
+        header('Location: produits.php');
+        exit;
+    }
+}
+?>
+<h1>Ajouter un produit</h1>
+<form method="post" action="ajouter.php">
+    <label>Nom : <input type="text" name="nom"></label>
+    <label>Prix : <input type="text" name="prix"></label>
+    <button>Ajouter</button>
+</form>
+```
+
+</Checkpoint> */}
+
+### Exercice 8 &ndash; Modifier un produit (Update)
+
+Créez `admin/modifier.php?id=...` : la page charge le produit visé, affiche un formulaire prérempli, puis enregistre les changements à l'envoi.
+
+<Checkpoint question="Indice">
+En `GET`, lisez le produit par son `id` (requête préparée) et préremplissez les champs avec l'attribut `value`, échappé. En `POST`, exécutez un `UPDATE ... WHERE id = :id`, puis redirigez vers la liste.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// admin/modifier.php
+require 'db.php';
+$id = (int) ($_GET['id'] ?? 0);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nom = trim($_POST['nom'] ?? '');
+    $prix = (float) str_replace(',', '.', $_POST['prix'] ?? '');
+
+    $requete = $pdo->prepare('UPDATE produits SET nom = :nom, prix = :prix WHERE id = :id');
+    $requete->execute(['nom' => $nom, 'prix' => $prix, 'id' => $id]);
+    header('Location: produits.php');
+    exit;
+}
+
+$requete = $pdo->prepare('SELECT nom, prix FROM produits WHERE id = :id');
+$requete->execute(['id' => $id]);
+$produit = $requete->fetch(PDO::FETCH_ASSOC);
+
+if ($produit === false) {
+    exit('Produit introuvable.');
+}
+?>
+<h1>Modifier le produit</h1>
+<form method="post" action="modifier.php?id=<?= $id ?>">
+    <label>Nom : <input type="text" name="nom" value="<?= htmlspecialchars($produit['nom']) ?>"></label>
+    <label>Prix : <input type="text" name="prix" value="<?= htmlspecialchars($produit['prix']) ?>"></label>
+    <button>Enregistrer</button>
+</form>
+```
+
+</Checkpoint> */}
+
+### Exercice 9 &ndash; Supprimer un produit (Delete)
+
+Créez `admin/supprimer.php?id=...` : la page demande d'abord une confirmation, et supprime le produit seulement à l'envoi du formulaire.
+
+<Checkpoint question="Indice">
+Une suppression modifie l'état du système : elle ne doit pas se faire par une simple requête `GET` (une lecture doit rester sans effet). Affichez donc une confirmation, et exécutez le `DELETE ... WHERE id = :id` uniquement sur l'envoi `POST`, avant de rediriger.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// admin/supprimer.php
+require 'db.php';
+$id = (int) ($_GET['id'] ?? 0);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $requete = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+    $requete->execute(['id' => $id]);
+    header('Location: produits.php');
+    exit;
+}
+?>
+<h1>Supprimer le produit</h1>
+<p>Cette action est définitive. Confirmer la suppression ?</p>
+<form method="post" action="supprimer.php?id=<?= $id ?>">
+    <button>Confirmer la suppression</button>
+</form>
+<a href="produits.php">Annuler</a>
+```
+
+</Checkpoint> */}
+
+{/* ## Partie 4 : Ajouter une base de données au TP1 (synthèse)
+
+Au TP1, les réservations disparaissaient au rafraîchissement. On les rend maintenant **durables et partagées** en les rangeant dans une base de données, avec PDO.
+
+<Aside type="prerequis" title="Point de départ">
+Reprenez votre TP1 (le théâtre) et ses fonctions, dont `genererPlaces`. Assurez-vous que MySQL est démarré dans XAMPP et que vous savez ouvrir phpMyAdmin.
+</Aside>
+
+### Exercice 10 &ndash; Le schéma de la base
+
+**Base de données**
+
+Dans phpMyAdmin, créez une base `theatre`, puis une table `reservations`. Une même place ne doit pas pouvoir être réservée deux fois pour la même représentation.
+
+<Checkpoint question="Indice">
+La clé primaire `id` est en `AUTO_INCREMENT`. Pour empêcher une double réservation, ajoutez une contrainte `UNIQUE` sur le couple `(representation, place)` : la base refusera alors un second enregistrement identique.
+</Checkpoint>
+
+<Checkpoint question="Solution">
+
+```sql
+CREATE TABLE reservations (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    representation VARCHAR(50)  NOT NULL,
+    place          VARCHAR(30)  NOT NULL,
+    nom            VARCHAR(100) NOT NULL,
+    courriel       VARCHAR(150) NOT NULL,
+    cree_le        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (representation, place)
+);
+```
+
+</Checkpoint>
+
+### Exercice 11 &ndash; Se connecter et lire les places réservées
+
+**Base de données**
+
+Créez `db.php` : la connexion PDO à la base `theatre`, plus une fonction `placesReservees` qui retourne la liste des identifiants de places déjà réservées pour une représentation.
+
+Signature : `placesReservees(PDO $pdo, string $representation): array`
+
+<Checkpoint question="Indice">
+Utilisez une requête préparée avec un paramètre `:rep` pour la représentation. `fetchAll(PDO::FETCH_COLUMN)` renvoie directement un tableau plat des valeurs de la colonne `place`, pratique pour tester l'appartenance ensuite.
+</Checkpoint>
+
+<Checkpoint question="Solution">
+
+```php
+<?php
+// db.php
+$pdo = new PDO('mysql:host=localhost;dbname=theatre;charset=utf8mb4', 'root', '');
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+function placesReservees(PDO $pdo, string $representation): array
+{
+    $requete = $pdo->prepare('SELECT place FROM reservations WHERE representation = :rep');
+    $requete->execute(['rep' => $representation]);
+    return $requete->fetchAll(PDO::FETCH_COLUMN);
+}
+```
+
+</Checkpoint>
+
+### Exercice 12 &ndash; Enregistrer une réservation
+
+**Base de données**
+
+Écrivez une fonction qui insère une réservation. Si la place vient d'être prise par quelqu'un d'autre, la contrainte `UNIQUE` bloque l'insertion : la fonction retourne alors `false`.
+
+Signature : `reserverPlace(PDO $pdo, string $representation, string $place, string $nom, string $courriel): bool`
+
+<Checkpoint question="Indice">
+Un `INSERT` préparé range chaque valeur dans un paramètre nommé, jamais par concaténation. Enveloppez l'exécution dans un `try/catch` : une violation de la contrainte `UNIQUE` lève une `PDOException`, que vous interceptez pour retourner `false`.
+</Checkpoint>
+
+<Checkpoint question="Solution">
+
+```php
+<?php
+function reserverPlace(PDO $pdo, string $representation, string $place, string $nom, string $courriel): bool
+{
+    try {
+        $requete = $pdo->prepare(
+            'INSERT INTO reservations (representation, place, nom, courriel)
+             VALUES (:rep, :place, :nom, :courriel)'
+        );
+        $requete->execute([
+            'rep'      => $representation,
+            'place'    => $place,
+            'nom'      => $nom,
+            'courriel' => $courriel,
+        ]);
+        return true;
+    } catch (PDOException $e) {
+        // La place était déjà réservée (contrainte UNIQUE).
+        return false;
+    }
+}
+```
+
+</Checkpoint>
+
+### Exercice 13 &ndash; Intégrer au plan de salle
+
+**Intégration**
+
+Modifiez `reserve.php` du TP1 pour utiliser la base : marquez comme réservées, dans le plan, les places renvoyées par `placesReservees`, et remplacez la mise à jour en mémoire par un appel à `reserverPlace`. Vérifiez ensuite qu'une réservation survit à un rafraîchissement.
+
+<Checkpoint question="Indice">
+Après avoir généré les places, parcourez la liste de `placesReservees` et passez l'état de chacune à `reserve`. Sur un envoi valide, appelez `reserverPlace` : si elle retourne `false`, ajoutez une erreur « place déjà prise » au lieu de confirmer.
+</Checkpoint>
+
+<Checkpoint question="Solution">
+
+```php
+<?php
+require 'db.php';
+
+$config = require 'data/salle.php';
+$places = genererPlaces($config); // fonction du TP1
+
+// Marquer les places déjà réservées d'après la base.
+foreach (placesReservees($pdo, $repId) as $id) {
+    if (isset($places[$id])) {
+        $places[$id]['etat'] = 'reserve';
+    }
+}
+
+// Sur un envoi valide (nom, courriel et place vérifiés) :
+if (empty($erreurs)) {
+    if (reserverPlace($pdo, $repId, $placeChoisie, $nom, $courriel)) {
+        $confirmation = $placeChoisie;
+    } else {
+        $erreurs[] = "Cette place vient d'être réservée par quelqu'un d'autre.";
+    }
+}
+```
+
+</Checkpoint>
+
+<Highlight couleur="ambre">
+Contrairement à la session, les réservations rangées en base sont **durables** (elles survivent au rafraîchissement et au redémarrage) et **partagées** : tous les visiteurs voient les mêmes places occupées. C'est la différence de fond entre une session et une base de données.
+</Highlight>
+
+<MarginNote type="lien">
+Vous avez parcouru les deux mécanismes de préservation : la session pour l'état d'une visite (le panier), et la base de données pour les données durables et communes, gérées ici par une page d'administration (les produits) et par le TP1 (les réservations).
+</MarginNote> */}

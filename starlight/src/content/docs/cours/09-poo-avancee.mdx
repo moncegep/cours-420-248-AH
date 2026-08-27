@@ -1,0 +1,114 @@
+---
+title: Notions avancées de la programmation orientée objet
+description: Les notions avancées de l'orienté objet (composition, héritage, polymorphisme), illustrés en JavaScript, en Java et en PHP.
+sidebar:
+  order: 10
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+
+## L'héritage
+
+### Des familles de produits
+
+Tous les produits ne sont pas toujours traitées de la même façon et peuvent avoir des règles ou attributs qui diffèrent
+de l'ensemble des produits. Par exemple, un produit en promotion a un rabais et une règle de calcul; un produit périssable
+a une date de péremption; un produit renouvelable a une fréquence de renouvellement.  
+Chacun reste un produit, avec les même caractéristiques de base (nom, prix, disponibilité), mais ajoute ou adapte quelque chose.
+
+On exprime cela par une **famille de classes** : une classe générale `Produit`, et des classes spécialisées qui en **héritent**. 
+Une classe qui hérite reprend toute la structure de la classe générale et la complète: elle reprend ses attributs 
+et ses méthodes, puis en ajoute ou en redéfinit.
+
+Autrement dit, un produit en promotion est un produit, avec un rabais en plus. 
+
+### Traduction en code
+
+Supposons qu'on cherche à distinguer un produit en promotion (`ProduitEnPromotion`) d'un produit régulier (`Produit`).
+`ProduitEnPromotion` est un `Produit`, avec un rabais en plus et un affichage du prix modifié.
+Il devrait donc hériter tous les attributs et méthodes de `Produit` (parent) et définir un attribut pour 
+le montant du rabais et redéfinir la méthode `prixFormate()` pour afficher le rabais.
+
+Le constructeur de la sous-classe `ProduitEnPromotion` appelle celui du parent (`Produit`) pour initialiser
+les attributs hérités du parent. La sous-classe redéfinie également `prixFormate()`, mais utilise dans sa définition celle du parent.
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class ProduitEnPromotion extends Produit {
+  constructor(nom, prix, rabais) {
+    super(nom, prix);
+    this.rabais = rabais;
+  }
+
+  prixFormate() {
+    return super.prixFormate() + ` (rabais ${this.rabais} %)`;
+  }
+}
+```
+
+- Relation d'héritage: `extends` (enfant extends parent)
+- Appel du constructeur du parent: `super()`
+- Appel d'une méthode du parent : `super.prixFormate()`
+
+</TabItem>
+<TabItem  label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+class ProduitEnPromotion extends Produit
+{
+    public int $rabais;
+
+    public function __construct(string $nom, float $prix, int $rabais)
+    {
+        parent::__construct($nom, $prix);
+        $this->rabais = $rabais;
+    }
+
+    public function prixFormate(): string
+    {
+        return parent::prixFormate() . " (rabais {$this->rabais} %)";
+    }
+}
+```
+
+- Relation d'héritage: `extends` (enfant extends parent)
+- Appel du constructeur du parent: `parent::__construct`
+- Appel d'une méthode du parent : `parent::prixFormate()`
+
+</TabItem>
+<TabItem  label="Java" icon='seti:java'>
+
+```java
+public class ProduitEnPromotion extends Produit {
+    private int rabais;
+
+    public ProduitEnPromotion(String nom, double prix, int rabais) {
+        super(nom, prix);
+        this.rabais = rabais;
+    }
+
+    @Override
+    public String prixFormate() {
+        return super.prixFormate() + " (rabais " + rabais + " %)";
+    }
+}
+```
+
+- Relation d'héritage: `extends` (enfant extends parent)
+- Appel du constructeur du parent: `super()`
+- Appel d'une méthode du parent : `super.prixFormate()`
+
+</TabItem>
+</Tabs>
+
+Un `ProduitEnPromotion` s'utilise comme un `Produit` (il en possède tout), mais son `prixFormate` ajoute la mention du rabais. 
+C'est le principe de l'héritage : réutiliser sans recopier, et spécialiser ou contraindre au besoin.

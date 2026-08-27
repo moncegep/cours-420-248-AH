@@ -1,0 +1,375 @@
+---
+title: "Structurer le code : POO avancée et MVC"
+description: Approfondir la programmation orientée objet (constantes, membres statiques, classes abstraites, interfaces, composition) et s'en servir pour organiser une application selon le patron modèle-vue-contrôleur.
+sidebar:
+  order: 10
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import { Steps } from '@astrojs/starlight/components';
+
+Vos pages fonctionnent, mais elles font tout à la fois : lire les paramètres, interroger la base, valider un formulaire et produire du HTML. Tant que le fichier est court, cela se tient. Passé quelques centaines de lignes, retrouver la ligne à corriger devient pénible, et deux personnes ne peuvent plus travailler sans se gêner.
+
+Ce chapitre répond à cette difficulté en deux temps. D'abord, quelques outils supplémentaires de la programmation orientée objet, ceux qui servent à poser des frontières nettes entre les parties d'un système. Ensuite, un patron d'organisation qui répartit le code en trois responsabilités : le **modèle**, la **vue** et le **contrôleur**.
+
+<Aside type="prerequis" title="Avant de commencer">
+Ce chapitre prolonge [les bases de la programmation orientée objet](/cours/09-poo) (classes, objets, encapsulation, héritage) et suppose que vous avez manipulé PDO au chapitre [Préserver les données](/cours/07-preservation).
+</Aside>
+
+## Approfondir la programmation orientée objet
+
+### Constantes et membres statiques
+
+Une valeur qui ne change jamais et qui appartient à la classe plutôt qu'à un objet particulier se déclare en **constante**, avec `const`. Un membre **statique** (`static`) appartient lui aussi à la classe : il existe sans qu'on crée d'objet.
+
+On accède aux deux avec l'opérateur `::`, et à l'intérieur de la classe on écrit `self::`.
+
+```php
+<?php
+class Produit
+{
+    public const TAUX_TPS = 0.05;
+    private static int $compteur = 0;
+
+    public function __construct(public string $nom, public float $prix)
+    {
+        self::$compteur++;
+    }
+
+    public function prixAvecTaxe(): float
+    {
+        return $this->prix * (1 + self::TAUX_TPS);
+    }
+
+    public static function nombreCrees(): int
+    {
+        return self::$compteur;
+    }
+}
+
+echo Produit::TAUX_TPS;        // 0.05, sans créer d'objet
+new Produit('Sirop', 14.50);
+echo Produit::nombreCrees();   // 1
+```
+
+<MarginNote type="astuce" titre="Promotion des paramètres">
+`public function __construct(public string $nom, ...)` déclare l'attribut et l'affecte en une seule écriture. Cette forme abrégée existe depuis PHP 8 et évite les affectations répétitives dans le constructeur.
+</MarginNote>
+
+### Classes abstraites
+
+Une **classe abstraite** sert de base commune : elle ne s'instancie pas directement, mais rassemble ce que partagent ses sous-classes et impose les méthodes qu'elles doivent fournir. Une méthode déclarée `abstract` n'a pas de corps ; chaque sous-classe doit l'écrire.
+
+```php
+<?php
+abstract class Article
+{
+    public function __construct(protected string $nom, protected float $prix) {}
+
+    // Commun à tous les articles.
+    public function etiquette(): string
+    {
+        return $this->nom . ' : ' . number_format($this->prixFinal(), 2, ',', ' ') . ' $';
+    }
+
+    // Chaque sous-classe décide de son prix final.
+    abstract public function prixFinal(): float;
+}
+
+class ArticleRegulier extends Article
+{
+    public function prixFinal(): float
+    {
+        return $this->prix;
+    }
+}
+
+class ArticleEnSolde extends Article
+{
+    public function __construct(string $nom, float $prix, private int $rabais)
+    {
+        parent::__construct($nom, $prix);
+    }
+
+    public function prixFinal(): float
+    {
+        return $this->prix * (1 - $this->rabais / 100);
+    }
+}
+
+$articles = [
+    new ArticleRegulier("Sirop d'érable 540 ml", 14.50),
+    new ArticleEnSolde('Tire sur la neige', 6.00, 20),
+];
+
+foreach ($articles as $article) {
+    echo $article->etiquette() . '<br>';
+}
+```
+
+La boucle traite les deux objets de la même façon, alors que chacun calcule son prix à sa manière. C'est le **polymorphisme** : un même appel, des comportements différents selon le type réel de l'objet.
+
+<Highlight couleur="ambre">
+L'intérêt tient dans la boucle : elle ne connaît que `Article`. Ajouter demain un `ArticleLiquide` avec sa propre règle de prix ne demande aucune modification du code qui l'affiche.
+</Highlight>
+
+### Interfaces
+
+Une **interface** ne contient aucun code : seulement une liste de méthodes qu'une classe s'engage à fournir. Là où une classe abstraite partage une implémentation entre parents et enfants, une interface décrit un contrat que n'importe quelle classe peut remplir, même sans lien de parenté. Une classe n'a qu'un seul parent, mais elle peut appliquer plusieurs interfaces.
+
+```php
+<?php
+interface SourceDeTravaux
+{
+    public function travaux(): array;
+    public function travail(string $id): ?array;
+}
+
+class SourceFichier implements SourceDeTravaux
+{
+    public function __construct(private array $donnees) {}
+
+    public function travaux(): array
+    {
+        return $this->donnees['travaux'];
+    }
+
+    public function travail(string $id): ?array
+    {
+        return $this->donnees['travaux'][$id] ?? null;
+    }
+}
+```
+
+Le reste de l'application déclare attendre une `SourceDeTravaux`, sans savoir laquelle. Une `SourceApi` qui interrogerait la vraie plateforme s'y substituerait sans changer une ligne ailleurs, du moment qu'elle applique la même interface.
+
+<MarginNote type="definition" titre="Abstraite ou interface ?">
+Une **classe abstraite** répond à « ces classes sont de la même famille et partagent du code ». Une **interface** répond à « ces classes savent faire la même chose », même sans famille commune. En cas de doute, l'interface est le choix le plus souple.
+</MarginNote>
+
+### Composition : associer plutôt qu'hériter
+
+L'héritage exprime « est un » : un article en solde **est un** article. La **composition** exprime « possède un » : un panier **possède des** produits ; un dépôt de données **possède une** connexion.
+
+```php
+<?php
+class DepotDisponibilites
+{
+    // Le dépôt possède une connexion : il ne descend pas de PDO.
+    public function __construct(private PDO $pdo) {}
+
+    public function pourTravail(string $travail): array
+    {
+        $requete = $this->pdo->prepare(
+            'SELECT etudiant, creneau FROM disponibilites WHERE travail = :t'
+        );
+        $requete->execute(['t' => $travail]);
+        return $requete->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+```
+
+Recevoir la connexion par le constructeur plutôt que la créer soi-même s'appelle l'**injection de dépendances**. La classe reste utilisable avec n'importe quelle connexion, ce qui simplifie les tests et les changements de configuration.
+
+<Checkpoint question="Héritage ou composition pour une classe Facture qui doit additionner des produits ?">
+La composition. Une facture n'**est pas** un produit : elle **possède** une liste de produits. On lui donne donc un attribut contenant les produits, plutôt que de la faire hériter de `Produit`. Une bonne règle : si la phrase « est un » sonne faux, c'est de la composition.
+</Checkpoint>
+
+## Le patron modèle-vue-contrôleur
+
+Ces outils servent maintenant à répartir le code. Le patron **MVC** distingue trois responsabilités.
+
+- Le **modèle** détient les données et les règles du domaine : lire et écrire en base, calculer, valider. Il ne produit aucun HTML et ignore tout des formulaires.
+- La **vue** produit l'affichage. Elle reçoit des données déjà prêtes et se contente de les présenter, en les échappant. Elle ne fait ni requête ni décision.
+- Le **contrôleur** reçoit la requête, lit les paramètres, appelle le modèle, choisit la vue et lui transmet les données.
+
+<MarginNote type="rappel" titre="Une répartition, pas une technologie">
+MVC n'est ni une extension ni une bibliothèque : c'est une façon de ranger le code. On l'applique en PHP pur, avec des fichiers et des dossiers.
+</MarginNote>
+
+### Le trajet d'une requête
+
+<Steps>
+
+1. Le navigateur demande `travail.php?travail=labo-pdo`.
+2. Le **contrôleur** lit `$_GET['travail']`, vérifie que le travail existe et, sinon, redirige.
+3. Il demande au **modèle** les données nécessaires : le travail, les disponibilités par créneau, le meilleur créneau.
+4. Il transmet ces données à la **vue**, qui produit le HTML.
+5. La réponse part vers le navigateur.
+
+</Steps>
+
+### La même page, avant et après
+
+Voici un extrait typique de page qui mélange tout : requête, décision et affichage.
+
+```php
+<?php
+// travail.php (tout mélangé)
+$pdo = new PDO('mysql:host=localhost;dbname=dex;charset=utf8mb4', 'root', '');
+$id = $_GET['travail'] ?? '';
+
+$requete = $pdo->prepare('SELECT etudiant, creneau FROM disponibilites WHERE travail = :t');
+$requete->execute(['t' => $id]);
+
+echo '<h1>Disponibilités</h1><ul>';
+foreach ($requete->fetchAll(PDO::FETCH_ASSOC) as $ligne) {
+    echo '<li>' . htmlspecialchars($ligne['etudiant']) . ' : '
+        . htmlspecialchars($ligne['creneau']) . '</li>';
+}
+echo '</ul>';
+```
+
+La même chose répartie en trois responsabilités. Le modèle ne connaît que les données :
+
+```php
+<?php
+// modeles/Coordination.php
+class Coordination
+{
+    public function __construct(private PDO $pdo, private string $travail) {}
+
+    public function disponibilites(): array
+    {
+        $requete = $this->pdo->prepare(
+            'SELECT etudiant, creneau FROM disponibilites WHERE travail = :t'
+        );
+        $requete->execute(['t' => $this->travail]);
+        return $requete->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+```
+
+La vue ne connaît que l'affichage :
+
+```php
+<?php // vues/disponibilites.php ?>
+<h1>Disponibilités</h1>
+<ul>
+<?php foreach ($disponibilites as $ligne): ?>
+    <li>
+        <?= htmlspecialchars($ligne['etudiant']) ?> :
+        <?= htmlspecialchars($ligne['creneau']) ?>
+    </li>
+<?php endforeach; ?>
+</ul>
+```
+
+Le contrôleur relie les deux :
+
+```php
+<?php
+// travail.php (contrôleur)
+require 'config/connexion.php';          // fournit $pdo
+require 'modeles/Coordination.php';
+
+$id = $_GET['travail'] ?? '';
+if ($id === '') {
+    header('Location: index.php');
+    exit;
+}
+
+$coordination = new Coordination($pdo, $id);
+$disponibilites = $coordination->disponibilites();   // données prêtes pour la vue
+
+require 'vues/disponibilites.php';
+```
+
+<Aside type="exemple" title="Une organisation de dossiers possible">
+
+```text
+projet/
+├── index.php              contrôleur : liste des travaux
+├── travail.php            contrôleur : un travail
+├── config/connexion.php   la connexion PDO
+├── modeles/               les classes du domaine
+│   ├── Coordination.php
+│   └── Plateforme.php
+├── vues/                  les gabarits d'affichage
+│   ├── entete.php
+│   ├── disponibilites.php
+│   └── pied.php
+└── data/                  les jeux de données
+```
+
+</Aside>
+
+### Ce que la répartition apporte
+
+- **Retrouver le code** : une erreur d'affichage se corrige dans `vues/`, une erreur de calcul dans `modeles/`.
+- **Réutiliser** : la même classe `Coordination` sert à une page HTML et à une réponse JSON, sans duplication.
+- **Travailler à plusieurs** : deux personnes modifient une vue et un modèle sans se gêner.
+- **Remplacer une partie** : changer la source des travaux ne touche ni les vues ni les contrôleurs, si le modèle applique une interface.
+
+<Highlight couleur="ambre">
+Une règle simple pour vérifier votre découpage : aucune balise HTML dans un modèle, aucune requête SQL dans une vue. Si l'un des deux se produit, la responsabilité est au mauvais endroit.
+</Highlight>
+
+<Aside type="astuce" title="Et les cadriciels ?">
+Symfony et Laravel reposent sur cette même répartition, avec en plus un routeur, un moteur de gabarits et une couche d'accès aux données. Les comprendre commence par comprendre MVC en PHP pur, ce que vous faites ici.
+</Aside>
+
+## Récapitulatif
+
+- `const` et `static` appartiennent à la classe plutôt qu'à un objet ; on y accède avec `::` et `self::`.
+- Une **classe abstraite** rassemble ce que partagent ses sous-classes et impose des méthodes ; le **polymorphisme** permet de les traiter uniformément.
+- Une **interface** décrit un contrat sans code ; une classe peut en appliquer plusieurs, ce qui rend les parties interchangeables.
+- La **composition** (« possède un ») et l'**injection de dépendances** évitent des héritages artificiels et facilitent les changements.
+- **MVC** répartit le code en trois responsabilités : le modèle (données et règles), la vue (affichage échappé), le contrôleur (requête, orchestration, choix de la vue).
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Dans une organisation MVC, où se trouve une requête SQL ?"
+  options={[
+    { texte: "Dans la vue, au plus près de l'affichage", correct: false },
+    { texte: "Dans le modèle", correct: true },
+    { texte: "Dans le contrôleur, pour aller plus vite", correct: false },
+  ]}
+  retour="L'accès aux données appartient au modèle. La vue affiche des données déjà prêtes, et le contrôleur se contente d'orchestrer."
+/>
+
+<Quiz
+  client:visible
+  question="Qu'est-ce qui distingue une interface d'une classe abstraite ?"
+  options={[
+    { texte: "L'interface ne contient aucun code, et une classe peut en appliquer plusieurs", correct: true },
+    { texte: "L'interface s'instancie avec new, contrairement à la classe abstraite", correct: false },
+    { texte: "Il n'y a aucune différence en PHP", correct: false },
+  ]}
+  retour="Une interface est un contrat sans implémentation, et une classe peut en appliquer plusieurs. Une classe abstraite partage du code, mais une classe n'a qu'un seul parent."
+/>
+
+<Quiz
+  client:visible
+  question="Comment accède-t-on à une constante de classe en PHP ?"
+  options={[
+    { texte: "Avec la flèche, sur un objet", correct: false },
+    { texte: "Avec les deux points : Produit::TAUX_TPS", correct: true },
+    { texte: "Avec le point, comme en JavaScript", correct: false },
+  ]}
+  retour="Les éléments de classe (constantes, membres statiques) s'atteignent avec ::, et self:: à l'intérieur de la classe. La flèche sert aux membres d'un objet."
+/>
+
+<Quiz
+  client:visible
+  question="Une classe Facture doit contenir plusieurs produits. Quel lien choisir ?"
+  options={[
+    { texte: "L'héritage : Facture extends Produit", correct: false },
+    { texte: "La composition : la facture possède une liste de produits", correct: true },
+    { texte: "Une interface : Facture implements Produit", correct: false },
+  ]}
+  retour="Une facture n'est pas un produit, elle en possède : c'est de la composition. L'héritage se réserve aux relations « est un »."
+/>
+
+## Références
+
+- [php.net : classes abstraites](https://www.php.net/manual/fr/language.oop5.abstract.php)
+- [php.net : interfaces](https://www.php.net/manual/fr/language.oop5.interfaces.php)
+- [php.net : membres statiques](https://www.php.net/manual/fr/language.oop5.static.php)
+- [php.net : promotion des propriétés du constructeur](https://www.php.net/manual/fr/language.oop5.decon.php)

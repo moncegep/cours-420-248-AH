@@ -1,0 +1,666 @@
+---
+title: Construire la plateforme Decoupe
+description: "Une série d'exercices de synthèse pour construire Decoupe, une plateforme de salons de coiffure : pages générées côté serveur, fragments réutilisables, fonctions de recherche et de filtrage, puis une API JSON avec paramètres, POST, PUT et DELETE."
+sidebar:
+  order: 10
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+
+Cette série d'exercice vise à construire **Decoupe**, une plateforme qui répertorie des salons de coiffure. 
+On avance par étapes : d'abord les pages du site générées côté serveur, pour terminer avec une API qui expose
+ les mêmes données en JSON. 
+
+Chaque exercice réutilise le précédent, alors conservez votre code d'une étape à l'autre.
+> Le travail sera fait dans un dossier `decoupe`, à créer dans le dossier XAMPP `htdocs`.
+
+## Les données
+
+Toutes les pages s'appuient sur le même fichier de données, fourni ci-dessous. 
+Il retourne un tableau de douze salons. 
+
+Chaque salon possède un identifiant, un nom, une ville, une note, un indicateur de promotion, un horaire et une liste de services. Chaque service précise son nom, un court descriptif, un prix de base et sa clientèle (`homme`, `femme` ou `mixte`).
+
+```php
+<?php
+// decoupe/data/salons.php
+return [
+    [
+        'id' => 1, 'nom' => 'Studio Ciseaux', 'ville' => 'Montréal',
+        'note' => 4.7, 'promotion' => true,
+        'horaire' => 'Mardi au samedi, 9 h à 18 h',
+        'services' => [
+            ['nom' => 'Coupe homme',    'description' => 'Coupe classique aux ciseaux', 'prix_base' => 25, 'clientele' => 'homme'],
+            ['nom' => 'Coloration',     'description' => 'Couleur complète',             'prix_base' => 60, 'clientele' => 'femme'],
+            ['nom' => 'Taille de barbe','description' => 'Contour et entretien',          'prix_base' => 18, 'clientele' => 'homme'],
+        ],
+    ],
+    [
+        'id' => 2, 'nom' => 'La Belle Mèche', 'ville' => 'Québec',
+        'note' => 4.9, 'promotion' => false,
+        'horaire' => 'Lundi au vendredi, 10 h à 19 h',
+        'services' => [
+            ['nom' => 'Coupe femme',    'description' => 'Coupe et brushing',        'prix_base' => 45, 'clientele' => 'femme'],
+            ['nom' => 'Mise en plis',   'description' => 'Coiffure pour occasion',   'prix_base' => 35, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 3, 'nom' => 'Tif et Style', 'ville' => 'Montréal',
+        'note' => 4.3, 'promotion' => true,
+        'horaire' => 'Mardi au samedi, 9 h à 17 h',
+        'services' => [
+            ['nom' => 'Coupe homme',        'description' => 'Coupe tendance',              'prix_base' => 22, 'clientele' => 'homme'],
+            ['nom' => 'Rasage traditionnel','description' => 'Rasage à la serviette chaude', 'prix_base' => 30, 'clientele' => 'homme'],
+        ],
+    ],
+    [
+        'id' => 4, 'nom' => 'Coupe et Compagnie', 'ville' => 'Laval',
+        'note' => 4.1, 'promotion' => false,
+        'horaire' => 'Lundi au samedi, 9 h à 20 h',
+        'services' => [
+            ['nom' => 'Coupe enfant', 'description' => 'Pour les 12 ans et moins', 'prix_base' => 18, 'clientele' => 'mixte'],
+            ['nom' => 'Coupe femme',  'description' => 'Coupe simple',              'prix_base' => 40, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 5, 'nom' => "L'Atelier du Cheveu", 'ville' => 'Longueuil',
+        'note' => 4.6, 'promotion' => true,
+        'horaire' => 'Mardi au vendredi, 9 h à 18 h',
+        'services' => [
+            ['nom' => 'Balayage',    'description' => 'Éclaircissement progressif', 'prix_base' => 90, 'clientele' => 'femme'],
+            ['nom' => 'Coupe femme', 'description' => 'Coupe et coiffage',          'prix_base' => 42, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 6, 'nom' => 'Barbe et Lame', 'ville' => 'Gatineau',
+        'note' => 4.8, 'promotion' => false,
+        'horaire' => 'Lundi au vendredi, 8 h à 17 h',
+        'services' => [
+            ['nom' => 'Rasage traditionnel','description' => 'Rasage complet au coupe-chou', 'prix_base' => 32, 'clientele' => 'homme'],
+            ['nom' => 'Taille de barbe',    'description' => 'Mise en forme et huile',        'prix_base' => 20, 'clientele' => 'homme'],
+        ],
+    ],
+    [
+        'id' => 7, 'nom' => 'Chez Manon', 'ville' => 'Sherbrooke',
+        'note' => 4.2, 'promotion' => false,
+        'horaire' => 'Mardi au samedi, 9 h à 18 h',
+        'services' => [
+            ['nom' => 'Coupe femme', 'description' => 'Coupe et brushing', 'prix_base' => 38, 'clientele' => 'femme'],
+            ['nom' => 'Coloration',  'description' => 'Retouche de racines', 'prix_base' => 55, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 8, 'nom' => 'Le Salon Nordique', 'ville' => 'Trois-Rivières',
+        'note' => 4.5, 'promotion' => true,
+        'horaire' => 'Mercredi au dimanche, 10 h à 18 h',
+        'services' => [
+            ['nom' => 'Coupe homme',  'description' => 'Coupe et coiffage',        'prix_base' => 26, 'clientele' => 'homme'],
+            ['nom' => 'Coupe enfant', 'description' => 'Pour les 12 ans et moins', 'prix_base' => 16, 'clientele' => 'mixte'],
+        ],
+    ],
+    [
+        'id' => 9, 'nom' => 'Coiffure Éclat', 'ville' => 'Montréal',
+        'note' => 4.4, 'promotion' => false,
+        'horaire' => 'Lundi au vendredi, 9 h à 19 h',
+        'services' => [
+            ['nom' => 'Mise en plis', 'description' => 'Coiffure pour occasion',    'prix_base' => 34, 'clientele' => 'femme'],
+            ['nom' => 'Balayage',     'description' => 'Reflets sur mesure',         'prix_base' => 85, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 10, 'nom' => 'Tendance Studio', 'ville' => 'Laval',
+        'note' => 4.0, 'promotion' => true,
+        'horaire' => 'Mardi au samedi, 10 h à 18 h',
+        'services' => [
+            ['nom' => 'Coupe femme', 'description' => 'Coupe moderne',      'prix_base' => 39, 'clientele' => 'femme'],
+            ['nom' => 'Coupe homme', 'description' => 'Coupe et dégradé',   'prix_base' => 24, 'clientele' => 'homme'],
+        ],
+    ],
+    [
+        'id' => 11, 'nom' => 'La Griffe', 'ville' => 'Québec',
+        'note' => 4.7, 'promotion' => false,
+        'horaire' => 'Lundi au samedi, 9 h à 18 h',
+        'services' => [
+            ['nom' => 'Coloration',  'description' => 'Couleur complète', 'prix_base' => 62, 'clientele' => 'femme'],
+            ['nom' => 'Coupe femme', 'description' => 'Coupe et brushing', 'prix_base' => 44, 'clientele' => 'femme'],
+        ],
+    ],
+    [
+        'id' => 12, 'nom' => "Ciseaux d'Or", 'ville' => 'Montréal',
+        'note' => 4.9, 'promotion' => true,
+        'horaire' => 'Mardi au dimanche, 9 h à 20 h',
+        'services' => [
+            ['nom' => 'Coupe homme',        'description' => 'Coupe et coiffage',  'prix_base' => 28, 'clientele' => 'homme'],
+            ['nom' => 'Rasage traditionnel','description' => 'Rasage à chaud',       'prix_base' => 33, 'clientele' => 'homme'],
+            ['nom' => 'Balayage',           'description' => 'Éclaircissement doux', 'prix_base' => 95, 'clientele' => 'femme'],
+        ],
+    ],
+];
+```
+
+{/* L'arborescence visée à la fin de la série :
+
+```text
+decoupe/
+├── data/
+│   └── salons.php          // fourni
+├── fragments/
+│   ├── entete.php          // exercice 4
+│   ├── pied.php            // exercice 4
+│   └── carte-salon.php     // exercice 4
+├── accueil.php             // exercices 3 et 4
+├── salons.php              // exercices 1 et 4
+├── salon.php               // exercice 2
+└── api/
+    └── salons.php           // exercices 5 à 8
+``` */}
+
+<MarginNote type="rappel" titre="Charger les données">
+Lorsqu'un fichier PHP se terminant par `return` est inclus dans un autre fichier (via `require` ou `include`), 
+ce fichier récupère la valeur retournée. Celle-ci peut être immédiatement stockée dans une variable.
+**Exemple:** `$salons = require 'data/salons.php';`.
+</MarginNote>
+
+## Rappels utiles
+
+### Utilisation de `htmlspecialchars`
+
+Toute donnée affichée dans une page doit être échappée avec `htmlspecialchars()` : un nom de salon, une ville, un service, ou toute valeur venue des données ou du client.
+
+### Fonctions utilitaires
+
+<table>
+  <thead>
+    <tr>
+      <th>Fonction</th>
+      <th>Rôle</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`htmlspecialchars($texte)`</td>
+      <td>Échapper une valeur avant de l'insérer dans du HTML.</td>
+    </tr>
+    <tr>
+      <td>`number_format($n, 2, ',', ' ')`</td>
+      <td>Afficher un prix avec deux décimales, une virgule et un espace pour les milliers.</td>
+    </tr>
+    <tr>
+      <td>`array_filter($liste, $test)`</td>
+      <td>Ne garder que les éléments qui satisfont une condition.</td>
+    </tr>
+    <tr>
+      <td>`array_values($liste)`</td>
+      <td>Réindexer une liste après un filtrage.</td>
+    </tr>
+    <tr>
+      <td>`count($liste)`</td>
+      <td>Compter les éléments d'un tableau.</td>
+    </tr>
+    <tr>
+      <td>`trim($texte)`</td>
+      <td>Retirer les espaces au début et à la fin d'une chaîne.</td>
+    </tr>
+    <tr>
+      <td>`json_encode` et `json_decode`</td>
+      <td>Convertir entre un tableau PHP et du texte JSON.</td>
+    </tr>
+  </tbody>
+</table>
+
+## Niveau 1 : Les pages du site
+
+### Exercice 1 &ndash; La liste des salons
+
+Créez la page `salons.php`. La page charge les données présentées plus haut, 
+puis affiche chaque salon avec son nom, sa ville et sa note. Le nom est un lien
+vers la page de détail, `salon.php?id=...`, que vous construirez à l'exercice suivant. 
+**Échappez toute donnée affichée.**
+
+<Checkpoint question="Indice">
+`require` renvoie le tableau des salons. Parcourez-le avec `foreach`. Pour le lien, insérez l'identifiant dans l'URL : `salon.php?id=<?= $salon['id'] ?>`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// salons.php
+$salons = require 'data/salons.php';
+?>
+<h1>Nos salons partenaires</h1>
+<ul>
+<?php foreach ($salons as $salon): ?>
+    <li>
+        <a href="salon.php?id=<?= $salon['id'] ?>">
+            <?= htmlspecialchars($salon['nom']) ?>
+        </a>
+        (<?= htmlspecialchars($salon['ville']) ?>), note : <?= $salon['note'] ?>
+    </li>
+<?php endforeach; ?>
+</ul>
+```
+
+</Checkpoint> */}
+
+### Exercice 2 &ndash; Le détail d'un salon
+
+Créez maintenant la page `salon.php`. La page lit l'identifiant passé en paramètre
+et affiche le salon correspondant : nom, ville, note, horaire, et la liste des 
+services avec leur descriptif, leur prix et leur clientèle. 
+
+Écrivez d'abord une fonction qui retrouve un salon par son identifiant, puis affichez
+un formulaire de prise de rendez-vous (méthode POST) demandant le nom du client et 
+une date. Si l'identifiant ne correspond à aucun salon, affichez un message et renvoyez un statut 404 (avec `http_response_code`).
+
+Signature : `trouverSalon(array $salons, int $id): ?array`
+
+<Checkpoint question="Indice">
+La fonction reprend le patron de recherche : un `foreach`, un `return` dès qu'un `id` correspond, et `return null` à la fin. Convertissez `$_GET['id']` en entier avec `(int)`. Pour le prix, `number_format` donne un affichage soigné. Le formulaire renvoie vers la même page, donc son `action` conserve l'identifiant.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// salon.php
+$salons = require 'data/salons.php';
+
+function trouverSalon(array $salons, int $id): ?array
+{
+    foreach ($salons as $salon) {
+        if ($salon['id'] === $id) {
+            return $salon;
+        }
+    }
+    return null;
+}
+
+$id = (int) ($_GET['id'] ?? 0);
+$salon = trouverSalon($salons, $id);
+
+if ($salon === null) {
+    http_response_code(404);
+    echo '<p>Salon introuvable.</p>';
+    exit;
+}
+
+// Traitement du formulaire de rendez-vous.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $client = trim($_POST['client'] ?? '');
+    $date = $_POST['date'] ?? '';
+    if ($client !== '' && $date !== '') {
+        echo '<p>Merci ' . htmlspecialchars($client)
+            . ', votre demande pour le ' . htmlspecialchars($date) . ' est enregistrée.</p>';
+    }
+}
+?>
+<h1><?= htmlspecialchars($salon['nom']) ?></h1>
+<p>Ville : <?= htmlspecialchars($salon['ville']) ?></p>
+<p>Note : <?= $salon['note'] ?></p>
+<p>Horaire : <?= htmlspecialchars($salon['horaire']) ?></p>
+
+<h2>Services</h2>
+<ul>
+<?php foreach ($salon['services'] as $service): ?>
+    <li>
+        <?= htmlspecialchars($service['nom']) ?>
+        (<?= htmlspecialchars($service['clientele']) ?>) :
+        <?= number_format($service['prix_base'], 2, ',', ' ') ?> $
+        <br>
+        <?= htmlspecialchars($service['description']) ?>
+    </li>
+<?php endforeach; ?>
+</ul>
+
+<h2>Prendre rendez-vous</h2>
+<form method="post" action="salon.php?id=<?= $salon['id'] ?>">
+    <label>Votre nom : <input type="text" name="client"></label>
+    <label>Date souhaitée : <input type="date" name="date"></label>
+    <button>Réserver</button>
+</form>
+```
+
+</Checkpoint> */}
+
+### Exercice 3 &ndash; Les salons en promotion
+
+Créez la page d'entrée du site `accueil.php`. Elle met en avant seulement les salons en promotion. 
+
+Écrivez une fonction qui reçoit tous les salons et retourne uniquement ceux dont la promotion est active, puis affichez le résultat.
+
+Signature : `salonsEnPromotion(array $salons): array`
+
+<Checkpoint question="Indice">
+Parcourez les salons et ajoutez au résultat ceux dont `promotion` vaut `true`.  
+La fonction `array_filter` fait la même chose en une expression, avec une fonction fléchée : 
+`array_filter($salons, fn($s) => $s['promotion'])`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// accueil.php
+$salons = require 'data/salons.php';
+
+function salonsEnPromotion(array $salons): array
+{
+    $resultat = [];
+    foreach ($salons as $salon) {
+        if ($salon['promotion'] === true) {
+            $resultat[] = $salon;
+        }
+    }
+    return $resultat;
+}
+
+$promotions = salonsEnPromotion($salons);
+?>
+<h1>Nos salons en promotion</h1>
+<ul>
+<?php foreach ($promotions as $salon): ?>
+    <li>
+        <a href="salon.php?id=<?= $salon['id'] ?>">
+            <?= htmlspecialchars($salon['nom']) ?>
+        </a>
+        (<?= htmlspecialchars($salon['ville']) ?>)
+    </li>
+<?php endforeach; ?>
+</ul>
+```
+
+</Checkpoint> */}
+
+### Exercice 4 &ndash; Optimiser avec des fragments réutilisables
+
+Les pages `salons.php` et `accueil.php` répètent le même affichage de salon, et chaque page répétera bientôt la même structure de document (l'en-tête et le pied).  
+Optimisez le site en extrayant des fragments réutilisables :
+
+1. un layout : `fragments/entete.php`, qui ouvre la page à partir d'un titre, et `fragments/pied.php`, qui la referme ;
+2. une carte de salon : `fragments/carte-salon.php`, qui affiche un salon à partir d'une variable `$salon`.
+
+Réécrivez ensuite les pages `salons.php` et `accueil.php` pour qu'elles incluent ces fragments au lieu de répéter le HTML.
+
+<Checkpoint question="Indice">
+`include` insère un fragment à l'endroit voulu. Un fragment voit les variables définies avant son inclusion : `entete.php` utilise `$titre`, et `carte-salon.php` utilise `$salon`.  
+Dans la boucle, on définit `$salon` à chaque tour (le `foreach` s'en charge), puis on inclut la carte.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php // fragments/entete.php, attend $titre ?>
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title><?= htmlspecialchars($titre) ?></title>
+</head>
+<body>
+```
+
+```php
+<?php // fragments/pied.php ?>
+</body>
+</html>
+```
+
+```php
+<?php // fragments/carte-salon.php, attend $salon ?>
+<li>
+    <a href="salon.php?id=<?= $salon['id'] ?>">
+        <?= htmlspecialchars($salon['nom']) ?>
+    </a>
+    (<?= htmlspecialchars($salon['ville']) ?>), note : <?= $salon['note'] ?>
+</li>
+```
+
+```php
+<?php
+// salons.php
+$salons = require 'data/salons.php';
+$titre = 'Nos salons partenaires';
+
+include 'fragments/entete.php';
+?>
+<h1>Nos salons partenaires</h1>
+<ul>
+<?php foreach ($salons as $salon): ?>
+    <?php include 'fragments/carte-salon.php'; ?>
+<?php endforeach; ?>
+</ul>
+<?php include 'fragments/pied.php'; ?>
+```
+
+</Checkpoint> */}
+
+## Niveau 2 : L'API en JSON
+
+<Aside type="syntaxe" title="Sur la persistance">
+Ces exercices portent sur les échanges de requêtes et de réponses, pas sur le stockage. La création, la modification et la suppression renverront donc la ressource concernée sans l'enregistrer durablement. La persistance dans une base de données est un sujet ultérieur.
+</Aside>
+
+### Exercice 5 &ndash; La liste des salons en JSON
+
+**API**
+
+Créez la page `api/salons.php`. Ce point d'accès retourne la liste des salons en JSON, pour un programme qui souhaite les données sans la présentation. Annoncez le format avec l'en-tête approprié.
+
+<Highlight couleur='ambre'>Attention au chemin : le fichier se trouve dans `api/`, alors que les données sont dans `data/`. Utilisez `__DIR__` pour un chemin fiable.</Highlight>
+
+<Checkpoint question="Indice">
+`header('Content-Type: application/json; charset=utf-8')` annonce le format, puis `json_encode` produit le JSON.  
+Depuis `api/salons.php`, le fichier de données se trouve à `__DIR__ . '/../data/salons.php'`. L'option `JSON_UNESCAPED_UNICODE` garde les accents lisibles.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// decoupe/api/salons.php
+$salons = require __DIR__ . '/../data/salons.php';
+
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode($salons, JSON_UNESCAPED_UNICODE);
+```
+
+Test avec curl :
+
+```sh
+curl http://localhost/decoupe/api/salons.php
+```
+
+</Checkpoint> */}
+
+### Exercice 6  Filtrer avec des paramètres de requête
+
+**API et paramètres**
+
+Enrichissez `api/salons.php` pour qu'il accepte deux filtres dans la chaîne de requête : `?ville=Montréal` ne retourne que les salons de cette ville, et `?promo=1` ne retourne que les salons en promotion. Les deux filtres peuvent se combiner.
+
+<Checkpoint question="Indice">
+Lisez les filtres dans `$_GET`. Appliquez `array_filter` sur la liste pour chaque filtre présent. Après un `array_filter`, les clés d'origine sont conservées, ce qui produirait un objet JSON plutôt qu'un tableau : `array_values` réindexe la liste avant l'encodage.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// decoupe/api/salons.php
+$salons = require __DIR__ . '/../data/salons.php';
+
+$ville = $_GET['ville'] ?? null;
+if (is_string($ville) && $ville !== '') {
+    $salons = array_filter($salons, fn($s) => $s['ville'] === $ville);
+}
+
+if (($_GET['promo'] ?? '') === '1') {
+    $salons = array_filter($salons, fn($s) => $s['promotion'] === true);
+}
+
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(array_values($salons), JSON_UNESCAPED_UNICODE);
+```
+
+Test avec curl :
+
+```sh
+curl "http://localhost/decoupe/api/salons.php?ville=Montréal&promo=1"
+```
+
+</Checkpoint> */}
+
+### Exercice 7 &ndash; Enregistrer un salon avec POST
+
+**API et POST**
+
+Ajoutez la prise en charge de la méthode POST à `api/salons.php`. Une requête POST transporte un salon en JSON dans son corps. Lisez ce corps, vérifiez que le nom et la ville sont présents, puis répondez avec le statut `201` et le salon créé. Si les données sont incomplètes, répondez avec le statut `400`. Une requête GET conserve le comportement des exercices précédents.
+
+<Checkpoint question="Indice">
+Consultez `$_SERVER['REQUEST_METHOD']` pour aiguiller.  
+Un corps JSON se lit avec `file_get_contents('php://input')`, puis `json_decode(..., true)`.  
+Vérifiez les champs avec `isset` avant de construire le salon. Attribuez un nouvel identifiant, par exemple `count($salons) + 1`.
+</Checkpoint>
+
+{/* <Checkpoint question="Solution">
+
+```php
+<?php
+// decoupe/api/salons.php
+$salons = require __DIR__ . '/../data/salons.php';
+header('Content-Type: application/json; charset=utf-8');
+
+$methode = $_SERVER['REQUEST_METHOD'];
+
+if ($methode === 'GET') {
+    $ville = $_GET['ville'] ?? null;
+    if (is_string($ville) && $ville !== '') {
+        $salons = array_filter($salons, fn($s) => $s['ville'] === $ville);
+    }
+    if (($_GET['promo'] ?? '') === '1') {
+        $salons = array_filter($salons, fn($s) => $s['promotion'] === true);
+    }
+    echo json_encode(array_values($salons), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($methode === 'POST') {
+    $donnees = json_decode(file_get_contents('php://input'), true);
+
+    if (!is_array($donnees) || !isset($donnees['nom'], $donnees['ville'])) {
+        http_response_code(400);
+        echo json_encode(['erreur' => 'Le nom et la ville sont requis.']);
+        exit;
+    }
+
+    $nouveau = [
+        'id'        => count($salons) + 1,
+        'nom'       => (string) $donnees['nom'],
+        'ville'     => (string) $donnees['ville'],
+        'note'      => 0,
+        'promotion' => false,
+        'horaire'   => '',
+        'services'  => [],
+    ];
+
+    http_response_code(201);
+    echo json_encode($nouveau, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+http_response_code(405);
+echo json_encode(['erreur' => "Méthode $methode non prise en charge."]);
+```
+
+Test avec curl :
+
+```sh
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"nom":"Coupe Express","ville":"Laval"}' \
+     http://localhost/decoupe/api/salons.php
+```
+
+</Checkpoint> */}
+
+{/* ## Bonus — PUT et DELETE
+
+### Exercice 8 · Modifier et supprimer un salon
+
+**API, PUT et DELETE**
+
+Complétez `api/salons.php` avec deux méthodes supplémentaires. `PUT` modifie un salon désigné par `?id=...` à partir des champs reçus en JSON, et retourne le salon mis à jour. `DELETE` supprime le salon désigné par `?id=...` et retourne un statut `204` sans corps. Dans les deux cas, un identifiant introuvable donne un statut `404`. Réutilisez la fonction `trouverSalon` de l'exercice 2.
+
+<Checkpoint question="Indice">
+Le même aiguillage sur `$_SERVER['REQUEST_METHOD']` sert pour `PUT` et `DELETE`. Ces requêtes ne viennent pas d'un formulaire HTML, mais d'un outil comme Bruno, Postman ou curl. Pour `PUT`, lisez l'identifiant dans `$_GET`, retrouvez le salon, puis remplacez ses champs par ceux du corps JSON. Le statut `204` signifie « pas de contenu » : aucune donnée ne suit.
+</Checkpoint>
+
+<Checkpoint question="Solution">
+
+```php
+<?php
+// À intégrer dans decoupe/api/salons.php, avec la fonction trouverSalon.
+
+function trouverSalon(array $salons, int $id): ?array
+{
+    foreach ($salons as $salon) {
+        if ($salon['id'] === $id) {
+            return $salon;
+        }
+    }
+    return null;
+}
+
+if ($methode === 'PUT') {
+    $id = (int) ($_GET['id'] ?? 0);
+    $salon = trouverSalon($salons, $id);
+
+    if ($salon === null) {
+        http_response_code(404);
+        echo json_encode(['erreur' => 'Salon introuvable.']);
+        exit;
+    }
+
+    $donnees = json_decode(file_get_contents('php://input'), true) ?? [];
+    $salon['nom'] = (string) ($donnees['nom'] ?? $salon['nom']);
+    $salon['ville'] = (string) ($donnees['ville'] ?? $salon['ville']);
+
+    echo json_encode($salon, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($methode === 'DELETE') {
+    $id = (int) ($_GET['id'] ?? 0);
+
+    if (trouverSalon($salons, $id) === null) {
+        http_response_code(404);
+        echo json_encode(['erreur' => 'Salon introuvable.']);
+        exit;
+    }
+
+    // Dans une vraie application, la suppression aurait lieu ici.
+    http_response_code(204); // 204 No Content
+    exit;
+}
+```
+
+Test avec curl :
+
+```sh
+curl -X PUT \
+     -H "Content-Type: application/json" \
+     -d '{"ville":"Longueuil"}' \
+     "http://localhost/decoupe/api/salons.php?id=2"
+
+curl -X DELETE "http://localhost/decoupe/api/salons.php?id=2"
+```
+
+</Checkpoint>
+
+<MarginNote type="lien">
+Vous avez construit un site complet et son API : un fichier de données, des fragments réutilisables, des fonctions de recherche et de filtrage, des pages générées côté serveur, et un point d'accès qui répond en JSON aux quatre méthodes principales.
+</MarginNote> */}

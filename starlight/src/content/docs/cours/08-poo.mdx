@@ -1,0 +1,478 @@
+---
+title: Les bases de la programmation orientée objet
+description: Les concepts fondamentaux de l'orienté objet (classe, objet, attributs, constructeur, méthodes, encapsulation, getters et setters), illustrés en JavaScript, en Java et en PHP.
+sidebar:
+  order: 9
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Supposons que vous deviez créer un système pour gérer les produits d'un commerce. 
+Ce système manipule des produits et devra donc être capable d'interroger un produit
+répertorié pour connaître son prix ou sa disponibilité, et devra pouvoir, par exemple,
+appliquer un rabais ou modifier le descriptif d'un produit.
+
+La programmation orientée objet permet de créer (programmer) ce genre de système et de décrire
+ce genre de structure (comme *produit*), à l'aide d'**objets** et de **classes**. Les objets pourront
+communiquer entre eux pour supporter les transactions et requêtes qu'on souhaite faire avec le système. 
+
+## Classes et objets
+
+### Classe
+
+Une **classe** décrit la **structure générale (caractéristiques et actions)** 
+d'une entité (ex: produit, étudiant, document, joueur) ou d'un composant ou 
+service (ex: service de paiement, gestionnaire d'identifiants, service de sauvegarde) du système.  
+
+#### Exemple: classe <Highlight>Produit</Highlight>
+
+Une classe `Produit`, indique les caractéristiques que possède tout produit 
+(*son nom*, *son prix*, *sa disponibilité*) et les actions qu'on peut faire sur
+n'importe quel produit (consulter son prix, lui appliquer un rabais, modifier son descriptif). 
+<Highlight>La classe est un **modèle**, valable pour tous les produits.</Highlight>
+
+### Objet
+
+Un objet est une **instance** (concrète) d'une classe donnée. Il représente une entité
+ou un concept manipulé par le programme et possède son propre état. 
+
+#### Exemple: objet <Highlight couleur='ambre'>produit</Highlight>
+
+La classe `Produit` décrit ce que possède et peut faire un produit; 
+l'objet `$sirop` représente un produit particulier manipulé par notre programme: 
+un pot de sirop à 14,50 $, en stock.
+À partir d'une seule classe `Produit`, on crée autant d'objets qu'il y a de produits
+répertoriés, tous bâtis sur le même modèle.
+
+<MarginNote type="attention" titre="Un objet n'est pas un exemplaire">
+Un objet est une instance concrète, mais demeure une abstraction.
+Chaque exemplaire d'un produit en magasin ou en entrepôt n'est pas nécessairement un objet distinct, 
+sauf si on souhaite distinguer chaque unité.  
+Sinon, un objet peut maintenir dans sa structure
+la quantité d'exemplaire et la modifier pour refléter l'état actuel.
+</MarginNote>
+
+### Attributs et méthodes
+
+De manière plus formel, en orientée objet, les caractéristiques d'une classe se 
+traduiront par des **attributs** (les données de l'objet) et les actions réalisables
+avec l'objet se traduiront par des **méthodes** (le comportement de l'objet). 
+
+### Traduction en code
+
+Considérons une classe `Produit` avec deux attributs (`nom`, `prix`) et une méthode `prixFormate()`
+qui applique un formatage au prix pour l'affichage.
+La classe vient avec un *constructeur* (une méthode spéciale) qui permet d'initialiser une instance
+(objet) de la classe avec des données.
+
+Ci-dessous, on montre la déclaration d'une classe et la création d'un objet dans trois langages
+(orienté objet) couramment utilisés dans le développement côté serveur: JavaScript, PHP et Java.
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class Produit {
+  constructor(nom, prix) {
+    this.nom = nom;
+    this.prix = prix;
+  }
+
+  prixFormate() {
+    return this.prix.toFixed(2) + " $";
+  }
+}
+
+const sirop = new Produit("Sirop d'érable 540 ml", 14.50);
+console.log(sirop.prixFormate()); // "14.50 $"
+```
+
+- **Constructeur**: `constructor`
+- Accès à l'**objet courant**: `this`
+- Accès à un **membre** (attribut ou méthode) de l'objet: avec le point (`.`, `objet.prixFormate()`)
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+class Produit
+{
+    public string $nom;
+    public float $prix;
+
+    public function __construct(string $nom, float $prix)
+    {
+        $this->nom = $nom;
+        $this->prix = $prix;
+    }
+
+    public function prixFormate(): string
+    {
+        return number_format($this->prix, 2, ',', ' ') . ' $';
+    }
+}
+
+$sirop = new Produit("Sirop d'érable 540 ml", 14.50);
+echo $sirop->prixFormate(); // "14,50 $"
+```
+
+- **Constructeur**: `__construct`
+- Accès à l'**objet courant**: `$this`
+- Accès à un **membre** (attribut ou méthode) de l'objet: avec la flèche (`->`, `$objet->prixFormate()`)
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public class Produit {
+    private String nom;
+    private double prix;
+
+    public Produit(String nom, double prix) {
+        this.nom = nom;
+        this.prix = prix;
+    }
+
+    public String prixFormate() {
+        return String.format("%.2f $", prix);
+    }
+}
+
+// Utilisation (dans une méthode main)
+Produit sirop = new Produit("Sirop d'érable 540 ml", 14.50);
+System.out.println(sirop.prixFormate()); // "14.50 $"
+```
+
+- **Constructeur**: nom de la classe (ex: `Produit()` pour class `Produit`)
+- Accès à l'**objet courant**: `this`
+- Accès à un **membre** (attribut ou méthode) de l'objet: avec le point (`.`, `objet.prixFormate()`)
+
+</TabItem>
+</Tabs>
+
+Tous emploient le mot-clé `class` pour définir une classe et créent un objet avec `new`.
+<Highlight couleur="ambre">En PHP : les variables portent un `$`, l'objet courant s'écrit `$this` (et non `this`), et l'on accède à un membre avec la flèche `->` (et non le point `.`).</Highlight>
+
+## L'encapsulation
+
+**Un vrai système n'est généralement pas composé d'une seule classe** : il fait communiquer et 
+travailler ensemble des objets variés, aux rôles distincts (des produits, un panier, 
+un catalogue, une commande). 
+
+En règle générale, pour faciliter la communication et la coordination des actions entre plusieurs acteurs ou appareils, 
+il faut réduire le bruit et simplifier l'interface de communication de chaque participant.
+Il doit être simple de savoir quoi et comment communiquer avec chaque participant.
+Ce principe est également suivi en programmation orientée objet, où nous faisons coordonner de multiples objets.
+
+<Highlight>Chaque objet doit donc présenter aux autres une **couche publique** claire, 
+qui indique ce qu'on peut lui demander, tout en gardant pour lui une **couche privée**, ses états et ses actions internes.</Highlight>
+
+Prenez la question « ce produit est-il disponible ? ». Celui qui la pose attend une réponse simple : oui ou non. À l'interne, pourtant, l'objet peut faire un calcul, appliquer des règles et consulter des attributs cachés (le stock, un indicateur d'activité) pour y répondre. 
+Le reste du système n'a pas à connaître ces détails : il pose la question et l'objet la traite à sa façon.
+
+L'**encapsulation** consiste donc à **exposer une couche publique stable**, qui changera peu, tout en **cachant les détails internes**.
+
+### Modificateurs d'accès : `public` et `private`
+
+Pour contrôler ce qui est exposé au public, on utilise des modificateurs d'accès 
+(ex: `public`, `private`) qui contrôlent la visibilité des membres (attributs et méthodes).
+- Un membre `public` est accessible par tous les autres objets ; 
+- un membre `private` n'est accessible que depuis l'intérieur de la classe. 
+
+### Traduction en code
+
+Voici un produit qui garde son stock privé et n'expose que la question de sa disponibilité. 
+JavaScript marque un champ privé d'un `#`, alors que PHP et Java utilisent le mot-clé `private`.
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class Produit {
+  #stock;
+  #actif;
+
+  constructor(stock, actif) {
+    this.#stock = stock;
+    this.#actif = actif;
+  }
+
+  estDisponible() {
+    return this.#actif && this.#stock > 0;
+  }
+}
+
+const sirop = new Produit(3, true);
+console.log(sirop.estDisponible()); // true
+```
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+class Produit
+{
+    private int $stock;
+    private bool $actif;
+
+    public function __construct(int $stock, bool $actif)
+    {
+        $this->stock = $stock;
+        $this->actif = $actif;
+    }
+
+    public function estDisponible(): bool
+    {
+        return $this->actif && $this->stock > 0;
+    }
+}
+
+$sirop = new Produit(3, true);
+var_dump($sirop->estDisponible()); // bool(true)
+```
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public class Produit {
+    private int stock;
+    private boolean actif;
+
+    public Produit(int stock, boolean actif) {
+        this.stock = stock;
+        this.actif = actif;
+    }
+
+    public boolean estDisponible() {
+        return actif && stock > 0;
+    }
+}
+```
+
+</TabItem>
+</Tabs>
+
+De l'extérieur, on n'appelle que `estDisponible()` et on obtient oui ou non. 
+Les attributs `stock` et `actif` restent internes : aucun autre objet ne les lit ni ne les modifie directement. 
+On peut même changer plus tard la manière de calculer la disponibilité sans rien 
+casser ailleurs, tant que la question et sa réponse ne changent pas.
+
+## Accéder et modifier les données : getters et setters
+
+Les attributs `private` permettent à un objet de conserver certaines données à l'intérieur de sa classe. 
+Cependant, le reste du système peut parfois avoir besoin de **consulter** ou de **modifier** certaines de ces données.
+
+Plutôt que de rendre directement les attributs publics, on peut exposer des méthodes permettant de contrôler leur accès :
+
+- un **getter** permet de consulter une valeur;
+- un **setter** permet de modifier une valeur.
+
+Cela permet à l'objet de conserver le contrôle sur son propre état.
+
+### Exemple : contrôler le prix d'un produit
+
+Supposons que le prix d'un produit soit privé. 
+Le reste du système doit pouvoir connaître ce prix et éventuellement le modifier. 
+Lors d'une modification, un prix négatif ne devrait pas être accepté.
+
+On peut donc exposer un getter pour lire le prix et un setter qui vérifie la nouvelle valeur avant de la modifier.
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class Produit {
+  #prix;
+
+  constructor(prix) {
+    this.#prix = prix;
+  }
+
+  getPrix() {
+    return this.#prix;
+  }
+
+  setPrix(nouveauPrix) {
+    if (nouveauPrix >= 0) {
+      this.#prix = nouveauPrix;
+    }
+  }
+}
+
+const sirop = new Produit(14.50);
+
+console.log(sirop.getPrix()); // 14.5
+
+sirop.setPrix(12.99);
+console.log(sirop.getPrix()); // 12.99
+```
+
+</TabItem>
+
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+
+class Produit
+{
+    private float $prix;
+
+    public function __construct(float $prix)
+    {
+        $this->prix = $prix;
+    }
+
+    public function getPrix(): float
+    {
+        return $this->prix;
+    }
+
+    public function setPrix(float $nouveauPrix): void
+    {
+        if ($nouveauPrix >= 0) {
+            $this->prix = $nouveauPrix;
+        }
+    }
+}
+
+$sirop = new Produit(14.50);
+
+echo $sirop->getPrix(); // 14.5
+
+$sirop->setPrix(12.99);
+echo $sirop->getPrix(); // 12.99
+```
+
+</TabItem>
+
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public class Produit {
+    private double prix;
+
+    public Produit(double prix) {
+        this.prix = prix;
+    }
+
+    public double getPrix() {
+        return prix;
+    }
+
+    public void setPrix(double nouveauPrix) {
+        if (nouveauPrix >= 0) {
+            prix = nouveauPrix;
+        }
+    }
+}
+```
+
+```java
+Produit sirop = new Produit(14.50);
+
+System.out.println(sirop.getPrix()); // 14.5
+
+sirop.setPrix(12.99);
+System.out.println(sirop.getPrix()); // 12.99
+```
+
+</TabItem>
+</Tabs>
+
+Le reste du programme ne modifie donc pas directement l'attribut `prix`. Il demande plutôt à l'objet de le faire :
+
+```php
+$sirop->setPrix(12.99);
+```
+
+La méthode `setPrix()` peut alors vérifier que la modification est valide avant de l'appliquer.
+
+<Highlight>Un getter ou un setter fait partie de l'**interface publique** de l'objet. L'attribut peut rester privé : l'objet décide de quelle manière son état peut être consulté ou modifié.</Highlight>
+
+### Un getter ou un setter n'est pas toujours nécessaire
+
+Il n'est pas nécessaire de créer automatiquement un getter et un setter pour chaque attribut.
+
+Par exemple, si le prix d'un produit peut être consulté, mais ne doit jamais être modifié 
+directement après sa création, on pourrait fournir `getPrix()` sans fournir `setPrix()`.
+
+De même, certaines informations peuvent être obtenues par une méthode qui effectue
+un calcul plutôt que par un simple getter. Dans l'exemple précédent, `estDisponible()` 
+indique si un produit est disponible sans exposer directement les attributs `stock` et `actif`.
+
+L'objectif de l'encapsulation n'est donc pas de cacher les données pour ensuite les exposer
+systématiquement avec des getters et setters. Il s'agit plutôt de **définir clairement 
+ce que les autres objets ont le droit de demander ou de modifier**.
+
+<Checkpoint question="Pourquoi rendre prix privé si une méthode getPrix() permet quand même de le consulter ?">
+Parce que l'attribut reste sous le contrôle de la classe. La classe peut décider de permettre sa lecture sans permettre sa modification directe, ou imposer des règles lorsqu'une modification est demandée avec setPrix().
+</Checkpoint>
+
+
+## Récapitulatif
+
+- Une **classe** est un modèle qui décrit la structure et le comportement d'un type d'objet ; un **objet** est une instance d'une classe, généralement créée avec `new`.
+- Les **attributs** représentent les données ou l'état d'un objet, tandis que les **méthodes** représentent les actions qu'il peut réaliser.
+- Un **constructeur** initialise un nouvel objet : `constructor` en JavaScript, `__construct` en PHP et le nom de la classe en Java.
+- À l'intérieur d'une méthode, l'objet courant est représenté par `this` en JavaScript et en Java, et par `$this` en PHP.
+- On accède aux membres d'un objet avec `.` en JavaScript et en Java, et avec `->` en PHP.
+- L'**encapsulation** consiste à limiter l'accès direct aux détails internes d'un objet et à exposer une **interface publique** claire pour interagir avec lui.
+- Les modificateurs d'accès comme `public` et `private` permettent de déterminer quels membres peuvent être utilisés depuis l'extérieur de la classe.
+- Un **getter** permet de consulter une donnée privée et un **setter** permet de demander sa modification. Un setter peut vérifier ou transformer la valeur avant de modifier l'état de l'objet.
+- Il n'est pas nécessaire de créer un getter et un setter pour chaque attribut : une classe devrait exposer uniquement les données et les opérations dont le reste du système a besoin.
+
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Comment s'écrit l'objet courant à l'intérieur d'une méthode, en PHP ?"
+  options={[
+    { texte: "this", correct: false },
+    { texte: "$this", correct: true },
+    { texte: "self", correct: false },
+  ]}
+  retour="En PHP, l'objet courant est $this. JavaScript et Java écrivent this, sans le dollar."
+/>
+
+<Quiz
+  client:visible
+  question="Quel opérateur accède à un membre d'un objet en PHP ?"
+  options={[
+    { texte: "Le point : objet.membre", correct: false },
+    { texte: "La flèche : objet->membre", correct: true },
+    { texte: "Les deux points : objet::membre", correct: false },
+  ]}
+  retour="PHP utilise la flèche `->` pour accéder aux membres d'un objet. JavaScript et Java utilisent plutôt le point `.`."
+/>
+
+<Quiz
+  client:visible
+  question="Comment se nomme le constructeur d'une classe en PHP ?"
+  options={[
+    { texte: "constructor", correct: false },
+    { texte: "Le même nom que la classe", correct: false },
+    { texte: "__construct", correct: true },
+  ]}
+  retour="En PHP, le constructeur est la méthode __construct. constructor est le nom en JavaScript, et en Java le constructeur porte le nom de la classe."
+/>
+
+<Quiz
+  client:visible
+  question="Que garantit le mot-clé private sur un attribut ?"
+  options={[
+    { texte: "Qu'il n'est accessible que depuis l'intérieur de la classe", correct: true },
+    { texte: "Qu'il ne peut jamais changer de valeur", correct: false },
+    { texte: "Qu'il est partagé par tous les objets", correct: false },
+  ]}
+  retour="private limite l'accès à l'intérieur de la classe : c'est l'encapsulation. On expose alors des méthodes publiques pour lire ou modifier la donnée de façon contrôlée."
+/>
