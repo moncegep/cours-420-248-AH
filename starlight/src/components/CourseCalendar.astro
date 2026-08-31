@@ -25,6 +25,8 @@ interface Props {
 
 const { weeks, phases, today } = Astro.props;
 
+const format = (value : string) => value.replace(/\n/g, '<br>');
+
 function getCurrentWeekIndex(todayOverride?: string): number {
     const now = todayOverride ? new Date(todayOverride) : new Date();
     for (let i = weeks.length - 1; i >= 0; i--) {
@@ -64,7 +66,7 @@ const hasTopic = (week: Week): boolean => week.topics.length > 0;
                                 <div class="week-number">
                                     {isCurrent && <span class="current-dot" />}
                                     <span class="num">Séance {week.number}</span>
-                                    <span class="date">{week.date}</span>
+                                    <span class="date" set:html={format(week.date)}></span>
                                 </div>
                                 <div class="week-content">
                                     <h4 class="week-title">{week.title}</h4>
@@ -108,6 +110,7 @@ const hasTopic = (week: Week): boolean => week.topics.length > 0;
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        margin: 0;
         margin-left: -1rem;
         padding: 0.75rem 1rem;
         font-weight: 600;
@@ -129,11 +132,13 @@ const hasTopic = (week: Week): boolean => week.topics.length > 0;
     .weeks {
         display: flex;
         flex-direction: column;
+        margin: 0;
     }
 
     .week-row {
         display: flex;
         gap: 1rem;
+        margin: 0;
         margin-left: -1rem;
         padding: 0.6rem 1rem;
         border-top: 1px solid rgba(128, 128, 128, 0.1);
@@ -201,6 +206,7 @@ const hasTopic = (week: Week): boolean => week.topics.length > 0;
         flex-direction: column;
         gap: 0.2rem;
         flex: 1;
+        margin-top: 6px;
     }
 
         .week-title {
@@ -209,6 +215,7 @@ const hasTopic = (week: Week): boolean => week.topics.length > 0;
         }
 
         .week-topics {
+            margin-top: 6px;
             font-size: 0.8rem;
             opacity: 0.65;
             line-height: 1.5;

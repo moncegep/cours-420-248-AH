@@ -1,129 +1,242 @@
 {
+  "course": {
+    "code": "420-248-AH",
+    "title": "Programmation web 2",
+    "term": "Automne 2026",
+    "ponderation": "2-4-3",
+    "competency": "00SU – Effectuer le développement d'applications web transactionnelles (atteinte complète)",
+    "program": "Programmation web et mobile",
+    "programNumber": "420.B1",
+    "teacher": "Louis-Edouard Lafontant",
+    "email": "louis-edouard.lafontant@collegeahuntsic.qc.ca",
+    "departmentSite": "http://collegeahuntsic.info/"
+  },
   "weeks": [
     {
-      "number": "1", "date": "", "startDate": "2026-06-03",
-      "title": "Introduction et mise en route",
+      "number": "1",
+      "date": "24 août \n 27 août",
+      "startDate": "2026-08-24",
+      "title": "Présentation du cours",
       "topics": [
-        "Présentation du plan de cours",
-        "Modèle client-serveur et cycle d'une requête HTTP",
-        "Rôle du serveur: exécuter du code et produire du HTML",
-        "Prise en main des outils de développement (éditeur, navigateur)",
-        "Révision des bases de programmation (variables, conditions, boucles)"
+        "Prise en main des outils de développement",
+        "Introduction au développement côté serveur",
+        "Installation et configuration de XAMPP",
+        "Introduction à PHP & Révision de programmation"
       ]
     },
     {
-      "number": "2", "date": "", "startDate": "2026-06-10",
-      "title": "Environnement XAMPP et premiers pas en PHP",
+      "number": "2",
+      "date": "31 août \n 3 septembre",
+      "startDate": "2026-08-31",
+      "title": "Page web dynamique",
       "topics": [
-        "Installation et configuration de XAMPP (Apache)",
-        "Dossier htdocs et exécution d'un script via localhost",
-        "Balises PHP, echo, print",
-        "Variables, typage dynamique et types de base",
-        "Commentaires et débogage (var_dump, print_r)",
-        "Première page web dynamique"
+        "Notions avancées de programmation en PHP",
+        "Navigation et composition de page",
+        "Instructions include et require"
       ]
     },
     {
-      "number": "3", "date": "", "startDate": "2026-06-15",
-      "title": "Structures, tableaux et fonctions",
+      "number": "3",
+      "date": "10 septembre",
+      "startDate": "2026-09-10",
+      "title": "Site dynamique avec formulaire",
       "topics": [
-        "Opérateurs et structures conditionnelles (if, switch, ternaire, ??)",
-        "Boucles (for, while, foreach)",
-        "Tableaux indexés et associatifs",
-        "Fonctions: paramètres, valeurs par défaut, return",
-        "Portée des variables (scope)",
-        "Inclusion de fichiers (include, require)",
-        "Création d'un site simple avec traitement backend"
+        "Manipulation de formulaires",
+        "Introduction aux Superglobales PHP ($_GET, $_POST, $_SERVER)",
+        "Ajout de comportement dynamique avec script JS",
+        "Validation de formulaires côté client et côté serveur"
       ]
     },
     {
-      "number": "4", "date": "", "startDate": "2026-06-22",
-      "title": "Formulaires et validation",
+      "number": "4",
+      "date": "14 septembre \n 17 septembre",
+      "startDate": "2026-09-14",
+      "title": "Site dynamique avec base de données",
       "topics": [
-        "Envoi de données: méthodes GET et POST",
-        "Récupération des données de formulaire ($_GET, $_POST)",
-        "Validation des données côté serveur",
-        "Sécurité de l'affichage (htmlspecialchars)"
+        "Rappel de base de données relationnelles",
+        "Introduction à MySQL et phpMyAdmin",
+        "Modélisation relationnelle et langage SQL",
+        "Communication avec PDO et requête paramétrée"
       ]
     },
     {
-      "number": "5", "date": "", "startDate": "2026-06-29",
-      "title": "Superglobales et introduction au MVC",
+      "number": "5",
+      "date": "21 septembre \n 24 septembre",
+      "startDate": "2026-09-21",
+      "title": "Application serveur de gestion de données",
       "topics": [
-        "Superglobales: $_GET, $_POST, $_SERVER",
-        "Verbes HTTP et $_SERVER['REQUEST_METHOD']",
-        "Aperçu des API: répondre à un programme plutôt qu'à un navigateur (réponse JSON avec json_encode, test avec curl)",
-        "Le patron MVC: modèle, vue, contrôleur",
-        "Séparation des responsabilités (données, logique, présentation)",
-        "Routes et contrôleurs: aiguiller une requête",
-        "Vues: générer le HTML côté serveur"
+        "Opérations CRUD",
+        "Programmation orientée objet en PHP",
+        "Organisation de code",
+        "Architecture MVC"
+      ]
+    },
+    {
+      "number": "6",
+      "date": "28 septembre \n 1 octobre",
+      "startDate": "2026-09-28",
+      "title": "API REST",
+      "topics": [
+        "Introduction aux APIs",
+        "Architecture REST",
+        "GET, POST, PUT, DELETE",
+        "Retour sur Superglobales PHP"
       ],
-      "evaluation": "Travail pratique 1 (20 %)"
+      "evaluation": "Remise du travail pratique 1 (15 %)"
     },
     {
-      "number": "6", "date": "", "startDate": "2026-08-03",
-      "title": "Base de données MySQL et CRUD",
+      "number": "7",
+      "date": "6 octobre \n 8 octobre",
+      "startDate": "2026-10-06",
+      "title": "Révision et examen intra",
       "topics": [
-        "Rappel des bases de données relationnelles",
-        "Introduction à MySQL et à phpMyAdmin",
-        "Connexion à la base de données (PDO)",
-        "Requêtes préparées et protection contre l'injection SQL",
-        "Opérations CRUD via contrôleurs et formulaires"
-      ]
-    },
-    {
-      "number": "7", "date": "", "startDate": "2026-08-10",
-      "title": "Structuration MVC du code",
-      "topics": [
-        "Organisation du code en MVC: modèles, contrôleurs, vues",
-        "Modèles: encapsuler l'accès à la base de données",
-        "Gabarits de vues et réutilisation (en-tête, pied de page)",
-        "Bonnes pratiques de structure et de maintenabilité"
+        "Révision"
       ],
-      "evaluation": "Travail pratique 2 (20 %)"
+      "evaluation": "Examen intra (20 %)"
     },
     {
-      "number": "8", "date": "", "startDate": "2026-08-17",
-      "title": "Authentification, sessions et cookies",
+      "number": "8",
+      "date": "14 octobre \n 15 octobre",
+      "startDate": "2026-10-14",
+      "title": "Développement côté client",
       "topics": [
-        "Notion de session HTTP et d'état côté serveur",
-        "Sessions PHP ($_SESSION, session_start)",
-        "Cookies: portée et limites",
-        "Inscription et connexion d'un utilisateur",
-        "Hachage des mots de passe (password_hash, password_verify)",
-        "Présentation du projet intégrateur"
+        "Prise en main des outils (Node.js, Vite)",
+        "API Fetch",
+        "Application CRUD avec backend REST"
       ]
     },
     {
-      "number": "9", "date": "", "startDate": "2026-08-24",
-      "title": "Rôles, permissions et contrôle d'accès",
+      "number": "9",
+      "date": "19 octobre \n 22 octobre",
+      "startDate": "2026-10-19",
+      "title": "Introduction à Vue.js",
       "topics": [
-        "Contrôle d'accès basé sur les rôles",
-        "Restriction des pages selon l'utilisateur connecté",
-        "Protection des routes et redirections",
-        "Suivi de l'avancement du projet intégrateur"
+        "Composants Vue",
+        "Syntaxe de gabarit (template)",
+        "Liaison de données",
+        "Directives de base : v-bind, v-if, v-for, v-on"
       ]
     },
     {
-      "number": "10", "date": "", "startDate": "2026-08-31",
-      "title": "Finalisation du projet et révision",
+      "number": "10",
+      "date": "26 octobre \n 29 octobre",
+      "startDate": "2026-10-26",
+      "title": "Composition d'une application avec Vue.js",
       "topics": [
-        "Finalisation et présentation du projet intégrateur",
-        "Préparation à la livraison et au déploiement",
-        "Révision en vue de l'examen final"
+        "Props et communication entre composants",
+        "Propriétés calculées (computed) et observateurs (watchers)"
+      ]
+    },
+    {
+      "number": "11",
+      "date": "2 octobre \n 5 novembre",
+      "startDate": "2026-11-02",
+      "title": "Navigation et gestion de formulaire avec Vue.js",
+      "topics": [
+        "Vue Router pour la navigation entre vues",
+        "Gestion de formulaires avec v-model",
+        "Appels API avec Axios"
+      ],
+      "evaluation": "Remise du travail pratique 2 (15 %)"
+    },
+    {
+      "number": "12",
+      "date": "9 novembre",
+      "startDate": "2026-11-09",
+      "title": "Authentification",
+      "topics": [
+        "Authentification",
+        "Sessions et cookies",
+        "Bonnes pratiques de sécurité"
+      ]
+    },
+    {
+      "number": "13",
+      "date": "16 novembre \n 18 novembre",
+      "startDate": "2026-11-16",
+      "title": "Rôle et permission",
+      "topics": [
+        "Rôle et permission",
+        "JWT Token",
+        "Contrôle d'accès basé sur les rôles (RBAC)"
+      ]
+    },
+    {
+      "number": "14",
+      "date": "23 novembre \n 26 novembre",
+      "startDate": "2026-11-23",
+      "title": "Notions avancées avec Vue.js",
+      "topics": [
+        "Notions avancées avec Vue.js",
+        "Gestion d'état globale",
+        "Organisation de projet",
+        "Travail sur projet"
+      ]
+    },
+    {
+      "number": "15",
+      "date": "30 novembre \n 3 décembre",
+      "startDate": "2026-11-30",
+      "title": "Remise et présentation de projet",
+      "topics": [
+        "Travail sur projet"
       ],
       "evaluation": "Projet intégrateur (30 %)"
     },
     {
-      "number": "11", "date": "", "startDate": "2026-09-03",
-      "title": "Examen final",
-      "topics": [],
-      "evaluation": "Examen final (30 %)"
+      "number": "16",
+      "date": "7 décembre \n 10 décembre",
+      "startDate": "2026-12-07",
+      "title": "Révision et examen final",
+      "topics": [
+        "Révision"
+      ],
+      "evaluation": "Examen final (20 %)"
     }
   ],
   "phases": [
-    { "label": "Fondements du développement côté serveur", "range": [0, 3] },
-    { "label": "Environnement XAMPP, MVC et base de données", "range": [4, 6] },
-    { "label": "Sécurité et projet intégrateur", "range": [7, 10] }
+    {
+      "label": "Développement côté serveur",
+      "range": [
+        0,
+        6
+      ]
+    },
+    {
+      "label": "Application web monopage",
+      "range": [
+        7,
+        10
+      ]
+    },
+    {
+      "label": "Sécurité, Authentification & Projet intégrateur",
+      "range": [
+        11,
+        15
+      ]
+    }
+  ],
+  "evaluations": [
+    {
+      "label": "Travail pratique 1",
+      "weight": 15
+    },
+    {
+      "label": "Travail pratique 2",
+      "weight": 15
+    },
+    {
+      "label": "Projet intégrateur",
+      "weight": 30
+    },
+    {
+      "label": "Examen intra",
+      "weight": 20
+    },
+    {
+      "label": "Examen final",
+      "weight": 20
+    }
   ]
 }

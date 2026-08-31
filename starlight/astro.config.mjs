@@ -26,15 +26,17 @@ export default defineConfig({
 				{
 					label: 'Notes de cours',
 					items: [
-						{ label: 'Introduction', slug: 'cours/01-introduction' },
-						{ label: 'Prise en main des bases de PHP', slug: 'cours/02-prog-base-php' },
-						{ label: 'Notions avancées de PHP', slug: 'cours/03-prog-avancee-php' },
-						// { label: 'Navigation et composition de pages', slug: 'cours/04-navigation' },
-						// { label: 'Formulaires et GET / POST', slug: 'cours/05-formulaires' },
-						// { label: 'Superglobales', slug: 'cours/06-superglobals' },
-						// { label: 'Préservation de session et données', slug: 'cours/07-preservation' },
-						// { label: 'Programmation orientée objet', slug: 'cours/08-poo' },
-						// { label: 'MVC', slug: 'cours/10-mvc' },
+						{ label: 'Développement côté serveur', items: [
+							{ label: 'Introduction', slug: 'cours/01-introduction' },
+							{ label: 'Programmation en PHP', slug: 'cours/02-prog-base-php' },
+							{ label: 'Notions avancées de PHP', slug: 'cours/03-prog-avancee-php' },
+							{ label: 'Page dynamique', slug: 'cours/03-page-dynamique' },
+							// { label: 'Formulaires et GET / POST', slug: 'cours/05-formulaires' },
+							// { label: 'Superglobales', slug: 'cours/06-superglobals' },
+							// { label: 'Préservation de session et données', slug: 'cours/07-preservation' },
+							// { label: 'Programmation orientée objet', slug: 'cours/08-poo' },
+							// { label: 'MVC', slug: 'cours/10-mvc' },
+						] },
 					]
 				},
 				{

@@ -1,0 +1,347 @@
+---
+title: Construire une page dynamique
+description: Comprendre où le HTML est produit, suivre le cycle d'une requête PHP, assembler une page à partir de données, de logique et de présentation, puis composer un site.
+sidebar:
+  order: 4
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import ModeRendu from '../../../components/react/ModeRendu.jsx';
+import FluxSequence from '../../../components/react/FluxSequence.jsx';
+import ExtractionProgressive from '../../../components/react/ExtractionProgressive.jsx';
+import CompositionPage from '../../../components/react/CompositionPage.jsx';
+import FluxDiagram from '../../../components/react/FluxDiagram.tsx';
+
+
+Le contenu d'une page Web peut être **préparé à l'avance** ou **produit au moment où la page est demandée**.
+Dans le premier cas, on parle généralement de **contenu statique**. Dans le second, la page est **générée dynamiquement**.
+
+Tout au long du cours, nous rencontrerons différentes façons de construire une page web. Chaque stratégie répondra aux deux questions suivantes:
+- **où** le contenu est-il produit : sur le serveur ou dans le navigateur ?
+- **quand** est-il produit : avant la requête ou lorsque l'utilisateur demande la page ?
+
+
+## Mode de rendu d'une page Web
+
+Une page web statique, soit un fichier `.html` est envoyé tel quel par le serveur : ce que vous écrivez est exactement ce que le navigateur reçoit. 
+Lorsqu'un langage de programmation ou de scripting comme PHP (fichier `.php`) est utilisé pour décrire la page,
+il est d'abord **exécuté** par le serveur pour produire le HTML qui sera envoyé par le serveur. 
+
+> Le navigateur ne reçoit jamais le code PHP, **seulement le HTML produit**.
+
+### Rendement côté serveur vs côté client
+
+Le type de rendu décrit plus haut est appelé rendu côté serveur : le serveur construit le HTML de la page avant de l'envoyer au navigateur.
+Cette approche est particulièrement utile lorsque le contenu doit être disponible dès la réponse du serveur, par exemple pour produire des pages à partir de données, centraliser la logique de présentation ou permettre une navigation classique où chaque adresse correspond à une page produite par le serveur.
+PHP fonctionne naturellement de cette façon : une requête arrive, le serveur exécute le programme PHP et retourne le HTML obtenu.
+
+Le navigateur peut cependant lui aussi construire ou modifier une interface grâce à JavaScript. On parle alors de rendu côté client lorsque la construction d'une partie importante de l'interface se fait dans le navigateur après le chargement du JavaScript.
+Dans une application monopage (*Single Page Application* ou SPA), le serveur peut envoyer une structure HTML initiale relativement minimale, puis JavaScript prend en charge une grande partie de la construction de l'interface et de la navigation.
+
+##### Suivez les trois moments du trajet, dans un mode puis dans l'autre : le début et la fin se ressemblent, c'est au milieu que tout se joue.
+
+<ModeRendu client:visible />
+
+<Highlight couleur="ambre">Le PHP ne franchit jamais la frontière du serveur.</Highlight> 
+
+<Aside type="exemple" title="Vérifiez-le vous-même">
+Faites « Afficher le code source de la page » dans le navigateur : aucune balise `<?php` n'apparaît. Si vous en voyez, c'est que le fichier n'a **pas** été exécuté : mauvaise extension, page ouverte en `file://` plutôt que par le serveur, ou serveur mal configuré.
+</Aside>
+
+<MarginNote type="rappel">
+Les deux modes ne s'excluent pas. Une page produite par PHP peut très bien être enrichie ensuite par du JavaScript : c'est même le cas le plus fréquent.
+</MarginNote>
+
+
+## Cycle de vie d'une page dynamique
+
+Chaque affichage d'une page PHP suit le même trajet, du clic jusqu'à l'écran.
+
+<Steps>
+
+1. Le navigateur envoie une **requête HTTP** vers une adresse.
+
+2. Le serveur repère le fichier visé et **exécute** le code PHP qu'il contient.
+
+3. PHP **récupère ou prépare les données** nécessaires : un tableau, un fichier, plus tard une base de données.
+
+4. PHP **produit le contenu HTML** à partir de ces données.
+
+5. Le serveur retourne la **réponse HTTP**, dont le corps est ce HTML.
+
+6. Le navigateur **interprète et affiche** le HTML reçu.
+
+</Steps>
+
+<FluxSequence
+  client:visible
+  titre="Cycle de vie d'une requête vers une page PHP"
+  acteurs={[
+    { key: 'navigateur', label: 'Navigateur', icone: 'laptop' },
+    { key: 'serveur', label: 'Serveur + PHP', icone: 'server' },
+    { key: 'donnees', label: 'Données', icone: 'database' },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: 'GET /produits.php', mono: true },
+    { de: 1, vers: 1, texte: 'exécute produits.php' },
+    { de: 1, vers: 2, texte: 'lecture des données', note: 'tableau, fichier ou base de données' },
+    { de: 2, vers: 1, texte: '2 produits' },
+    { de: 1, vers: 1, texte: 'produit le HTML' },
+    { de: 1, vers: 0, texte: 'HTML produit', statut: 200 },
+    { de: 0, vers: 0, texte: 'interprète et affiche' },
+  ]}
+/>
+
+<Aside type="attention" title="Une requête, une exécution, puis plus rien">
+À la fin de l'étape 5, le script est terminé et **toutes ses variables disparaissent**. 
+Une nouvelle requête démarre une nouvelle exécution. Pour conserver une information entre deux requêtes, l'application doit la transmettre ou la stocker explicitement : session, fichier, base de données, etc.
+</Aside>
+
+<Checkpoint question="Vous modifiez une variable PHP dans produits.php. Sa valeur sera-t-elle encore là quand l'utilisateur cliquera vers contact.php ?">
+Non. Chaque requête déclenche une nouvelle exécution, indépendante de la précédente. Pour conserver une information d'une page à l'autre, il faut la transmettre explicitement (chaîne de requête, formulaire) ou la stocker (session, fichier, base de données).
+</Checkpoint>
+
+
+
+
+## Construction d'une page dynamique
+
+Voici une page de produits parfaitement ordinaire, écrite en HTML pur.
+
+```html
+<h1>Nos produits</h1>
+<ul>
+  <li>Tire sur la neige — 6,25 $</li>
+  <li>Sirop d'érable 540 ml — 14,50 $</li>
+</ul>
+```
+
+Elle a l'air simple, et elle l'est. Pourtant elle contient déjà les trois éléments d'une page dynamique, mêlés au point d'être indiscernables : les **données**, la **logique** qui détermine quoi afficher, et la **présentation**.
+
+Les données sautent aux yeux : deux noms, deux prix. La présentation aussi : un titre, une liste. La logique, elle, est invisible — et c'est tout le problème. Le catalogue compte en réalité **trois** produits ; le beurre d'érable est en rupture et n'apparaît pas. La liste est triée par prix croissant. Le montant est écrit « 14,50 $ », avec la virgule et l'espace. Trois décisions ont donc bien été prises, mais **hors du fichier** : quelqu'un les a évaluées de tête, une fois, puis a écrit le résultat.
+
+<Aside type="attention" title="Une logique pré-évaluée est une logique perdue">
+Tant que rien ne bouge, cette page fonctionne. Le jour où un prix change, où un produit revient en stock ou où le catalogue passe à quarante articles, il faut refaire les trois calculs de tête et réécrire le HTML — sans oublier une ligne. Rien dans le fichier ne rappelle quelles étaient les règles, et personne ne peut les vérifier.
+</Aside>
+
+Construire une page dynamique, c'est ressortir ces éléments du HTML un par un, et les confier au serveur. Parcourez les quatre étapes : l'écran affiché reste rigoureusement le même, seule l'organisation change.
+
+<ExtractionProgressive client:visible />
+
+Chaque extraction règle un problème et en révèle un autre. Sortir les données donne une source unique, mais la page continue de choisir ses produits à la main. Écrire la logique rend les règles lisibles, mais le HTML, resté figé, se met à contredire ce que la logique affirme. Ce n'est qu'à la dernière étape, quand la structure devient une boucle, que les trois pièces s'accordent.
+
+<Highlight couleur="ambre">Préparez d'abord, affichez ensuite.</Highlight> Tout ce qui calcule, filtre ou trie se place **avant** le premier caractère de HTML. La partie basse du fichier ne fait plus que parcourir et afficher : elle reste lisible même pour quelqu'un qui ne connaît pas PHP.
+
+<Aside type="syntaxe" title="La syntaxe alternative">
+Dans la zone de présentation, `if:` / `endif;` et `foreach:` / `endforeach;` remplacent avantageusement les accolades. Les balises HTML restent visibles et l'ouverture d'un bloc se referme par un mot lisible, plutôt qu'un `}` perdu au milieu du balisage.
+</Aside>
+
+<MarginNote type="astuce">
+`htmlspecialchars(...)` sur toute donnée affichée, sans exception. Le réflexe se prend maintenant, pendant que les données sont encore écrites par vous ; il sera vital quand elles viendront d'un formulaire.
+</MarginNote>
+
+
+## Composition de pages et création d'un site
+
+Un site PHP est composé de plusieurs pages reliées par des **liens HTML** ordinaires. Naviguer vers une autre page déclenche une nouvelle requête : le cycle vu plus haut, répété.
+
+```html
+<nav>
+  <a href="index.php">Accueil</a>
+  <a href="produits.php">Produits</a>
+  <a href="contact.php">Contact</a>
+</nav>
+```
+
+Chacune de ces pages a besoin du même en-tête, de la même navigation, du même pied de page, souvent des mêmes données et des mêmes fonctions. Les recopier serait ingérable : la moindre retouche obligerait à ouvrir tous les fichiers. On les **inclut** plutôt.
+
+### Quatre cas d'usage
+
+Lorsqu'il rencontre `include` ou `require`, PHP exécute le fichier demandé à cet endroit du programme. 
+Le HTML produit par ce fichier s'insère donc à cet endroit dans la réponse.
+Mais on ne s'en sert pas pour la même chose, et c'est ce qu'on attend du fichier qui dicte le mécanisme à employer.
+
+**Le cadre commun.** L'en-tête et le pied de page entourent le contenu de chaque page. Ils produisent du HTML, une fois par page.
+
+```php
+<?php require __DIR__ . "/includes/header.php"; ?>
+
+<main>
+  <h2>Nos produits</h2>
+</main>
+
+<?php require __DIR__ . "/includes/footer.php"; ?>
+```
+
+**Le fragment répété.** Un bloc qui revient — la carte d'un produit — est extrait puis inclus **à chaque tour de boucle**. Ici, la répétition est le but : surtout pas de `_once`.
+
+```php
+<?php foreach ($afficher as $p): ?>
+  <?php include __DIR__ . "/partials/product-card.php"; ?>
+<?php endforeach; ?>
+```
+
+**Les déclarations.** Un fichier de fonctions ou de classes produit rien à l'écran : il déclare. Le charger deux fois provoque une erreur fatale, puisqu'on ne peut pas redéclarer une fonction.
+
+```php
+<?php
+require_once __DIR__ . "/lib/functions.php";   // formatPrix() déclarée ici, une seule fois
+```
+
+**Les données.** Un fichier peut se contenter de `return` une valeur. C'est l'approche privilégiée pour les fichiers de configuration. On l'importe alors comme une expression, et la donnée cesse d'être mêlée à la page qui l'affiche — c'est l'extraction de l'étape 2, mais dans un fichier séparé.
+
+```php
+<?php
+// data/products.php
+return [
+  ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50, "stock" => 8],
+  ["nom" => "Beurre d'érable 250 g",  "prix" => 9.95,  "stock" => 0],
+];
+```
+
+```php
+<?php
+$products = require __DIR__ . "/data/products.php";
+```
+
+<MarginNote type="rappel">
+Un fichier inclus **partage la portée** de celui qui l'inclut : c'est pour cela que la carte produit peut utiliser `$p`, la variable de la boucle, sans qu'on la lui passe. Pratique, mais sans aucune isolation — nommez vos variables avec soin.
+</MarginNote>
+
+### Choisir le bon mécanisme
+
+Les quatre cas se distinguent par ce que le fichier produit, et cela suffit à trancher.
+
+| Cas d'usage | Ce que le fichier produit | Mécanisme |
+| --- | --- | --- |
+| En-tête, pied de page | du HTML, une fois par page | `include` ou `require` |
+| Fragment répété | du HTML, à chaque tour de boucle | `include`, jamais `_once` |
+| Fonctions, classes | rien à l'écran, des déclarations | `require_once` |
+| Données, configuration | rien à l'écran, une valeur retournée | `require` avec affectation |
+
+Reste à choisir entre `include` et `require`, qui ne diffèrent que par leur réaction à un fichier manquant.
+
+| Mécanisme | Fichier introuvable |
+| --- | --- |
+| `include` | avertissement, le script continue |
+| `require` | erreur fatale, le script s'arrête |
+
+<Highlight couleur="ambre">`require` dès que la page n'a aucun sens sans le fichier.</Highlight> Un en-tête absent, une configuration manquante, un fichier de fonctions introuvable : mieux vaut un arrêt net qu'une page à moitié construite, qui s'effondrera trois lignes plus loin avec un message incompréhensible.
+
+<Aside type="syntaxe" title="__DIR__, pour des chemins fiables">
+`__DIR__` est le dossier du fichier courant. `require __DIR__ . "/data/products.php"` fonctionne quel que soit l'endroit d'où la page est appelée, contrairement à un chemin relatif nu qui dépend du répertoire de travail du serveur.
+</Aside>
+
+<Aside type="attention" title="Deux sortes de chemins à ne pas confondre">
+Le `href` d'un lien est un **chemin d'URL**, interprété par le navigateur. Le chemin d'un `include` est un **chemin de fichier**, interprété par le serveur. `href="produits.php"` et `include __DIR__ . "/includes/header.php"` n'obéissent pas aux mêmes règles : l'un vise une adresse web, l'autre un fichier sur le disque.
+</Aside>
+
+### Synthèse : une page assemblée
+
+Les quatre cas se retrouvent dans une seule page. Sélectionnez un fichier pour isoler sa contribution au HTML final, ou suivez une ligne `include` pour aller voir le fichier qu'elle appelle.
+
+<CompositionPage client:visible />
+
+Notez ce que produit chacun : `data/products.php` n'écrit rien mais fournit la matière ; `header.php` et `footer.php` posent le cadre ; `product-card.php` apparaît deux fois, une par produit ; et `produits.php` lui-même se réduit à trois variables et quatre inclusions.
+
+### Le trajet complet
+
+Composer un site, c'est séparer progressivement ses responsabilités. Le diagramme de séquence de la deuxième section suivait la requête **entre les machines** ; celui-ci suit les responsabilités **à l'intérieur du serveur**, de la demande jusqu'à l'écran.
+
+<FluxDiagram
+  client:visible
+  titre="Le trajet complet d'une page dynamique"
+  steps={[
+    {
+      titre: 'Requête',
+      desc: "Un clic ou une adresse saisie : le navigateur demande une page au serveur.",
+    },
+    {
+      titre: 'Page PHP',
+      desc: "Le serveur exécute le fichier visé, dans un script neuf.",
+      note: { type: 'warn', text: "Les variables de la requête précédente n'existent plus : le script repart de zéro." },
+    },
+    {
+      titre: 'Préparation des données',
+      desc: "Le script rassemble sa matière : tableau, fichier importé, base de données.",
+    },
+    {
+      titre: 'Composition de la présentation',
+      desc: "La logique filtre et trie ; le gabarit et les parties incluses assemblent.",
+    },
+    {
+      titre: 'HTML produit',
+      desc: "Plus une seule balise PHP. Chaque donnée affichée est passée par htmlspecialchars().",
+    },
+    {
+      titre: 'Réponse',
+      desc: "Le serveur renvoie ce HTML dans le corps de la réponse HTTP.",
+    },
+    {
+      titre: 'Navigateur',
+      desc: "Le navigateur interprète et affiche. Le prochain clic relance le trajet.",
+    },
+  ]}
+/>
+
+Chaque étape a désormais son fichier, ou sa portion de fichier. C'est ce qui rend le site plus facile à comprendre, à modifier et à faire évoluer : on sait toujours **où** intervenir, et un changement reste local.
+
+<Checkpoint question="Vous extrayez vos fonctions d'affichage dans lib/functions.php. Quel mécanisme d'inclusion, et pourquoi ?">
+`require_once`. `require` parce qu'une page privée de ses fonctions ne peut pas s'afficher : l'arrêt immédiat vaut mieux qu'une erreur obscure plus loin. Et `_once` parce qu'un fichier qui déclare des fonctions ne peut pas être chargé deux fois — PHP refuse toute redéclaration.
+</Checkpoint>
+
+## Réflexes et pièges
+
+- **Le PHP reste sur le serveur** : si vous voyez `<?php` dans le code source affiché par le navigateur, le fichier n'a pas été exécuté.
+- **Les variables du script ne survivent pas à la requête.** : les variables disparaissent à la fin du script. Transmettre ou stocker, jamais espérer.
+- **Préparer, puis afficher** : la logique en haut du fichier, la présentation en bas.
+- **Échapper systématiquement** : `htmlspecialchars(...)` sur tout ce qui s'affiche, y compris dans les fragments réutilisés.
+- **`_once` pour les déclarations**, `include` simple pour un fragment que l'on veut répéter.
+- **Chemin d'URL ou chemin de fichier** : `href` pour le navigateur, `include`/`require` avec `__DIR__` pour le serveur.
+
+## Récapitulatif
+
+- Une page PHP est **exécutée sur le serveur** ; le navigateur ne reçoit que le HTML produit. Le rendu côté client, lui, construit l'interface en JavaScript après réception.
+- Le cycle d'une page dynamique va de la requête HTTP à l'affichage, en passant par l'exécution du fichier, la préparation des données et la production du HTML.
+- Une page dynamique combine **données**, **logique** et **présentation** — dans cet ordre, de préférence.
+- Un site s'assemble à partir de pages reliées par des liens, de parties incluses (`header.php`, `footer.php`, `partials/`) et de fichiers de données importés par `require`.
+- `require` convient aux fichiers indispensables, `require_once` aux fichiers qui déclarent des fonctions ou des classes, et `include` aux fragments de présentation que l'on veut pouvoir répéter.
+- Un lien utilise un **chemin d'URL** interprété par le navigateur, tandis que `include` et `require` utilisent des **chemins de fichiers** interprétés sur le serveur. `__DIR__` permet d'ancrer ces chemins sur le fichier courant.
+
+<Quiz
+  client:visible
+  question="Pourquoi le navigateur ne reçoit-il jamais de code PHP ?"
+  options={[
+    { texte: "Le navigateur le supprime avant l'affichage", correct: false },
+    { texte: "Le serveur exécute le PHP et n'envoie que le HTML produit", correct: true },
+    { texte: "Le PHP est transmis, mais chiffré", correct: false },
+  ]}
+  retour="Le PHP est exécuté sur le serveur. Ce qui part vers le navigateur, c'est le résultat de cette exécution : du HTML ordinaire."
+/>
+
+<Quiz
+  client:visible
+  question="Que se passe-t-il exactement quand l'utilisateur clique sur <a href='produits.php'> ?"
+  options={[
+    { texte: "Le navigateur remplace une portion de la page courante", correct: false },
+    { texte: "Une nouvelle requête part vers le serveur, qui exécute produits.php", correct: true },
+    { texte: "PHP charge le fichier sans repasser par le réseau", correct: false },
+  ]}
+  retour="Chaque lien déclenche un cycle complet : requête, exécution du fichier ciblé, production du HTML, réponse, affichage."
+/>
+
+<Quiz
+  client:visible
+  question="À quoi sert __DIR__ dans require __DIR__ . '/data/products.php' ?"
+  options={[
+    { texte: "À rendre le chemin indépendant du répertoire de travail", correct: true },
+    { texte: "À indiquer l'URL publique du fichier", correct: false },
+    { texte: "À éviter de charger le fichier deux fois", correct: false },
+  ]}
+  retour="__DIR__ ancre le chemin sur le dossier du fichier courant. Le chargement unique, lui, relève de la variante _once."
+/>
