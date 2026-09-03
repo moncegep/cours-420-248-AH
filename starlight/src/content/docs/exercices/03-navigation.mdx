@@ -1,5 +1,5 @@
 ---
-title: Exercices — Navigation et composition
+title: Exercices — Composition de page dynamique
 description: Découper une page en fragments et les assembler avec include et require, naviguer entre les pages, puis automatiser la composition avec des fonctions.
 sidebar:
   order: 9
@@ -12,335 +12,526 @@ import Checkpoint from '../../../components/Checkpoint.astro';
 
 
 <Aside type="prerequis" title="Avant de commencer">
-Ces exercices prolongent le chapitre [Navigation et composition](/cours/04-navigation). 
+Ces exercices prolongent le chapitre [Page dynamique](/cours/03-page-dynamique). 
 </Aside>
 
-## Niveau 1 — Découper une page : fragments, `include` et `require`
+## Entrainement
 
-Dans la construction d'un site ou une application web, le réflexe de base à avoir est : repérer ce qui se répète, le sortir dans un fichier (un **fragment**), et l'insérer là où il faut avec `include` ou `require`.
+Le site **Nord & Tasse** est une petite boutique montréalaise spécialisée dans le café et les accessoires pour la préparation du café à la maison.
 
-### Exercice 1.1 : Repérer les fragments et le contenu propre
+<Aside type="note" title="Pour commencer">
+Pour ces exercices, crée un dossier `site-nord-tasse` dans le dossier `xampp/htdocs`
+et n'oublie pas de démarrer (*Start*) XAMPP.
+</Aside>
 
-Voici deux pages d'un même site. Repère ce qui est **identique** sur les deux (à extraire dans des fragments) et ce qui est **propre** à chaque page.
+### Exercice 1 : Optimiser la structure
+
+Le site contient actuellement trois pages :
+
+* une page d'accueil ;
+* une page qui présente les produits ;
+* une page de contact.
+
+Repère ce qui est **identique** ou commun aux trois pages et qui pourrait être extrait dans des fragments réutilisables. Identifie également ce qui est **propre** à chaque page.
+
+Crée ensuite les fragments nécessaires et intègre-les dans chacune des pages avec `include` ou `require`.
+
+---
 
 #### Page `accueil.php`
 
 ```html
 <!doctype html>
 <html lang="fr">
-<head><title>Accueil — Érablière</title></head>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Accueil — Nord & Tasse</title>
+</head>
+
 <body>
-  <nav><a href="accueil.php">Accueil</a> · <a href="contact.php">Contact</a></nav>
+
+  <header>
+    <p><strong>Nord & Tasse</strong></p>
+
+    <nav>
+      <a href="accueil.php">Accueil</a> ·
+      <a href="produits.php">Produits</a> ·
+      <a href="contact.php">Contact</a>
+    </nav>
+  </header>
+
   <main>
-    <h1>Bienvenue à l'Érablière dorée</h1>
-    <p>Nos produits d'érable, directement de la cabane.</p>
+    <h1>Le café simplement</h1>
+
+    <p>
+      Nord & Tasse sélectionne des cafés et des accessoires
+      pour préparer un bon café à la maison.
+    </p>
+
+    <section>
+      <h2>Notre sélection</h2>
+
+      <p>
+        Découvrez chaque mois des cafés provenant de torréfacteurs
+        québécois ainsi que nos accessoires préférés.
+      </p>
+
+      <a href="produits.php">Découvrir nos produits</a>
+    </section>
   </main>
-  <footer>© 2025 L'Érablière dorée</footer>
+
+  <footer>
+    <p>© 2026 Nord & Tasse — Montréal</p>
+  </footer>
+
 </body>
 </html>
 ```
+
+---
+
+#### Page `produits.php`
+
+```html
+<!doctype html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Produits — Nord & Tasse</title>
+</head>
+
+<body>
+
+  <header>
+    <p><strong>Nord & Tasse</strong></p>
+
+    <nav>
+      <a href="accueil.php">Accueil</a> ·
+      <a href="produits.php">Produits</a> ·
+      <a href="contact.php">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Nos produits</h1>
+
+    <p>
+      Découvrez notre sélection de cafés et d'accessoires
+      pour préparer votre café à la maison.
+    </p>
+
+    <section>
+      <h2>Café Boréal</h2>
+
+      <p>
+        Un café à torréfaction moyenne aux notes de chocolat,
+        de noisette et de caramel.
+      </p>
+
+      <p><strong>18,95 $</strong> — 340 g</p>
+    </section>
+
+    <section>
+      <h2>Café Matin clair</h2>
+
+      <p>
+        Un café léger et fruité, aux notes d'agrumes et de miel.
+      </p>
+
+      <p><strong>17,50 $</strong> — 340 g</p>
+    </section>
+
+    <section>
+      <h2>Presse française</h2>
+
+      <p>
+        Une cafetière simple permettant de préparer un café
+        riche et corsé en quelques minutes.
+      </p>
+
+      <p><strong>29,95 $</strong></p>
+    </section>
+
+    <section>
+      <h2>Moulin manuel</h2>
+
+      <p>
+        Un moulin compact avec réglage de la mouture,
+        adapté au café filtre et à la presse française.
+      </p>
+
+      <p><strong>34,95 $</strong></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2026 Nord & Tasse — Montréal</p>
+  </footer>
+
+</body>
+</html>
+```
+
+---
 
 #### Page `contact.php`
 
 ```html
 <!doctype html>
 <html lang="fr">
-<head><title>Contact — Érablière</title></head>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Contact — Nord & Tasse</title>
+</head>
+
 <body>
-  <nav><a href="accueil.php">Accueil</a> · <a href="contact.php">Contact</a></nav>
+
+  <header>
+    <p><strong>Nord & Tasse</strong></p>
+
+    <nav>
+      <a href="accueil.php">Accueil</a> ·
+      <a href="produits.php">Produits</a> ·
+      <a href="contact.php">Contact</a>
+    </nav>
+  </header>
+
   <main>
     <h1>Nous joindre</h1>
-    <p>Téléphone : 1 800 ÉRABLE.</p>
+
+    <p>
+      Une question sur un produit ou sur la préparation du café ?
+      Notre équipe pourra vous conseiller.
+    </p>
+
+    <section>
+      <h2>Coordonnées</h2>
+
+      <p>Téléphone : 514 555-0182</p>
+      <p>Courriel : bonjour@nordettasse.example</p>
+      <p>Adresse : 1250, rue du Marché, Montréal</p>
+    </section>
+
+    <section>
+      <h2>Heures d'ouverture</h2>
+
+      <p>Lundi au vendredi : 8 h à 18 h</p>
+      <p>Samedi et dimanche : 9 h à 17 h</p>
+    </section>
   </main>
-  <footer>© 2025 L'Érablière dorée</footer>
+
+  <footer>
+    <p>© 2026 Nord & Tasse — Montréal</p>
+  </footer>
+
 </body>
 </html>
 ```
 
-<Checkpoint question="Indice">
-Lis les deux pages côte à côte. Ce qui est rigoureusement identique peut vivre dans **un seul** fichier partagé. Ce qui change d'une page à l'autre reste propre à la page.
+<Checkpoint question="Indice 1">
+
+Compare les trois pages côte à côte.
+
+Certaines parties sont répétées **exactement** dans les trois fichiers. Par exemple, la navigation et le pied de page sont identiques.
+
+Plutôt que de les copier dans chaque page, elles pourraient être placées dans des fichiers séparés et incluses avec `include`.
+
 </Checkpoint>
 
-<Checkpoint question="Solution">
-**Identique → deux fragments.** 
-- `entete.php`: L'en-tête, du `<!doctype html>` jusqu'à la fin du `<nav>`. 
-- `pied.php`: Le `<footer>` et la fermeture (`</body></html>`).
+<Checkpoint question="Indice 2">
 
-**Propre à chaque page → le contenu.** 
-- Seul le `<main>` change et c'est tout ce que chaque fichier de page (`accueil.php`, `contact.php`) doit garder.
-
-Le `<title>` diffère lui aussi (« Accueil — … » contre « Contact — … »). 
-On peut résoudre ça en passant le titre à l'en-tête par une variable.
-</Checkpoint>
-
-### Exercice 1.2 : Insérer un fragment avec `include`
-
-Les fragments `entete.php` et `pied.php` existent déjà (ci-dessous). 
-Écris `accueil.php` pour qu'il les **insère** autour de son contenu, sans recopier le HTML commun.
-
-#### Fragment `entete.php`
+Le début du document est presque identique dans les trois pages, mais le contenu de `<title>` change :
 
 ```html
-<!doctype html>
-<html lang="fr">
-<head><title>L'Érablière dorée</title></head>
-<body>
-  <nav><a href="accueil.php">Accueil</a> · <a href="contact.php">Contact</a></nav>
-
+<title>Accueil — Nord & Tasse</title>
 ```
-
-#### Fragment `pied.php`
 
 ```html
-  <footer>© 2025 L'Érablière dorée</footer>
-</body>
-</html>
+<title>Produits — Nord & Tasse</title>
 ```
-
-<Checkpoint question="Indice">
-`include 'fichier.php';` insère le contenu du fichier à cet endroit, comme un copier-coller exécuté. Place l'include de l'en-tête **avant** ton contenu, et celui du pied **après**.
-</Checkpoint>
-
-<Checkpoint question="Solution">
-
-```php
-<!-- accueil.php -->
-<?php include 'entete.php'; ?>
-
-<main>
-  <h1>Bienvenue à l'Érablière dorée</h1>
-  <p>Nos produits d'érable, directement de la cabane.</p>
-</main>
-
-<?php include 'pied.php'; ?>
-```
-
-</Checkpoint>
-
-### Exercice 1.3 : Passer le titre au fragment
-
-Le `<title>` change d'une page à l'autre, mais l'en-tête est partagé. Un fichier inclus **voit les variables définies avant son include**. Voici `entete.php`, qui attend désormais une variable `$titre` :
-
-```php
-<!-- entete.php -->
-<!doctype html>
-<html lang="fr">
-<head><title><?= htmlspecialchars($titre) ?></title></head>
-<body>
-  <nav><a href="accueil.php">Accueil</a> · <a href="contact.php">Contact</a></nav>
-```
-
-Écris le début de `accueil.php` pour que le titre affiché soit « Accueil — Érablière ».
-
-<Checkpoint question="Indice">
-Définis `$titre` **avant** d'inclure `entete.php`. L'include n'a pas de portée séparée : il partage les variables de la page qui l'inclut.
-</Checkpoint>
-
-<Checkpoint question="Solution">
-
-```php
-<!-- accueil.php -->
-<?php $titre = 'Accueil — Érablière'; ?>
-<?php include 'entete.php'; ?>
-
-<main>
-  <h1>Bienvenue à l'Érablière dorée</h1>
-</main>
-
-<?php include 'pied.php'; ?>
-```
-
-</Checkpoint>
-
-## Niveau 2 — Naviguer entre les pages
-
-Les pages assemblées, reste à les **relier** et à réagir à ce que l'URL demande.
-
-### Exercice 2.1 : Relier les pages
-
-Dans `entete.php`, la barre de navigation relie les pages du site.  
-Écris le `<nav>` qui mène à l'accueil, aux produits et au contact (fichiers `accueil.php`, `produits.php`, `contact.php`).
-
-<Checkpoint question="Indice">
-Un lien interne, c'est `<a href="produits.php">Produits</a>`. Le chemin est relatif au dossier de la page courante.
-</Checkpoint>
-
-<Checkpoint question="Solution">
 
 ```html
-<nav>
-  <a href="accueil.php">Accueil</a>
-  <a href="produits.php">Produits</a>
-  <a href="contact.php">Contact</a>
-</nav>
+<title>Contact — Nord & Tasse</title>
 ```
 
-</Checkpoint>
+Il n'est pas nécessaire de créer trois fragments différents.
 
-### Exercice 2.2 : Lire la page demandée dans l'URL
+Un fichier inclus **a accès aux variables définies avant son `include`**.
 
-Une URL comme `produits.php?categorie=sirop` transporte une donnée après le `?`. PHP la dépose dans la superglobale `$_GET`.  
-Récupère la catégorie demandée, ou `'tous'` si aucune n'est précisée.
+Il est donc possible de définir une variable `$titre` dans chaque page avant d'inclure le fragment commun.
 
-```php
-// produits.php?categorie=sirop  →  $categorie vaut "sirop"
-// produits.php                  →  $categorie vaut "tous"
-```
-
-<Checkpoint question="Indice">
-`$_GET['categorie']` contient la valeur écrite après `categorie=`. Au premier affichage, sans paramètre, cette clé n'existe pas : `??` fournit alors la valeur par défaut.
-</Checkpoint>
-
-<Checkpoint question="Solution">
+Par exemple :
 
 ```php
 <?php
-$categorie = $_GET['categorie'] ?? 'tous';
+$titre = 'Accueil';
+?>
 ```
 
 </Checkpoint>
 
-### Exercice 2.3 : Marquer la page active
+<Checkpoint question="Indice 3">
 
-Pour aider le visiteur à se repérer, la page courante doit se distinguer dans le menu. La page courante est connue dans `$pageActive`. Ajoute la classe `actif` au seul lien correspondant.
+Une organisation possible du projet pourrait commencer ainsi :
 
-```php
-// Si $pageActive vaut 'produits', seul le lien Produits reçoit class="actif".
+```text
+/
+├── accueil.php
+├── produits.php
+├── contact.php
+└── fragments/
+    ├── ...
+    ├── ...
+    └── ...
 ```
 
-<Checkpoint question="Indice">
-Pour chaque lien, compare sa cible à `$pageActive`. Si elles correspondent, écris `class="actif"`, sinon rien. Un opérateur ternaire (`?:`) tient sur une ligne, à l'intérieur de l'attribut.
-</Checkpoint>
-
-<Checkpoint question="Solution">
-
-```php
-<nav>
-  <a href="accueil.php"  class="<?= $pageActive === 'accueil'  ? 'actif' : '' ?>">Accueil</a>
-  <a href="produits.php" class="<?= $pageActive === 'produits' ? 'actif' : '' ?>">Produits</a>
-  <a href="contact.php"  class="<?= $pageActive === 'contact'  ? 'actif' : '' ?>">Contact</a>
-</nav>
-```
+Demande-toi quelles parties appartiennent à la **structure générale du site** et lesquelles représentent réellement le **contenu propre à chaque page**.
 
 </Checkpoint>
 
-## Niveau 3 — Automatiser la composition avec des fonctions
+### Exercice 2 : Optimiser la navigation
 
-Mêmes idées, mais cette fois on remplace les fragments par des **fonctions qui retournent du HTML** : plus souples, paramétrables et testables.
+Dans l'exercice précédent, la navigation a été déplacée dans un fragment commun.
 
-<Aside type="exemple" title="Du fichier à la fonction">
-Un fragment inséré par `include` et une fonction qui **retourne** une chaîne de HTML rendent le même service. La fonction a un avantage : on lui passe des arguments, et on peut la tester sans recharger toute une page.
-</Aside>
+Cependant, la liste des liens est encore directement écrite dans ce fragment. Plus le site grandit, plus cette façon de faire devient difficile à maintenir.
 
-### Exercice 3.1 : L'en-tête et le pied en fonctions
+Modifie le site afin que sa navigation soit construite à partir d'un **fichier de configuration** décrivant les pages disponibles.
 
-Transforme tes fragments en fonctions : `entete($titre)` ouvre la page avec un titre, `pied()` la referme. (C'est la version « fonction » des exercices 1.2 et 1.4.)
+La configuration doit permettre de définir au minimum :
 
-Signature : `entete(string $titre): string` et `pied(): string`
+* l'identifiant d'une page ;
+* son titre ;
+* son URL.
 
-```php
-echo entete('Accueil');
-// <!doctype html><html lang="fr"><head><title>Accueil</title></head><body>
+La navigation doit ensuite être générée à partir de cette configuration plutôt que d'une liste de liens écrite manuellement.
 
-echo pied();
-// </body></html>
-```
+Pour aider le visiteur à se repérer dans le site, le lien correspondant à la **page courante** doit également se distinguer visuellement des autres.
 
-<Checkpoint question="Indice">
-Chaque fonction retourne un morceau de HTML. `entete` reçoit le titre à insérer dans `<title>` ; échappe-le avec `htmlspecialchars()`. `pied` n'a besoin d'aucun paramètre.
-</Checkpoint>
+Ajoute aussi l'attribut HTML approprié pour indiquer sémantiquement qu'un lien représente la page actuellement affichée.
 
-<Checkpoint question="Solution">
+<Checkpoint question="Indice 1">
 
-```php
-function entete(string $titre): string
-{
-    $titre = htmlspecialchars($titre);
-    return '<!doctype html><html lang="fr"><head><title>'
-        . $titre . '</title></head><body>';
-}
+Une structure de données peut représenter les différentes pages du site.
 
-function pied(): string
-{
-    return '</body></html>';
-}
-```
+Pour chaque page, il faut conserver les informations nécessaires pour produire un lien de navigation.
 
 </Checkpoint>
 
-### Exercice 3.2 : Charger des données depuis un fichier PHP
- 
-Pour séparer les données de l'affichage, on les range dans un fichier PHP à part. 
-Un fichier qui se termine par `return` **renvoie** une valeur, et `require` la récupère.
+<Checkpoint question="Indice 2">
 
-Voici le fichier de données ; dans `produits.php`, charge ce tableau dans `$produits`, puis affiche la liste.
- 
-```php
-<?php
-// data/produits.php
-return [
-    ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50],
-    ["nom" => "Beurre d'érable 250 g",  "prix" => 9.95],
-    ["nom" => "Tire sur la neige",       "prix" => 6.00],
-];
-```
- 
-<Checkpoint question="Indice">
-Un fichier qui fait `return [...]` renvoie cette valeur à qui l'inclut. On la capture donc dans une variable : `$donnees = require 'fichier.php';`. Ensuite, `$produits` est un tableau ordinaire — `count`, `foreach`, etc.
-</Checkpoint>
-<Checkpoint question="Solution">
-```php
-<?php
-// produits.php
-$produits = require 'data/produits.php';
- 
-echo count($produits) . ' produits au catalogue :';
- 
-foreach ($produits as $p) {
-    $prix = number_format($p['prix'], 2, ',', ' ');
-    echo '<p>' . htmlspecialchars($p['nom']) . ' — ' . $prix . ' $</p>';
-}
-// → 3 produits au catalogue : Sirop d'érable 540 ml — 14,50 $ ...
-```
- 
-</Checkpoint>
-<MarginNote type="astuce" titre="return ou variables ?">
-Deux façons de fournir des données par un fichier : le faire **`return`** une valeur (à capturer, comme ici), 
-ou y **définir des variables** (`$siteNom = "...";`) que la page voit après l'`include`. 
-Pour un fichier de données ou de configuration, `return` est plus clair.
-</MarginNote>
+Pour distinguer la page courante, le fragment doit savoir **quelle page est actuellement affichée**.
 
-### Exercice 3.3 : Un menu qui se génère
+Une possibilité consiste à définir une variable propre à chaque page avant d'inclure les fragments communs.
 
-Dernière pièce : produire la barre de navigation par une fonction, à partir d'une liste de pages (`url => libellé`), 
-en mettant en évidence la page courante. 
-C'est l'extension de l'exercice 2.3.
-
-Signature : `menu(array $pages, string $courant): string`
-
-```php
-$pages = ['accueil' => 'Accueil', 'contact' => 'Contact'];
-menu($pages, 'contact');
-// <nav><a href="accueil">Accueil</a><a href="contact" class="actif">Contact</a></nav>
-```
-
-<Checkpoint question="Indice">
-Parcours le tableau avec `foreach ($pages as $url => $libelle)`. Pour chaque entrée, ajoute `class="actif"` si `$url === $courant`. Accumule les liens dans une chaîne (`.=`), puis enveloppe le tout dans `<nav>...</nav>`. Pense à `htmlspecialchars()` sur le libellé.
 </Checkpoint>
 
-<Checkpoint question="Solution">
+<Checkpoint question="Indice 3">
 
-```php
-function menu(array $pages, string $courant): string
-{
-    $liens = '';
-    foreach ($pages as $url => $libelle) {
-        $libelle = htmlspecialchars($libelle);
-        $classe = $url === $courant ? ' class="actif"' : '';
-        $liens .= '<a href="' . $url . '"' . $classe . '>' . $libelle . '</a>';
-    }
-    return '<nav>' . $liens . '</nav>';
-}
+Lorsque la page générée correspond à la page courante, ajoute :
+
+* une classe CSS permettant de la distinguer visuellement ;
+* l'attribut `aria-current="page"`.
+
+Par exemple, le HTML final pourrait contenir :
+
+```html
+<a href="produits.php" class="active" aria-current="page">
+  Produits
+</a>
 ```
+
+</Checkpoint>
+
+### Exercice 3 : Optimiser les données des produits
+
+La page `produits.php` contient actuellement à la fois :
+
+* les données des produits ;
+* le HTML utilisé pour les présenter.
+
+Cette organisation fonctionne avec quelques produits, mais elle devient rapidement difficile à maintenir lorsque le catalogue grandit.
+
+Modifie la page afin de **séparer les données de leur affichage**.
+
+Les informations sur les produits doivent être déplacées dans un fichier distinct. La page `produits.php` doit ensuite utiliser ces données pour générer la liste des produits.
+
+La présentation HTML d'un produit doit également être extraite dans un **template réutilisable**.
+
+#### Résultat attendu
+
+Une fois le travail terminé :
+
+* les informations sur les produits ne sont plus directement écrites dans `produits.php` ;
+* les produits sont définis dans un fichier distinct ;
+* `produits.php` parcourt les données disponibles pour afficher le catalogue ;
+* la structure HTML utilisée pour présenter un produit n'est définie qu'une seule fois ;
+* tous les produits utilisent le même template de présentation ;
+* l'ajout d'un produit ne nécessite pas de recopier un bloc HTML complet.
+
+<Checkpoint question="Indice 1">
+
+Les produits ont tous une structure semblable : un nom, une description, un prix et parfois un format.
+
+Une collection de tableaux associatifs permet de représenter ce type de données en PHP.
+
+</Checkpoint>
+
+<Checkpoint question="Indice 2">
+
+Le template d'un produit pourrait recevoir, par l'intermédiaire d'une variable, les informations du produit actuellement traité.
+
+Il devrait être responsable uniquement de sa présentation, par exemple :
+
+```html
+<section>
+  <h2>...</h2>
+  <p>...</p>
+  <p>...</p>
+</section>
+```
+
+Les valeurs affichées doivent toutefois provenir des données du produit et non être écrites directement dans le template.
+
+</Checkpoint>
+
+<Checkpoint question="Indice 3">
+
+La structure du projet pourrait maintenant contenir des fichiers dédiés aux données et aux templates :
+
+```text
+/
+├── accueil.php
+├── produits.php
+├── contact.php
+├── config.php
+├── donnees/
+│   └── ...
+└── fragments/
+    ├── entete.php
+    ├── navigation.php
+    ├── ...
+    └── pied.php
+```
+
+</Checkpoint>
+
+
+## Synthèse &ndash; Site personnel
+
+Tu dois maintenant créer un petit **site personnel de type portfolio** permettant de te présenter, de montrer quelques réalisations et de résumer ton parcours.
+
+### Pages obligatoires
+
+Ton site doit contenir **au moins trois pages**.
+
+#### Accueil
+
+La page d'accueil présente rapidement la personne et permet au visiteur de comprendre qui elle est et ce qu'elle recherche.
+
+Elle doit notamment présenter :
+
+* une courte présentation ;
+* quelques intérêts ;
+* les principales compétences ;
+* les disponibilités ou le type d'opportunités recherchées ;
+* une façon de prendre contact.
+
+Tu peux organiser cette information comme tu le souhaites.
+
+
+#### Réalisations
+
+La page `realisations.php` constitue le portfolio.
+
+Elle présente plusieurs projets ou réalisations de façon suffisamment détaillée pour permettre au visiteur de comprendre le travail effectué.
+
+Chaque réalisation devrait contenir plusieurs informations pertinentes, par exemple :
+
+* le titre du projet ;
+* une description ;
+* les technologies utilisées ;
+* le contexte du projet ;
+* le rôle ou les responsabilités ;
+* un lien vers le projet ou son dépôt, lorsque pertinent.
+
+Les réalisations doivent être présentées de manière cohérente et utiliser une structure visuelle commune.
+
+#### À propos
+
+La page `a-propos.php` présente plus en détail le parcours de la personne.
+
+Elle doit notamment contenir :
+
+* la formation ;
+* les expériences professionnelles ou scolaires ;
+* d'autres informations pertinentes au profil présenté.
+
+Tu peux y ajouter d'autres sections selon le contexte choisi : certifications, langues, activités, implication, intérêts professionnels, etc.
+
+### Contenu minimal
+
+Le portfolio doit contenir au minimum :
+
+* **3 pages** ;
+* **3 réalisations distinctes** ;
+* plusieurs compétences ;
+* au moins une formation ;
+* au moins une expérience ;
+* des informations permettant de contacter la personne.
+
+Tu peux ajouter d'autres pages ou sections si elles apportent quelque chose au portfolio.
+
+
+### Structure
+
+L'organisation des fichiers est laissée à ton jugement.
+
+Elle doit toutefois montrer clairement la séparation entre :
+
+* les pages du site ;
+* les éléments réutilisables ;
+* la configuration ;
+* les données utilisées pour générer certains contenus.
+
+Choisis des noms de fichiers et de dossiers qui permettent de comprendre facilement leur rôle.
+
+### Présentation
+
+Ajoute une ou plusieurs feuille de style CSS afin de donner au portfolio une présentation simple mais soignée.
+Le site doit notamment être lisible, facile à parcourir et utilisable sur différentes tailles d'écran.
+
+L'objectif n'est pas de produire une interface complexe, mais de présenter correctement le contenu et de montrer une bonne organisation du site.
+
+---
+
+<Checkpoint question="Réflexion">
+
+Observe l'organisation de ton projet.
+
+Si tu devais ajouter demain :
+
+* une quatrième page ;
+* une sixième réalisation ;
+* une nouvelle information dans toutes les cartes de projet ;
+
+combien de fichiers devrais-tu modifier ?
+
+Une bonne organisation devrait limiter le nombre de changements nécessaires.
+
+</Checkpoint>
+
+<Checkpoint question="Pour aller plus loin">
+
+Une fois les exigences minimales terminées, tu peux enrichir ton portfolio avec, par exemple :
+
+- des images pour les réalisations ;
+- des liens vers GitHub ou une démonstration ;
+- une page dédiée à une réalisation ;
+- des catégories de projets ;
+- des liens vers des profils professionnels ;
+- une section de technologies ou d'outils maîtrisés.
 
 </Checkpoint>

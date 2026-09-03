@@ -44,8 +44,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Premiers pas avec PHP', slug: 'exercices/01-introduction' },
 						{ label: 'Les fonctions en PHP', slug: 'exercices/02-fonctions' },
-						// { label: 'La navigation en PHP', slug: 'exercices/03-navigation' },
-						// { label: 'Site complet en PHP', slug: 'exercices/04-siteweb' },
+						{ label: 'Création de site web en PHP', slug: 'exercices/04-siteweb' },
 						// { label: 'Session et accès BD en PHP ', slug: 'exercices/05-donnees' },
 					]
 				},
