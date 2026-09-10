@@ -31,6 +31,7 @@ export default defineConfig({
 							{ label: 'Programmation en PHP', slug: 'cours/02-prog-base-php' },
 							{ label: 'Notions avancées de PHP', slug: 'cours/03-prog-avancee-php' },
 							{ label: 'Page dynamique', slug: 'cours/03-page-dynamique' },
+							{ label: 'Formulaire', slug: 'cours/04-formulaire' },
 							// { label: 'Formulaires et GET / POST', slug: 'cours/05-formulaires' },
 							// { label: 'Superglobales', slug: 'cours/06-superglobals' },
 							// { label: 'Préservation de session et données', slug: 'cours/07-preservation' },

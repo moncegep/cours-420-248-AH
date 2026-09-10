@@ -174,7 +174,9 @@ Quand des erreurs existent, on réaffiche le formulaire avec les messages — et
 
 ## Ouverture sur les API
 
-Un formulaire n'est qu'une façon, parmi d'autres, d'envoyer des données. Une **API** reçoit des requêtes émises non par un navigateur, mais par un autre programme (application mobile, autre serveur, code JavaScript). Le principe reste le même — une requête, une méthode, une réponse — mais les données échangées sont généralement du **JSON** plutôt que du HTML.
+Un formulaire n'est qu'une façon, parmi d'autres, d'envoyer des données. 
+Une **API** reçoit des requêtes émises non par un navigateur, mais par un autre programme (application mobile, autre serveur, code JavaScript). 
+Le principe reste le même — une requête, une méthode, une réponse — mais les données échangées sont généralement du **JSON** plutôt que du HTML.
 
 ```php
 <?php
@@ -190,10 +192,11 @@ $donnees = json_decode(file_get_contents("php://input"), true);
 ```
 
 <MarginNote type="lien">
-Les méthodes `GET`, `POST`, `PUT`, `DELETE` prennent ici tout leur sens : elles structurent une API REST (lire, créer, remplacer, supprimer). C'est le sujet d'un prochain chapitre — mais la discipline de validation reste exactement la même.
+Les méthodes `GET`, `POST`, `PUT`, `DELETE` prennent ici tout leur sens : elles structurent une API REST (lire, créer, remplacer, supprimer). 
+C'est le sujet d'un prochain chapitre. Bien entendu, la discipline de validation reste exactement la même.
 </MarginNote>
 
-<Highlight>Quelle que soit la porte d'entrée — formulaire ou API — les données viennent de l'extérieur : on les valide toujours avant de leur faire confiance.</Highlight>
+<Highlight>Quelle que soit la porte d'entrée, formulaire ou API, les données viennent de l'extérieur : on les valide toujours avant de leur faire confiance.</Highlight>
 
 ## Sécurité de l'affichage : `htmlspecialchars`
 

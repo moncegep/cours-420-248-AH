@@ -78,7 +78,7 @@ const presets = [
     label: 'POST avec chaîne de requête',
     methode: 'POST',
     url: '/index.php?page=commande',
-    champs: 'nom=Ti-Jean\ncourriel=tijean@exemple.test\nquantite=3',
+    champs: 'nom=Pascal Vicent\ncourriel=pascal.vincent@exemple.test\nquantite=3',
   },
   {
     label: 'Paramètre répété',
@@ -91,20 +91,20 @@ const presets = [
 const css = `
 .rqi { border:1px solid var(--sl-color-gray-5, #e6e9ef); border-radius:12px; overflow:hidden;
   background:var(--sl-color-bg, #fff); margin:1.5rem 0; }
-.rqi-head { padding:10px 14px; border-bottom:1px solid var(--sl-color-gray-5, #e6e9ef);
+.rqi-head { margin: 0; padding:10px 14px; border-bottom:1px solid var(--sl-color-gray-5, #e6e9ef);
   background:var(--sl-color-gray-6, #f7f8fa); }
-.rqi-title { font-size:12px; font-weight:700; letter-spacing:.03em;
+.rqi-title { font-size:15px; font-weight:700; letter-spacing:.03em;
   color:var(--sl-color-accent, #4f46e5); }
-.rqi-sub { font-size:12px; color:var(--sl-color-gray-3, #6b7280); margin-top:2px; }
+.rqi-sub { font-size:13px; color:var(--sl-color-gray-3, #6b7280); margin-top:2px; }
 .rqi-body { padding:14px; display:flex; flex-direction:column; gap:12px; }
 .rqi-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
 .rqi-seg { display:inline-flex; border:1px solid var(--sl-color-gray-5, #d7dce6); border-radius:8px; overflow:hidden; }
-.rqi-seg button { font-family:var(--sl-font-mono, 'Fira Code', monospace); font-size:12px; font-weight:700;
+.rqi-seg button {margin: 0; font-family:var(--sl-font-mono, 'Fira Code', monospace); font-size:14px; font-weight:700;
   padding:5px 14px; border:0; background:transparent; color:var(--sl-color-gray-2, #515a6e); cursor:pointer; }
 .rqi-seg button + button { border-left:1px solid var(--sl-color-gray-5, #d7dce6); }
 .rqi-seg button[data-on="true"] { background:var(--sl-color-accent-low, #eef0fe); color:var(--sl-color-accent, #4f46e5); }
 .rqi-field { display:flex; flex-direction:column; gap:4px; }
-.rqi-label { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+.rqi-label { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
   color:var(--sl-color-gray-3, #8a93a6); }
 .rqi-input, .rqi-area { font-family:var(--sl-font-mono, 'Fira Code', monospace); font-size:13px;
   padding:8px 10px; border:1px solid var(--sl-color-gray-5, #d7dce6); border-radius:8px;
@@ -112,12 +112,12 @@ const css = `
 .rqi-area { resize:vertical; min-height:64px; line-height:1.5; }
 .rqi-input:focus, .rqi-area:focus { outline:2px solid var(--sl-color-accent, #4f46e5); outline-offset:1px; border-color:transparent; }
 .rqi-presets { display:flex; flex-wrap:wrap; gap:6px; }
-.rqi-chip { font-size:11px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer;
+.rqi-chip { margin: 0; font-size:13px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer;
   border:1px solid var(--sl-color-gray-5, #d7dce6); background:transparent; color:var(--sl-color-gray-2, #515a6e); }
 .rqi-chip:hover { background:var(--sl-color-gray-6, #f1f2f6); }
 .rqi-out { display:grid; gap:10px; }
 .rqi-block { border:1px solid var(--sl-color-gray-5, #e6e9ef); border-radius:8px; overflow:hidden; }
-.rqi-block-head { font-family:var(--sl-font-mono, 'Fira Code', monospace); font-size:11px; font-weight:700;
+.rqi-block-head { font-family:var(--sl-font-mono, 'Fira Code', monospace); font-size:12px; font-weight:700;
   padding:5px 10px; background:var(--sl-color-gray-6, #f7f8fa); color:var(--sl-color-gray-2, #515a6e);
   border-bottom:1px solid var(--sl-color-gray-5, #e6e9ef); }
 .rqi-pre { margin:0; padding:9px 11px; font-family:var(--sl-font-mono, 'Fira Code', monospace);
@@ -208,7 +208,7 @@ export default function RequeteInspecteur() {
               className="rqi-area"
               value={champs}
               spellCheck={false}
-              placeholder={'nom=Ti-Jean\ncourriel=tijean@exemple.test'}
+              placeholder={'nom=Pascal Vincent\ncourriel=pascal.vincent@exemple.test'}
               onChange={(e) => setChamps(e.target.value)}
             />
           </div>

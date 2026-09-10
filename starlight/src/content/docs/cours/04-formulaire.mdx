@@ -1,0 +1,421 @@
+---
+title: Formulaires et données reçues
+description: Recevoir des données du navigateur avec $_GET, $_POST et $_SERVER, écrire un formulaire, valider côté serveur et rediriger après traitement.
+sidebar:
+  order: 5
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import RequeteInspecteur from '../../../components/react/RequeteInspecteur.jsx';
+import FormulaireSuperglobale from '../../../components/react/FormulaireSuperglobale.jsx';
+import ValidationServeur from '../../../components/react/ValidationServeur.jsx';
+import FluxSequence from '../../../components/react/FluxSequence.jsx';
+import FluxDiagram from '../../../components/react/FluxDiagram.tsx';
+
+Jusqu'ici, les données affichées par nos pages étaient écrites par nous (dans les fichiers PHP)
+Cependant, une application web traite généralement aussi des données en provenance de l'utilisateur, d'autres programmes ou appareils. 
+Dans ce chapitre, nous voyons un moyen de recevoir et traiter ce genre de données à l'aide de formulaire.
+
+## Recevoir des données du navigateur
+
+Une requête peut transporter des données par deux chemins. 
+Le premier est l'**URL** elle-même : tout ce qui suit le point d'interrogation forme la **chaîne de requête**, v
+isible dans la barre d'adresse. Le second est le **corps de la requête**, envoyé séparément et invisible dans la barre d'adresse.
+
+Avant que la première ligne de votre script s'exécute, PHP a déjà lu la requête et rempli trois tableaux.
+
+<MarginNote type="rappel">
+Une **superglobale** est une variable que PHP rend accessible partout dans le script, y compris à l'intérieur d'une fonction, sans avoir à la déclarer avec `global`. Le nom vient de là.
+</MarginNote>
+
+- `$_GET` — les paires nom/valeur trouvées dans la chaîne de requête ;
+- `$_POST` — les données envoyées dans le corps d'une requête `POST` avec l'encodage habituel d'un formulaire HTML;
+- `$_SERVER` — le contexte de la requête : méthode employée, adresse demandée, en-têtes reçus.
+
+<Aside type='plusloin' title='Limite de $_POST'>
+Plus tard, lorsqu'une application enverra du *JSON* à une API, les données seront toujours dans le corps de la requête, mais elles ne seront pas automatiquement placées dans `$_POST`.
+</Aside>
+
+Modifiez la requête ci-dessous et observez les trois tableaux se remplir.
+
+<RequeteInspecteur client:visible />
+
+<Aside type="attention" title="Un reflet, pas un rangement">
+Les superglobales sont la lecture que PHP fait **de cette requête-ci**. Elles ne conservent rien : à la requête suivante, elles sont reconstruites à partir de zéro, comme le reste du script. Y écrire une valeur pour la retrouver plus tard ne fonctionne pas.
+</Aside>
+
+Notez que les deux chemins ne s'excluent pas. Un formulaire envoyé en POST vers `traitement.php?etape=2` remplira `$_POST` avec ses champs **et** `$_GET` avec le paramètre de l'URL.
+
+## GET ou POST
+
+Le choix se discute mieux à partir de ses conséquences observables qu'à partir d'une règle apprise par cœur.
+
+| | GET | POST |
+| --- | --- | --- |
+| Où voyagent les données | dans l'URL | dans le corps de la requête |
+| Visible dans la barre d'adresse | oui | non |
+| Peut être mise en favori, partagée par courriel | oui | non |
+| Au rafraîchissement | rejouée sans avertissement | le navigateur demande confirmation |
+| Taille utilisable | limitée en pratique | nettement plus large |
+| Conservée dans le cache du navigateur | oui | non |
+
+<Aside type="attention" title="POST n'est pas un chiffrement">
+Les données d'un POST ne s'affichent pas dans la barre d'adresse, mais elles circulent en clair sur le réseau exactement comme celles d'un GET. Ce qui protège leur contenu en transit, c'est HTTPS, pas le choix de la méthode.
+</Aside>
+
+<Aside type="exemple" title="Bonne pratique — choisir selon l'effet de la requête">
+Une recherche, un filtre, une pagination gagnent le plus souvent à passer en GET : l'adresse obtenue devient partageable et se remet en favori telle quelle. 
+Une création, une modification ou une suppression passent plutôt en POST, pour éviter qu'un simple rafraîchissement ne les rejoue.  
+GET demande une représentation ou une information. POST demande au serveur d'effectuer une action.
+</Aside>
+
+## Écrire le formulaire
+
+Trois attributs suffisent à faire circuler des données : `method` sur le formulaire, `action` pour la destination, et `name` sur chaque champ.
+
+```html
+<form method="post" action="traitement.php">
+  <label>Nom
+    <input type="text" name="nom">
+  </label>
+  <button type="submit">Envoyer</button>
+</form>
+```
+
+<Highlight couleur="ambre">L'attribut `name` est le pont entre le champ et le code PHP.</Highlight> Un champ sans `name` s'affiche normalement, se remplit normalement, et n'arrive pas au serveur — c'est l'oubli le plus fréquent, et le plus silencieux.
+
+<FormulaireSuperglobale client:visible />
+
+Deux comportements méritent qu'on s'y arrête. Un nom terminé par `[]`, comme `interets[]`, indique à PHP de rassembler les valeurs répétées dans un tableau plutôt que de ne garder que la dernière. Et une case à cocher qui n'est pas cochée **n'est pas transmise du tout** : sa clé est absente du tableau, elle n'y figure pas à vide.
+
+```php
+$nom        = $_POST["nom"] ?? "";
+$infolettre = isset($_POST["infolettre"]);
+$interets   = $_POST["interets"] ?? [];
+```
+
+<Aside type="syntaxe" title="?? et isset()">
+`$_POST["nom"] ?? ""` retourne la valeur si la clé existe, et la chaîne vide sinon. `isset($_POST["infolettre"])` retourne simplement `true` ou `false` : pour une case à cocher, la présence de la clé **est** l'information. Lire directement `$_POST["infolettre"]` sur une case décochée produirait un avertissement.
+</Aside>
+
+## `$_SERVER`, le contexte de la requête
+
+`$_SERVER` ne contient pas les données saisies, mais les circonstances de la requête. Quelques entrées reviennent souvent.
+
+| Entrée | Contenu |
+| --- | --- |
+| `REQUEST_METHOD` | la méthode employée, `"GET"` ou `"POST"` |
+| `REQUEST_URI` | l'adresse demandée, chaîne de requête comprise |
+| `SCRIPT_NAME` | le chemin du fichier PHP exécuté |
+| `HTTP_USER_AGENT` | le navigateur annoncé par le client |
+| `REMOTE_ADDR` | l'adresse IP à l'origine de la requête |
+
+<Aside type="attention" title="Toutes les entrées ne se valent pas">
+`REQUEST_METHOD` et `SCRIPT_NAME` sont établis par le serveur. En revanche, les entrées commençant par `HTTP_` reprennent des en-têtes fournis par le client, qui peut les remplir comme bon lui semble. Elles renseignent, mais elles se traitent comme des données reçues plutôt que comme des faits.
+</Aside>
+
+### Une page qui se soumet à elle-même
+
+Plutôt que de séparer le formulaire et son traitement en deux fichiers, on écrit souvent les deux dans le même, et `REQUEST_METHOD` sert à distinguer les deux passages.
+
+<Steps>
+
+1. **Premier passage.** La personne arrive par un lien : la requête est un GET, le formulaire s'affiche vide.
+
+2. **Deuxième passage.** Elle envoie le formulaire : la requête est un POST vers la même adresse, et le script prend cette fois la branche de traitement.
+
+</Steps>
+
+```php
+<?php
+$erreurs = [];
+$soumis  = $_SERVER["REQUEST_METHOD"] === "POST";
+
+if ($soumis) {
+    // normaliser, valider, puis agir
+}
+?>
+
+<form method="post" action="">
+```
+
+<MarginNote type="astuce">
+Un `action=""` renvoie vers l'adresse courante, chaîne de requête comprise. 
+Si le formulaire se soumet à la page courante, il n'est même pas nécessaire de préciser `action`.
+</MarginNote>
+
+## Valider côté serveur
+
+Le balisage HTML sait déjà poser des contraintes : `required`, `type="email"`, `min` et `max`. Elles rendent un vrai service, et il y a tout intérêt à les écrire : elles signalent le problème immédiatement, sans aller-retour vers le serveur, et guident la personne pendant qu'elle remplit.
+
+Elles décrivent en revanche le comportement **du navigateur**. Une requête peut atteindre votre page sans être passée par lui : un outil en ligne de commande, un script, un formulaire recopié et modifié ailleurs produisent des requêtes tout aussi valides du point de vue du serveur.
+
+<ValidationServeur client:visible />
+
+### Quatre familles de contrôles
+
+La plupart des validations se rangent dans l'une de ces catégories.
+
+- **Présence** — le champ est-il rempli, une fois les espaces retirés ?
+- **Format ou type** — la valeur ressemble-t-elle à un courriel, à un entier, à une date ?
+- **Plage ou longueur** — le nombre est-il dans les bornes attendues, le texte pas trop long ?
+- **Cohérence** — les deux mots de passe correspondent-ils, la date de fin suit-elle la date de début ?
+
+On **normalise** avant de contrôler : retirer les espaces de début et de fin avec `trim()` évite de refuser un nom qui n'a que le tort d'avoir été copié-collé avec une espace.
+
+```php
+$nom      = trim($_POST["nom"] ?? "");
+$courriel = trim($_POST["courriel"] ?? "");
+$quantite = trim($_POST["quantite"] ?? "");
+$erreurs  = [];
+
+if ($nom === "") {
+    $erreurs["nom"] = "Le nom est obligatoire.";
+}
+
+if (!filter_var($courriel, FILTER_VALIDATE_EMAIL)) {
+    $erreurs["courriel"] = "L'adresse ne ressemble pas à un courriel.";
+}
+
+$q = filter_var($quantite, FILTER_VALIDATE_INT, [
+    "options" => ["min_range" => 1, "max_range" => 10],
+]);
+if ($q === false) {
+    $erreurs["quantite"] = "La quantité doit se situer entre 1 et 10.";
+}
+
+if (!isset($_POST["conditions"])) {
+    $erreurs["conditions"] = "Les conditions doivent être acceptées.";
+}
+```
+
+<Aside type="exemple" title="Bonne pratique — accumuler plutôt qu'interrompre">
+Rassembler les messages dans un tableau `$erreurs` indexé par nom de champ, plutôt que d'arrêter le traitement à la première anomalie, permet d'afficher tous les problèmes d'un coup. La personne corrige une fois au lieu de découvrir les erreurs une par une, envoi après envoi.
+</Aside>
+
+### Valider n'est pas échapper
+
+Les deux opérations sont faciles à confondre, alors qu'elles répondent à des questions différentes et n'ont pas lieu au même moment.
+
+| | Validation | Échappement |
+| --- | --- | --- |
+| Question posée | cette valeur est-elle acceptable ? | comment l'écrire sans qu'elle soit interprétée ? |
+| Moment | à la réception | à l'affichage |
+| Résultat | un message d'erreur, ou rien | du texte transformé pour la sortie |
+
+Une valeur peut être parfaitement valide et rester dangereuse à afficher telle quelle. `htmlspecialchars()` reste donc nécessaire au moment d'écrire dans la page, y compris pour des données qui ont passé toutes les validations.
+
+### Réafficher sans faire retaper
+
+Quand des erreurs subsistent, le formulaire revient — et il gagne à revenir rempli. Retaper huit champs parce que l'un d'eux posait problème décourage vite.
+
+```php
+<input type="text" name="nom"
+       value="<?php echo htmlspecialchars($nom); ?>">
+
+<?php if (isset($erreurs["nom"])): ?>
+  <p class="erreur"><?php echo htmlspecialchars($erreurs["nom"]); ?></p>
+<?php endif; ?>
+```
+
+<Checkpoint question="Vos champs portent déjà required et le type email. Pourquoi revalider côté serveur ?">
+Parce que ces attributs décrivent ce que fait le navigateur avant d'envoyer. La requête, elle, peut être construite ailleurs : par un outil en ligne de commande, un script, ou une copie modifiée de votre formulaire. Le serveur est le seul endroit que toutes les requêtes traversent, quelles que soient leur provenance. Cela ne rend pas les contraintes HTML inutiles pour autant : elles restent le moyen le plus rapide de signaler un problème à la personne qui remplit.
+</Checkpoint>
+
+## Rediriger après traitement
+
+Une fois les données validées et l'action effectuée, il reste à répondre. Répondre directement par une page de confirmation pose un problème discret.
+
+<FluxSequence
+  client:visible
+  titre="Sans redirection : le rafraîchissement rejoue la soumission"
+  acteurs={[
+    { key: 'navigateur', label: 'Navigateur', icone: 'laptop' },
+    { key: 'serveur', label: 'Serveur', icone: 'server' },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: 'POST /commande.php', mono: true },
+    { de: 1, vers: 1, texte: 'enregistre la commande' },
+    { de: 1, vers: 0, texte: 'page de confirmation', statut: 200 },
+    { de: 0, vers: 1, texte: 'POST /commande.php', mono: true, note: 'la personne rafraîchit la page' },
+    { de: 1, vers: 1, texte: 'enregistre une deuxième commande' },
+    { de: 1, vers: 0, texte: 'page de confirmation', statut: 200 },
+  ]}
+/>
+
+La page affichée est la réponse à un POST. 
+La rafraîchir peut demander au navigateur de renvoyer ce même POST, 
+ce qui répète alors l'action. Une réponse de redirection règle la situation.
+
+<FluxSequence
+  client:visible
+  titre="Avec redirection : le rafraîchissement ne rejoue qu'un GET"
+  acteurs={[
+    { key: 'navigateur', label: 'Navigateur', icone: 'laptop' },
+    { key: 'serveur', label: 'Serveur', icone: 'server' },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: 'POST /commande.php', mono: true },
+    { de: 1, vers: 1, texte: 'enregistre la commande' },
+    { de: 1, vers: 0, texte: 'Location: merci.php', statut: 303 },
+    { de: 0, vers: 1, texte: 'GET /merci.php', mono: true, note: 'suivi automatiquement par le navigateur' },
+    { de: 1, vers: 0, texte: 'page de remerciement', statut: 200 },
+    { de: 0, vers: 1, texte: 'GET /merci.php', mono: true, note: 'la personne rafraîchit : simple relecture' },
+    { de: 1, vers: 0, texte: 'page de remerciement', statut: 200 },
+  ]}
+/>
+
+Ce déroulement porte un nom : **POST-Redirect-GET**. Le POST agit, la redirection déplace le navigateur, et la page finalement affichée est le résultat d'un GET ordinaire — rejouable sans effet.
+
+```php
+if ($soumis && empty($erreurs)) {
+    // enregistrer la commande
+
+    header("Location: merci.php", true, 303);
+    exit;
+}
+```
+
+<MarginNote type="astuce">
+`exit` juste après `header()` n'est pas facultatif : sans lui, le script continue et produit du contenu que le navigateur, lui, ne lira pas. Le code qui suit s'exécuterait pourtant, avec ses éventuels effets.
+</MarginNote>
+
+Le code 303 indique explicitement au navigateur d'aller chercher la nouvelle adresse en GET. Le code 302, plus ancien, est encore très répandu et fonctionne de la même façon dans la pratique.
+
+<Aside type="attention" title="En-têtes déjà envoyés">
+`header()` doit être appelée avant toute sortie. Une ligne vide avant `<?php`, une espace après `?>` dans un fichier inclus, un `echo` de débogage oublié : le moindre caractère écrit avant l'appel déclenche l'erreur « headers already sent », et la redirection n'a pas lieu.
+</Aside>
+
+Notez que l'on redirige en cas de succès seulement. En cas d'erreur, on réaffiche la page avec les messages, sans rediriger : la redirection ferait perdre `$erreurs` et les valeurs saisies, puisque le script suivant repartirait de zéro. Les transporter d'une requête à l'autre demanderait une session, que nous verrons plus loin.
+
+## Le trajet d'une soumission
+
+<FluxDiagram
+  client:visible
+  titre="D'un formulaire vide à la page de confirmation"
+  steps={[
+    {
+      titre: 'Afficher le formulaire',
+      desc: "Première requête en GET : la page renvoie un formulaire vide.",
+    },
+    {
+      titre: 'Soumettre',
+      desc: "Le navigateur transmet chaque champ sous son attribut name.",
+    },
+    {
+      titre: 'Recevoir la requête',
+      tag: 'superglobales',
+      desc: "PHP remplit $_GET, $_POST et $_SERVER avant la première ligne du script.",
+    },
+    {
+      titre: 'Normaliser et valider',
+      tag: 'validation',
+      desc: "On contrôle présence, format, plage et cohérence ; les erreurs s'accumulent.",
+      note: { type: 'warn', text: "Les contraintes du balisage ne garantissent pas ce qui arrive au serveur." },
+    },
+    {
+      titre: 'Réafficher ou agir',
+      desc: "S'il reste des erreurs, la page revient avec les messages et les valeurs saisies.",
+    },
+    {
+      titre: 'Rediriger',
+      desc: "Sinon, une réponse 303 renvoie vers une page consultable en GET.",
+    },
+    {
+      titre: 'Page de confirmation',
+      desc: "Le rafraîchissement ne rejoue plus la soumission, seulement une lecture.",
+    },
+  ]}
+/>
+
+## Ouverture sur les API
+
+Un formulaire n'est qu'une façon, parmi d'autres, d'envoyer des données. 
+Une **API** reçoit des requêtes émises non par un navigateur, mais par un autre programme (application mobile, autre serveur, code JavaScript). 
+Le principe reste le même — une requête, une méthode, une réponse — mais les données échangées sont généralement du **JSON** plutôt que du HTML.
+
+```php
+<?php
+// Au lieu de renvoyer du HTML, on renvoie du JSON.
+header("Content-Type: application/json");
+echo json_encode(["statut" => "ok", "message" => "Reçu"]);
+```
+
+```php
+<?php
+// Et on lit un corps JSON envoyé par le client (au lieu de $_POST).
+$donnees = json_decode(file_get_contents("php://input"), true);
+```
+
+<MarginNote type="lien">
+Les méthodes `GET`, `POST`, `PUT`, `DELETE` prennent ici tout leur sens : elles structurent une API REST (lire, créer, remplacer, supprimer). 
+C'est le sujet d'un prochain chapitre. Bien entendu, la discipline de validation reste exactement la même.
+</MarginNote>
+
+## Réflexes et pièges
+
+- **Un champ sans `name` n'arrive pas au serveur**, même s'il s'affiche et se remplit correctement.
+- **Une case décochée est absente**, pas vide : `isset()` ou `??` avant de la lire.
+- **Normaliser avant de valider** : pour du texte, `trim()` d'abord, contrôles ensuite. La normalisation dépend du type de donnée.
+- **Les contraintes du balisage guident, les règles du serveur décident.** Écrire les deux, se fier aux secondes.
+- **Valider et échapper sont deux moments distincts** : à la réception pour l'un, à l'affichage pour l'autre.
+- **Rediriger après un POST réussi**, avec `exit` derrière `header()`, et sans la moindre sortie avant l'appel.
+- **Réafficher les valeurs saisies** en cas d'erreur, passées par `htmlspecialchars()`.
+
+## Récapitulatif
+
+- Les données d'une requête voyagent soit dans l'**URL**, soit dans le **corps** ; PHP les met à disposition dans `$_GET` et `$_POST`, et décrit le contexte dans `$_SERVER`.
+- Ces trois tableaux reflètent la requête en cours et sont reconstruits à chaque nouvelle requête.
+- Le choix entre GET et POST se raisonne à partir des conséquences : adresse partageable et rejouable d'un côté, action qu'il vaut mieux ne pas répéter de l'autre.
+- L'attribut `name` d'un champ devient la clé dans le tableau reçu ; un nom terminé par `[]` produit un tableau de valeurs.
+- La validation côté serveur s'applique à toutes les requêtes, y compris à celles qui ne sont pas passées par le formulaire. Elle se distingue de l'échappement, qui intervient à l'affichage.
+- Le patron **POST-Redirect-GET** évite qu'un rafraîchissement ne rejoue l'action, en répondant par une redirection plutôt que par une page.
+
+<Quiz
+  client:visible
+  question="Une case à cocher nommée infolettre n'est pas cochée. Que contient $_POST['infolettre'] ?"
+  options={[
+    { texte: "La chaîne vide", correct: false },
+    { texte: "La valeur false", correct: false },
+    { texte: "Rien : la clé est absente du tableau", correct: true },
+  ]}
+  retour="Une case décochée n'est pas transmise. La clé n'existe pas, d'où l'usage d'isset() ou de l'opérateur ?? avant de la lire."
+/>
+
+<Quiz
+  client:visible
+  question="Vos champs portent déjà required et min='1'. Que peut-on en conclure sur les données reçues ?"
+  options={[
+    { texte: "Elles respectent ces contraintes, la revalidation est superflue", correct: false },
+    { texte: "Elles les respectent si la requête vient du formulaire, ce que le serveur ne peut pas présumer", correct: true },
+    { texte: "Elles sont automatiquement nettoyées par PHP", correct: false },
+  ]}
+  retour="Ces attributs décrivent le comportement du navigateur. Une requête construite autrement arrive avec le contenu qu'on lui a donné, et le serveur ne peut pas distinguer les deux cas."
+/>
+
+<Quiz
+  client:visible
+  question="À quoi sert la redirection dans le patron POST-Redirect-GET ?"
+  options={[
+    { texte: "À accélérer l'affichage de la page de confirmation", correct: false },
+    { texte: "À faire que la page finalement affichée soit le résultat d'un GET, rejouable sans effet", correct: true },
+    { texte: "À masquer les données envoyées par le formulaire", correct: false },
+  ]}
+  retour="Sans redirection, la page affichée reste la réponse à un POST : la rafraîchir renvoie ce POST et répète l'action."
+/>
+
+<Quiz
+  client:visible
+  question="Une donnée a passé toutes vos validations. Faut-il encore l'échapper avant de l'afficher ?"
+  options={[
+    { texte: "Oui : valider dit si la valeur est acceptable, échapper dit comment l'écrire", correct: true },
+    { texte: "Non : une donnée validée peut être affichée telle quelle", correct: false },
+    { texte: "Seulement si elle vient de $_GET", correct: false },
+  ]}
+  retour="Un nom parfaitement valide peut contenir une apostrophe ou un chevron. htmlspecialchars() intervient à l'affichage, quelle que soit l'origine de la valeur."
+/>
