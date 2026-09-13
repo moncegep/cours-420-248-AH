@@ -1,0 +1,161 @@
+---
+title: Exercices — formulaires avancés
+description: "Série de six exercices sur les formulaires : lecture de code, filtres et recherche en GET, paiement validé avec redirection, prise de rendez-vous et formulaire multi-étapes."
+draft: true
+sidebar:
+  order: 6
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import RequeteInspecteur from '../../../components/react/RequeteInspecteur.jsx';
+
+## Exercice 1 — Un formulaire de paiement
+
+**Dossier** : `ex04-paiement/`
+
+### Objectif
+
+Valider un formulaire de paiement côté serveur, puis rediriger vers une page de confirmation consultable en GET.
+
+<Aside type="attention" title="Paiement simulé">
+Cet exercice ne traite aucun paiement réel : le numéro saisi sert uniquement de support à une validation de format, et n'est ni transmis ni conservé. Dans une vraie boutique, les données de carte transitent par un prestataire de paiement et ne passent pas par votre serveur.
+</Aside>
+
+### À faire
+
+<Steps>
+
+1. Valider chaque champ et rassembler les messages dans `$erreurs`, indexé par nom de champ : nom, adresse et ville présents ; courriel de format plausible ; code postal canadien de la forme `A1A 1A1` ; numéro de seize chiffres une fois les espaces retirés ; expiration de la forme `MM/AA` avec un mois valide.
+
+2. Afficher un résumé des erreurs en haut du formulaire, et le message de chaque champ sous le champ concerné.
+
+3. Réafficher les valeurs déjà saisies, échappées, pour que rien ne soit à retaper.
+
+4. Lorsque `$erreurs` est vide, rediriger vers `confirmation.php` en lui passant le nom, puis arrêter le script.
+
+</Steps>
+
+### Critères de réussite
+
+- Envoyer le formulaire vide affiche toutes les erreurs d'un coup, pas seulement la première.
+- Un code postal écrit `h2x1y4` est accepté ; `H2X 1Y` est refusé.
+- Après un envoi refusé, tous les champs correctement remplis ont conservé leur valeur.
+- Après un envoi accepté, l'adresse affichée est celle de `confirmation.php` et le rafraîchissement ne relance rien.
+- Saisir un nom contenant `<b>gras</b>` l'affiche tel quel sur la page de confirmation, sans mise en gras.
+
+<Aside type="syntaxe" title="Expressions régulières utiles">
+`preg_match('/^[A-Z]\d[A-Z] ?\d[A-Z]\d$/', $codePostal)` accepte les deux écritures du code postal, avec ou sans espace. `preg_replace('/\s+/', "", $carte)` retire les espaces avant de compter les chiffres.
+</Aside>
+
+### Bonus
+
+Valider le numéro de carte par l'algorithme de Luhn plutôt que par son seul nombre de chiffres. `4242 4242 4242 4242` le satisfait, `1234 5678 9012 3456` non.
+
+## Exercice 2 — Prise de rendez-vous
+
+**Dossier** : `ex05-rendez-vous/` — tout le calcul de dates est fourni dans `lib/creneaux.php`.
+
+### Objectif
+
+Transformer la grille de créneaux, aujourd'hui inerte, en un formulaire de réservation validé côté serveur.
+
+<MarginNote type="rappel">
+`lib/creneaux.php` fournit `debutDeSemaine()`, `joursDeLaSemaine()`, `heuresProposees()`, `cleCreneau()`, `creneauDepuisCle()`, `creneauEstProposable()`, `creneauxReserves()` et deux fonctions d'affichage. Rien à y modifier.
+</MarginNote>
+
+### À faire
+
+<Steps>
+
+1. Envelopper la grille et les coordonnées dans un même formulaire POST.
+
+2. Remplacer chaque libellé « libre » par un bouton radio `name="creneau"` dont la valeur est la clé du créneau, dans un `<label>` pour rester cliquable.
+
+3. Valider le nom et le courriel.
+
+4. Valider le créneau reçu, dans cet ordre : une clé a été transmise ; `creneauDepuisCle()` la reconstruit ; `creneauEstProposable()` l'accepte ; elle ne figure pas parmi les créneaux déjà pris.
+
+5. Lorsque tout est valide, rediriger vers `confirme.php` en lui passant la clé du créneau.
+
+</Steps>
+
+### Critères de réussite
+
+- Envoyer sans choisir de créneau affiche un message, et les coordonnées déjà saisies restent en place.
+- Après un envoi refusé, le créneau précédemment sélectionné est toujours coché.
+- Une clé forgée à la main, envoyée hors du formulaire, est refusée par le serveur : créneau du samedi, heure de 3 h, ou créneau déjà pris.
+- Un envoi accepté conduit à `confirme.php`, qui affiche la date en toutes lettres.
+
+<Aside type="attention" title="La grille n'est pas une garantie">
+Elle n'affiche des boutons que sur les créneaux libres, ce qui aide la personne qui réserve. Le serveur, lui, reçoit une chaîne de caractères et ne sait pas d'où elle vient : les quatre contrôles de l'étape 4 restent nécessaires même si la grille semble déjà les avoir appliqués.
+</Aside>
+
+### Bonus 1 — Interactions en JavaScript
+
+Rendre la sélection plus lisible : surligner la cellule choisie, afficher le créneau retenu en clair au-dessus du bouton d'envoi, désactiver le bouton tant qu'aucun créneau n'est sélectionné. Le formulaire doit continuer de fonctionner avec JavaScript désactivé — la validation serveur ne change pas.
+
+### Bonus 2 — Changer de semaine
+
+Ajouter deux liens « semaine précédente » et « semaine suivante ». Le décalage se transmet en GET, par exemple `rendez-vous.php?semaine=1`, et se lit avec `debutDeSemaine($decalage)`. Deux points à traiter : borner le décalage pour éviter les valeurs absurdes, et conserver la semaine consultée lorsque le formulaire est renvoyé avec des erreurs.
+
+## Exercice 3 — Un formulaire en trois étapes
+
+**Dossier** : `ex06-inscription/`
+
+### Objectif
+
+Répartir une inscription sur trois écrans successifs — coordonnées, adresse, préférences — en validant chaque étape, sans utiliser de session.
+
+<Highlight couleur="ambre">Rien ne survit à une requête : ce que l'étape 2 doit connaître de l'étape 1, elle doit le recevoir.</Highlight> L'état voyage donc en champs cachés, renvoyés au serveur à chaque envoi.
+
+### À faire
+
+<Steps>
+
+1. Valider uniquement les champs de l'étape que l'on vient de quitter.
+
+2. Si cette étape est valide, afficher la suivante ; sinon rester sur place avec les messages.
+
+3. Rejouer en champs cachés les valeurs des étapes déjà franchies, y compris les valeurs multiples des cases à cocher.
+
+4. Écrire les champs de l'étape 2, puis ceux de l'étape 3 avec un récapitulatif des saisies précédentes.
+
+5. À la fin de l'étape 3, rediriger vers `bienvenue.php`.
+
+</Steps>
+
+### Critères de réussite
+
+- Aucune erreur ne s'affiche au premier chargement.
+- Une étape refusée ne fait pas avancer, et conserve ce qui avait été saisi.
+- Arrivé à l'étape 3, le récapitulatif montre bien les valeurs des étapes 1 et 2.
+- Afficher le code source de la page à l'étape 3 laisse voir les champs cachés : c'est attendu, et cela explique pourquoi ce procédé ne convient pas à une donnée sensible.
+- Le rafraîchissement de `bienvenue.php` ne rejoue aucun envoi.
+
+<Aside type="syntaxe" title="Rejouer un tableau en champs cachés">
+Une valeur simple se rejoue par `<input type="hidden" name="ville" value="...">`. Un tableau demande une boucle et des crochets, un champ par valeur : `<input type="hidden" name="interets[]" value="...">` pour chaque entrée.
+</Aside>
+
+<Aside type="attention" title="Les champs cachés ne sont pas cachés">
+« Caché » qualifie l'affichage, pas la confidentialité : le contenu figure en clair dans le code source de la page et repart tel quel au serveur, où il peut avoir été modifié en chemin. Les valeurs rejouées se revalident donc à chaque étape, comme n'importe quelle donnée reçue.
+</Aside>
+
+### Bonus — Revenir en arrière
+
+Ajouter un bouton « Précédent » à partir de l'étape 2. Deux pistes : un second bouton d'envoi portant un `name` différent, que le script reconnaît avant de valider ; ou un champ caché indiquant la direction. Dans les deux cas, un retour en arrière ne déclenche aucune validation et conserve les valeurs déjà saisies.
+
+<Checkpoint question="Pourquoi le bouton « Précédent » ne doit-il pas déclencher la validation de l'étape courante ?">
+Parce qu'on quitte l'étape sans prétendre l'avoir remplie. Valider à ce moment-là afficherait des erreurs sur des champs que la personne a délibérément laissés de côté, et empêcherait le retour. Le script identifie donc l'intention — avancer ou reculer — avant de décider s'il y a lieu de valider.
+</Checkpoint>
+
+## Vérifier son travail
+
+<RequeteInspecteur client:visible />
+
+- Reproduisez l'adresse produite par vos filtres pour vérifier ce que PHP en lit.
+- Pour les envois en POST, saisissez les paires `nom=valeur` une par ligne : c'est l'occasion d'envoyer des valeurs que votre formulaire n'aurait jamais permises, et de contrôler que le serveur les refuse.

@@ -1,0 +1,377 @@
+---
+title: Exercices — formulaires
+description: "Série de six exercices sur les formulaires : lecture de code, filtres et recherche en GET, paiement validé avec redirection, prise de rendez-vous et formulaire multi-étapes."
+sidebar:
+  order: 6
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import RequeteInspecteur from '../../../components/react/RequeteInspecteur.jsx';
+
+
+## Le code de départ
+
+Tous les exercices partagent le même contexte : la boutique fictive **L'Érablière dorée**. 
+Téléchargez [le dossier de départ](/formulaires-depart.zip) et servez-le comme racine du site.
+
+<Aside type="note" title="Pour commencer">
+Pour bien réaliser ces exercices, extrait d'abord les dossiers se trouvant dans l'archive `formulaires-depart.zip`
+et place les dans le dossier `xampp/htdocs`.  
+**💡 N'oublie pas de démarrer (*Start*) XAMPP.**
+</Aside>
+
+#### Contenu de l'archive
+
+```text
+depart/
+├── assets/style.css
+├── data/
+│   ├── products.php          douze produits
+│   ├── categories.php        liste blanche des catégories
+│   └── panier.php            panier figé de l'exercice 4
+├── includes/                 header.php, footer.php
+├── partials/product-card.php
+├── ex02-catalogue/
+├── ex03-recherche/
+├── ex04-paiement/
+└── ex05-rendez-vous/
+```
+
+<Aside type="note" title="Chaque exercice est indépendant">
+Chaque dossier d'exercice est indépendant. Vous pouvez faire l'exercice 3 sans avoir terminé le 2 : son code de départ contient déjà les filtres attendus.
+</Aside>
+
+## Exercice 1 (QCM) — Lire et corriger du code de formulaire
+
+### Partie A — Comprendre ce que fait le code
+
+**A1.** Une personne saisit `sirop`, puis soumet le formulaire.
+
+```html
+<form action="recherche.php">
+  <input type="text" name="q">
+  <button type="submit">Chercher</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="Quelle adresse URL résulte de la soumission du formulaire ?"
+options={[
+{ texte: "recherche.php", correct: false },
+{ texte: "recherche.php#q=sirop", correct: false },
+{ texte: "recherche.php?q=sirop", correct: true },
+{ texte: "recherche.php/q/sirop", correct: false },
+{ texte: "recherche.php, avec q=sirop dans le corps de la requête", correct: false },
+]}
+retour="Comme l'attribut method est absent, le formulaire utilise GET par défaut. La valeur du champ est donc ajoutée à l'URL sous la forme ?q=sirop."
+/>
+
+---
+
+**A2.** La page `/boutique/index.php` contient ce formulaire.
+
+```html
+<form method="post" action="traitement.php">
+  <input type="text" name="nom">
+  <button type="submit">Envoyer</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="À quelle adresse les données du formulaire sont-elles envoyées ?"
+options={[
+{ texte: "/traitement.php", correct: false },
+{ texte: "/boutique/index.php", correct: false },
+{ texte: "/boutique/index.php/traitement.php", correct: false },
+{ texte: "/boutique/traitement.php", correct: true },
+{ texte: "Impossible à déterminer sans une adresse absolue", correct: false },
+]}
+retour="L'adresse traitement.php est relative à l'emplacement de la page actuelle. Comme index.php se trouve dans /boutique/, le formulaire est envoyé vers /boutique/traitement.php."
+/>
+
+---
+
+**A3.** Le formulaire est soumis sans cocher la case.
+
+```html
+<form method="post" action="traitement.php">
+  <input type="text" value="Patrick">
+
+  <input type="text" name="ville" value="Laval">
+
+  <input type="checkbox" name="cadeau" value="1">
+
+  <button type="submit">Envoyer</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="Quelles données retrouve-t-on dans $_POST ?"
+options={[
+{ texte: "Patrick, Laval et cadeau=0", correct: false },
+{ texte: "Seulement ville=Laval", correct: true },
+{ texte: "ville=Laval et cadeau=''", correct: false },
+{ texte: "Patrick et Laval", correct: false },
+{ texte: "Les trois champs du formulaire", correct: false },
+]}
+retour="Le premier champ n'a pas d'attribut name : il n'est donc pas transmis. La case cadeau n'est pas cochée : elle n'est pas transmise non plus. Seule la valeur ville=Laval est envoyée."
+/>
+
+---
+
+**A4.** Le champ contient la valeur `3` au moment de la soumission.
+
+```html
+<form method="post" action="commande.php?etape=2">
+  <input type="number" name="quantite" value="3">
+  <button type="submit">Valider</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="Que contiennent $_GET et $_POST dans commande.php ?"
+options={[
+{ texte: "$_GET contient etape et quantite; $_POST est vide", correct: false },
+{ texte: "$_POST contient etape et quantite; $_GET est vide", correct: false },
+{ texte: "$_GET et $_POST contiennent tous les deux etape et quantite", correct: false },
+{ texte: "$_GET est vide; $_POST contient quantite", correct: false },
+{ texte: "$_GET contient etape; $_POST contient quantite", correct: true },
+]}
+retour="La valeur etape=2 est déjà présente dans l'URL de l'action et se retrouve donc dans $_GET. Le champ quantite est soumis avec la méthode POST et se retrouve dans $_POST."
+/>
+
+---
+
+**A5.** Les options `petit` et `grand` sont sélectionnées avant la soumission.
+
+```html
+<form method="post" action="traitement.php">
+  <select name="tailles" multiple>
+    <option value="petit">Petit</option>
+    <option value="moyen">Moyen</option>
+    <option value="grand">Grand</option>
+  </select>
+
+  <button type="submit">Envoyer</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="Quelle valeur retrouve-t-on dans $_POST['tailles'] ?"
+options={[
+{ texte: "\"grand\"", correct: true },
+{ texte: "[\"petit\", \"grand\"]", correct: false },
+{ texte: "\"petit,grand\"", correct: false },
+{ texte: "\"petit\"", correct: false },
+{ texte: "Aucune valeur, car multiple n'est pas valide ici", correct: false },
+]}
+retour="Le navigateur envoie plusieurs valeurs ayant le même nom. Comme le champ s'appelle tailles plutôt que tailles[], PHP ne crée pas de tableau et conserve ici la dernière valeur reçue."
+/>
+
+### Partie B — Modifier le code pour obtenir le comportement souhaité
+
+**B1.** On veut pouvoir copier ou partager l'adresse d'une recherche avec les critères utilisés.
+
+```html
+<form method="post" action="recherche.php">
+  <input type="search" name="q">
+  <button type="submit">Chercher</button>
+</form>
+```
+
+<Quiz
+client:visible
+question="Quelle modification faut-il apporter au formulaire ?"
+options={[
+{ texte: "Remplacer action=\"recherche.php\" par action=\"#recherche\"", correct: false },
+{ texte: "Remplacer method=\"post\" par method=\"get\"", correct: true },
+{ texte: "Ajouter target=\"_blank\"", correct: false },
+{ texte: "Ajouter id=\"q\" au champ", correct: false },
+{ texte: "Remplacer le bouton par un lien", correct: false },
+]}
+retour="Avec GET, les valeurs du formulaire apparaissent dans l'URL. Une recherche comme sirop peut alors produire une adresse telle que recherche.php?q=sirop, qui peut être copiée ou partagée."
+/>
+
+---
+
+**B2.** Plusieurs cases peuvent être cochées, et on veut récupérer toutes leurs valeurs dans un tableau PHP.
+
+```html
+<input type="checkbox" name="interets" value="sirop">
+<input type="checkbox" name="interets" value="atelier">
+<input type="checkbox" name="interets" value="visite">
+```
+
+<Quiz
+client:visible
+question="Quelle modification faut-il apporter aux champs ?"
+options={[
+{ texte: "Donner un nom différent à chaque case", correct: false },
+{ texte: "Ajouter l'attribut multiple", correct: false },
+{ texte: "Écrire value[] à la place de value", correct: false },
+{ texte: "Lire $_POST['interets'][0] sans modifier le HTML", correct: false },
+{ texte: "Utiliser name=\"interets[]\"", correct: true },
+]}
+retour="Les crochets [] indiquent à PHP de regrouper les valeurs portant le même nom dans un tableau accessible avec $_POST['interets']."
+/>
+
+---
+
+**B3.** Après l'enregistrement d'une commande, actualiser la page provoque un nouvel enregistrement.
+
+```php
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    enregistrerCommande($_POST);
+    include __DIR__ . "/confirmation.php";
+}
+```
+
+<Quiz
+client:visible
+question="Quelle modification permet d'éviter ce problème ?"
+options={[
+{ texte: "Vérifier que $_POST n'est pas vide", correct: false },
+{ texte: "Placer enregistrerCommande() dans un try/catch", correct: false },
+{ texte: "Rediriger vers confirmation.php après l'enregistrement", correct: true },
+{ texte: "Remplacer POST par GET", correct: false },
+{ texte: "Utiliser include_once pour afficher la confirmation", correct: false },
+]}
+retour="Après avoir traité le POST, on redirige le navigateur vers une nouvelle page. L'actualisation recharge alors cette page en GET plutôt que de soumettre de nouveau le formulaire."
+/>
+
+---
+
+**B4.** Cette ligne produit un avertissement lorsque la case `cadeau` n'est pas cochée.
+
+```php
+$cadeau = $_POST["cadeau"];
+```
+
+Le formulaire contient :
+
+```html
+<input type="checkbox" name="cadeau" value="1">
+```
+
+<Quiz
+client:visible
+question="Quelle instruction permet de savoir directement si la case a été cochée ?"
+options={[
+{ texte: "$cadeau = trim($_POST[\"cadeau\"]);", correct: false },
+{ texte: "$cadeau = (bool) $_POST[\"cadeau\"];", correct: false },
+{ texte: "$cadeau = $_POST[\"cadeau\"] ?? \"\";", correct: false },
+{ texte: "$cadeau = isset($_POST[\"cadeau\"]);", correct: true },
+{ texte: "$cadeau = empty($_POST);", correct: false },
+]}
+retour="Une case décochée n'est pas transmise. Vérifier la présence de la clé cadeau avec isset() permet donc d'obtenir directement true ou false."
+/>
+
+---
+
+**B5.** Une page affiche un formulaire et traite elle-même sa soumission. Pourtant, une erreur de validation apparaît dès le premier affichage.
+
+```php
+$erreurs = [];
+
+if (trim($_POST["nom"] ?? "") === "") {
+    $erreurs["nom"] = "Le nom est obligatoire.";
+}
+```
+
+<Quiz
+client:visible
+question="Quelle modification permet de valider seulement après la soumission du formulaire ?"
+options={[
+{ texte: "Faire la validation seulement si la méthode est POST", correct: true },
+{ texte: "Initialiser $_POST['nom'] avec une chaîne vide", correct: false },
+{ texte: "Remplacer trim() par isset()", correct: false },
+{ texte: "Remplacer la condition par !empty($_POST['nom'])", correct: false },
+{ texte: "Déplacer $erreurs après la condition", correct: false },
+]}
+retour="Au premier affichage, la page est normalement demandée avec GET. Tester $_SERVER['REQUEST_METHOD'] permet de ne lancer la validation qu'après une soumission en POST."
+/>
+
+
+## Exercice 2 — Filtrer un catalogue
+
+**Dossier de départ** : `ex02-catalogue/`
+
+L'objectif ici est d'ajouter au catalogue un formulaire de filtres en mode `GET` 
+pour prendre en compte les filtres suivants: catégorie, prix maximal, disponibilité.
+
+#### À faire
+
+<Steps>
+
+1. Lire les trois filtres dans `$_GET`.
+
+2. Valider chaque filtre avant de s'en servir. Une catégorie absente de `data/categories.php` et un prix qui n'est pas un nombre positif se ramènent à « pas de filtre » plutôt qu'à une erreur.
+
+3. Réduire la liste affichée en appliquant les filtres retenus.
+
+4. Écrire le formulaire, avec `method="get"`, traité par la même page, avec un bouton de réinitialisation.
+
+</Steps>
+
+#### Critères de réussite
+
+- Les trois filtres se combinent : choisir une catégorie **et** un prix maximal réduit deux fois la liste.
+- Après envoi, le formulaire réaffiche les valeurs actives — le menu reste sur la catégorie choisie, la case reste cochée.
+- L'adresse obtenue, recopiée dans un autre onglet, produit exactement le même résultat.
+- Modifier l'adresse à la main pour y mettre `categorie=nimportequoi` affiche le catalogue complet, sans avertissement PHP.
+- Le nombre de produits affiché correspond à la liste réellement présentée.
+
+<Aside type="syntaxe" title="Réafficher l'état d'un champ">
+Pour un menu déroulant, l'option retenue porte l'attribut `selected` ; 
+pour une case, l'attribut `checked`.  
+Les deux s'écrivent conditionnellement : `<?php echo $cle === $categorie ? "selected" : ""; ?>`.
+</Aside>
+
+{/* <Aside type="exemple" title="Bonne pratique — la liste blanche">
+Comparer la valeur reçue à une liste de valeurs admises, comme le fait `data/categories.php`, est plus sûr que de tenter de repérer ce qui serait dangereux. La liste des valeurs acceptables est connue et courte ; la liste des valeurs problématiques ne l'est pas.
+</Aside> */}
+
+## Exercice 3 — Une barre de recherche
+
+**Dossier de départ** : `ex03-recherche/`
+> ✅ Les filtres de l'exercice 2 sont déjà écrits dans le code fourni.
+
+L'objectif ici est d'ajouter un champ de recherche qui filtre les produits par nom, 
+sans perdre les filtres déjà actifs.
+
+#### À faire
+
+<Steps>
+
+1. Lire le terme (tappé dans la barre de recherche) dans `$_GET["q"]` et le normaliser.
+
+2. Filtrer les produits pour ne garder que ceux dont le nom contient ce terme, sans tenir compte de la casse ni des espaces avant ou après le terme.
+
+3. Prévoir un message lorsque la recherche ne donne rien, plutôt qu'une grille vide.
+
+4. Intégrer le champ au formulaire existant, de façon qu'une recherche conserve la catégorie et le prix maximal déjà choisis.
+
+</Steps>
+
+#### Critères de réussite
+
+- Chercher `érable` avec la catégorie « Confiseries » selectionnée donne uniquement les confiseries dont le nom contient « érable ».
+- Chercher `SIROP` donne le même résultat que `sirop`.
+- Une recherche sans résultat affiche un message et propose de réinitialiser.
+- Vider le champ de recherche et renvoyer le formulaire rétablit la liste filtrée, sans perdre les autres filtres.
+
+<MarginNote type="astuce">
+Un champ de recherche et des filtres dans le même formulaire partent ensemble à chaque envoi : 
+c'est le moyen le plus simple de ne rien perdre. Si vous les séparez en deux formulaires, il faudra 
+rejouer les filtres en champs cachés dans celui de la recherche.
+</MarginNote>
