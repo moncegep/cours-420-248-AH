@@ -1,7 +1,6 @@
 ---
 title: Préserver les données
 description: "Deux mécanismes pour conserver des données au-delà d'une seule requête : les sessions PHP, puis les bases de données relationnelles avec MySQL, phpMyAdmin et une connexion en PDO."
-draft: true
 sidebar: 
   order: 8
 ---
@@ -16,22 +15,15 @@ import FluxSequence from '../../../components/react/FluxSequence.jsx';
 import SchemaBD from '../../../components/react/SchemaBD.jsx';
 
 Jusqu'ici, chaque requête que nous effectuons au serveur repartait de zéro, sans préserver nos données soumises (via formulaire) ou changements d'états. 
-On a pu observer cette limite au travail pratique : sans mécanisme de conservation, une réservation disparaît au rafraîchissement suivant.
-
-Ce chapitre présente deux façons de conserver des données au-delà d'une requête : les **sessions**, propres à un visiteur et de courte durée, puis les **bases de données**, durables et partagées par tous.
-
-<Aside type="prerequis" title="Avant de commencer">
-On s'appuie dans ce chapitre sur les [superglobales](/cours/06-superglobals), où la superglobale `$_SESSION` 
-avait été brièvement introduit et sur l'exploitation des [formulaires](/cours/05-formulaires). 
-La partie sur le relationnel suppose des notions de base de données relationnelles et du langage SQL, revues ici en rappel.
-</Aside>
+Ce chapitre présente deux façons de conserver des données au-delà d'une requête : les **sessions**, propres à un visiteur et de courte durée, 
+puis les **bases de données**, durables et partagées par tous.
 
 ## Le problème : une requête HTTP ne retient rien
 
 Le protocole HTTP est **sans état** : le serveur traite chaque requête indépendamment, sans conserver en mémoire les données transmises ou modifiées par la précédente. 
 Deux requêtes du même visiteur (utilisateur) sont considérées comme deux exécutions séparées qui ne partagent aucune variable.
 
-Pour qu'une donnée survive d'une requête à l'autre, il faut la ranger quelque part de persistant, puis la relire. C'est le rôle des mécanismes de préservation.
+Pour qu'une donnée survive d'une requête à l'autre, il faut la stocker quelque part de persistant (qui survie à la fermeture de la page), puis la relire. C'est le rôle des mécanismes de préservation.
 
 ## Conserver l'état dans l'URL
  
@@ -88,7 +80,7 @@ foreach ($_SESSION['panier'] ?? [] as $article) {
 }
 ```
 
-### Comment une session fonctionne
+### Fonctionnement d'une session
  
 Les données de session vivent sur le serveur. Pour savoir à quel visiteur elles appartiennent, PHP dépose dans le navigateur un témoin nommé `PHPSESSID`, qui contient seulement un identifiant. À la requête suivante, le navigateur renvoie ce témoin, et PHP retrouve les données correspondantes.
  
@@ -171,7 +163,7 @@ session_destroy();          // terminer toute la session
 
 Une session se termine aussi d'elle-même après un délai d'inactivité ou à la fermeture du navigateur.
 
-<Highlight couleur="ambre">Une session est **temporaire** : elle dure le temps d'une visite et n'appartient qu'à un visiteur. Pour conserver des données durablement, et les partager entre tous les visiteurs, il faut une base de données.</Highlight>
+Une session est **temporaire** : elle dure le temps d'une visite et n'appartient qu'à un visiteur. <Highlight couleur="ambre">Pour conserver des données durablement, et les partager entre tous les visiteurs, il faut une base de données.</Highlight>
 
 ## Les bases de données relationnelles
 
@@ -337,8 +329,8 @@ Une session est propre à un visiteur et temporaire : chaque personne aurait son
   question="Quel appel doit précéder toute sortie HTML pour utiliser une session ?"
   options={[
     { texte: "session_destroy()", correct: false },
-    { texte: "session_start()", correct: true },
     { texte: "header('Session')", correct: false },
+    { texte: "session_start()", correct: true },
   ]}
   retour="session_start() ouvre ou reprend la session, et doit être appelée avant tout affichage, sur chaque page qui utilise $_SESSION."
 />
@@ -347,8 +339,8 @@ Une session est propre à un visiteur et temporaire : chaque personne aurait son
   client:visible
   question="Dans une table relationnelle, à quoi sert la clé primaire ?"
   options={[
-    { texte: "À trier les lignes par ordre alphabétique", correct: false },
     { texte: "À identifier chaque ligne de façon unique", correct: true },
+    { texte: "À trier les lignes par ordre alphabétique", correct: false },
     { texte: "À chiffrer les données de la table", correct: false },
   ]}
   retour="La clé primaire (souvent une colonne id) identifie chaque ligne de manière unique. Une clé étrangère, elle, relie une table à une autre."

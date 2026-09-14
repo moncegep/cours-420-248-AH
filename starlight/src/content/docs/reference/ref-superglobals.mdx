@@ -1,8 +1,8 @@
 ---
-title: Superglobales
-description: Les superglobales $_GET, $_POST et $_SERVER, la méthode HTTP de la requête, et une introduction aux réponses JSON pour les API.
+title: "Référence : Superglobales"
+description: Les superglobales $_GET, $_POST et $_SERVER, la méthode HTTP de la requête.
 sidebar:
-  order: 7
+  order: 3
 ---
 
 import Aside from '../../../components/Aside.astro';
@@ -19,10 +19,10 @@ Lorsqu'une requête HTTP atteint une application PHP, le serveur doit répondre 
 2. Quelles données a-t-il envoyées ?
 3. Quelle réponse faut-il produire ?
 
-PHP met une partie de ces informations à disposition dans des tableaux appelés **superglobales**. Ce chapitre présente les trois principales, puis montre comment répondre non plus à un navigateur, mais à un programme.
+PHP met une partie de ces informations à disposition dans des tableaux associatifs appelés **superglobales**. 
 
 <Aside type="prerequis" title="Avant de commencer">
-On s'appuie sur les [formulaires et la validation](/cours/05-formulaires) (`$_GET`, `$_POST`, `REQUEST_METHOD`) ainsi que sur la [navigation et la composition](/cours/04-navigation) (`include`, gabarit et routeur).
+On s'appuie sur les [formulaires et la validation](/cours/04-formulaire) (`$_GET`, `$_POST`, `REQUEST_METHOD`) ainsi que sur les mécanismes de navigation et composition vue dans le chapitre sur les [pages dynamique](/cours/03-page-dynamique) (`include`, gabarit et routeur).
 </Aside>
 
 ## Une requête HTTP vue par PHP
@@ -79,12 +79,6 @@ PHP rend ces informations accessibles dans des tableaux disponibles dans tous le
 </table>
 
 Ce chapitre détaille les trois superglobales les plus courantes, `$_GET`, `$_POST` et `$_SERVER`, avant d'en présenter quelques autres.
-
-## Observer une requête
-
-Avant d'examiner chaque superglobale, voici une requête que vous pouvez modifier. Changez la méthode, l'adresse et les champs, puis observez les tableaux que PHP construit à partir de votre requête. Les sections suivantes reprennent ensuite chaque superglobale en détail.
-
-<RequeteInspecteur client:visible />
 
 ## La superglobale `$_GET`
 
@@ -334,253 +328,12 @@ Trois autres superglobales relèvent de sujets à venir. Elles sont mentionnées
 
 Ces trois superglobales seront développées dans un chapitre ultérieur.
 
-## Aperçu des API : répondre à un programme
-
-### Pourquoi pas du HTML, et dans quel format
-
-Une page renvoie du HTML, ce qui convient à un navigateur dont le rôle est de l'**afficher**. Le HTML mêle cependant les données et leur présentation : balises de structure, libellés, mise en forme. Un programme qui veut seulement une donnée précise, par exemple le prix d'un produit, devrait alors l'extraire de ce HTML, une opération fragile qui se brise au moindre changement de présentation.
-
-Une API permet de renvoyer les **données seules**, dans un format prévu pour les programmes. 
-Le format de données **JSON** est le plus répandu, mais ce n'est pas le seul :
-
-- le **XML**, présent dans de nombreux systèmes établis et certains domaines réglementés ;
-- le **CSV**, commode pour des données tabulaires destinées à un tableur ;
-- le **texte brut**, pour une réponse simple.
-
-Une même liste de produits prend ainsi plusieurs formes selon le client. Pour un navigateur, du HTML à présenter :
-
-```html
-<ul>
-  <li>Sirop d'érable 540 ml : 14,50 $</li>
-  <li>Beurre d'érable 250 g : 9,95 $</li>
-</ul>
-```
-
-Pour un programme, les mêmes données en JSON :
-
-```json
-[
-  { "nom": "Sirop d'érable 540 ml", "prix": 14.5 },
-  { "nom": "Beurre d'érable 250 g", "prix": 9.95 }
-]
-```
-
-Ou en XML, si le client l'attend ainsi :
-
-```xml
-<produits>
-  <produit><nom>Sirop d'érable 540 ml</nom><prix>14.50</prix></produit>
-  <produit><nom>Beurre d'érable 250 g</nom><prix>9.95</prix></produit>
-</produits>
-```
-
-### Fonctionnement d'une API
-
-Jusqu'ici, une requête GET atteignait une page complète :
-
-```sh
-GET /index.php?page=produits
-```
-
-Le serveur répondait avec toute la page : en-tête, menu, liste des produits, pied de page.
-
-Certains clients ne veulent pas cette page complète, mais demandent le **contenu sans la présentation**, afin de garder le contrôle sur la mise en forme.
-
-Pour servir une telle requête, plusieurs éléments doivent être réunis :
-
-1. distinguer cette requête d'une requête de page ordinaire, par une adresse dédiée (un fichier comme `api-produits.php`, ou une route `?page=api-produits`) ;
-2. produire une réponse qui ne contient que les données, sans le gabarit HTML ;
-3. annoncer le format avec l'en-tête `Content-Type: application/json` ;
-4. encoder les données avec `json_encode`.
-
-L'exemple d'un tel point d'accès en lecture :
-
-```php
-<?php
-// api-produits.php
-$produits = [
-    ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50],
-    ["nom" => "Beurre d'érable 250 g", "prix" => 9.95],
-];
-
-header('Content-Type: application/json; charset=utf-8');
-echo json_encode($produits, JSON_UNESCAPED_UNICODE);
-```
-
-<FluxSequence
-  client:visible
-  titre="Une requête d'API en lecture"
-  acteurs={[
-    { key: "prog", label: "Programme client", icone: "laptop" },
-    { key: "serveur", label: "Serveur PHP", icone: "server" },
-  ]}
-  etapes={[
-    { de: 0, vers: 1, texte: "GET", note: "/api-produits.php" },
-    { de: 1, vers: 0, texte: "Réponse : un corps JSON", statut: 200 },
-  ]}
-/>
-
-### Envoyer des données : la requête POST
-
-Un programme peut aussi **envoyer** des données, par exemple pour créer un produit. Il emploie alors la méthode POST. Le corps de la requête arrive de deux façons selon son format :
-
-- un corps de **formulaire**, comme celui d'un formulaire HTML, se trouve dans `$_POST` ;
-- un corps **JSON**, fréquent entre programmes, se lit avec `php://input`, puis `json_decode` le transforme en tableau.
-
-Pour traiter un tel envoi, on vérifie la méthode, on lit et valide les données, puis on répond avec un statut adapté, par exemple `201 Created` :
-
-```php
-<?php
-// api-produits.php  (méthode POST)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $donnees = json_decode(file_get_contents('php://input'), true);
-
-    if (!is_array($donnees) || !isset($donnees['nom'], $donnees['prix'])) {
-        http_response_code(400);
-        echo json_encode(['erreur' => 'Données invalides']);
-        exit;
-    }
-
-    // ... enregistrer le produit ...
-
-    http_response_code(201);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($donnees, JSON_UNESCAPED_UNICODE);
-}
-```
-
-La requête correspondante précise sa méthode, son en-tête de format et son corps :
-
-```http
-POST /api-produits.php
-Content-Type: application/json
-
-{ "nom": "Tire sur la neige", "prix": 6 }
-```
-
-<Highlight couleur="ambre">Un corps JSON n'arrive pas dans `$_POST`, qui est réservé aux corps de formulaire. On le lit avec `php://input`, puis on le décode avec `json_decode`.</Highlight>
-
-### Remplacer et supprimer : PUT et DELETE
-
-Deux autres méthodes complètent l'ensemble. **PUT** remplace une ressource existante, **DELETE** la supprime. On les traite comme POST, en consultant `$_SERVER['REQUEST_METHOD']` :
-
-```php
-<?php
-$methode = $_SERVER['REQUEST_METHOD'];
-
-if ($methode === 'PUT') {
-    // remplacer la ressource visée
-} elseif ($methode === 'DELETE') {
-    // supprimer la ressource visée
-}
-```
-
-Un formulaire HTML ne peut émettre que GET et POST. Les requêtes PUT et DELETE proviennent donc d'un programme ou d'un outil de test, présentés plus bas.
-
-### Configuration de XAMPP au besoin
-
-Apache, fourni avec XAMPP, traite GET et POST sans réglage particulier, et PHP reçoit PUT et DELETE de la même façon. Deux besoins peuvent toutefois demander une configuration :
-
-- pour des adresses propres comme `/api/produits` au lieu de `?page=api-produits`, activez le module de réécriture (`LoadModule rewrite_module modules/mod_rewrite.so` dans `httpd.conf`) et autorisez les fichiers `.htaccess` avec `AllowOverride All` sur le dossier du projet ;
-- pour recevoir un corps volumineux, les directives `post_max_size` et `upload_max_filesize` de `php.ini` fixent la taille acceptée.
-
-Après toute modification de `httpd.conf` ou de `php.ini`, redémarrez Apache depuis le panneau de contrôle de XAMPP.
-
-### Un exemple complet à tester
-
-Voici les morceaux précédents réunis en un seul fichier autonome. Déposez-le dans `htdocs`, sous le nom `api-produits.php`, et il répond aux requêtes GET et POST. La persistance des données (base de données ou session) viendra plus tard ; ici, la création renvoie simplement le produit reçu.
-
-```php
-<?php
-// api-produits.php, un point d'accès d'API minimal et complet.
-
-header('Content-Type: application/json; charset=utf-8');
-
-// Données de départ (plus tard : une base de données).
-$produits = [
-    ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50],
-    ["nom" => "Beurre d'érable 250 g", "prix" => 9.95],
-    ["nom" => "Tire sur la neige",     "prix" => 6.00],
-];
-
-$methode = $_SERVER['REQUEST_METHOD'];
-
-if ($methode === 'GET') {
-    // Lire : renvoyer la liste des produits.
-    echo json_encode($produits, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-if ($methode === 'POST') {
-    // Créer : lire le corps JSON, valider, répondre.
-    $donnees = json_decode(file_get_contents('php://input'), true);
-
-    if (!is_array($donnees) || !isset($donnees['nom'], $donnees['prix'])) {
-        http_response_code(400); // 400 Bad Request
-        echo json_encode(['erreur' => 'Le nom et le prix sont requis.']);
-        exit;
-    }
-
-    $nouveau = [
-        'nom'  => (string) $donnees['nom'],
-        'prix' => (float) $donnees['prix'],
-    ];
-
-    http_response_code(201); // 201 Created
-    echo json_encode($nouveau, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-// Toute autre méthode n'est pas prise en charge.
-http_response_code(405); // 405 Method Not Allowed
-echo json_encode(['erreur' => "Méthode $methode non prise en charge."]);
-```
-
-Une fois le fichier en place, la lecture s'obtient avec une requête GET, et la création avec une requête POST accompagnée d'un corps JSON. La sous-section suivante montre comment envoyer ces deux requêtes.
-
-### Tester l'API avec Bruno ou Postman
-
-**Bruno** et **Postman** sont des clients d'API qui permettent de composer une requête (méthode, adresse, en-têtes, corps) et examiner la réponse (statut, en-têtes, corps) sans écrire de code.
-
-- **Postman** est très répandu et conserve les requêtes dans un espace de travail, souvent partagé en ligne.
-- **Bruno** est léger et ouvert ; il enregistre les requêtes dans des fichiers locaux, faciles à versionner avec le code du projet.
-
-Pour tester l'API des produits avec l'un de ces outils, une requête GET vers `http://localhost/api-produits.php` affiche la réponse JSON. 
-Une requête POST vers la même adresse, avec l'en-tête `Content-Type: application/json` et un corps JSON, crée un produit.
-
-{/* Une fois la requête mise au point, **`curl`** produit le même résultat en une ligne, pratique pour un test rapide ou un script :
-
-```sh
-curl http://localhost/api-produits.php
-```
-
-L'option `-i` ajoute les en-têtes de la réponse, ce qui permet de vérifier le `Content-Type` :
-
-```sh
-curl -i http://localhost/api-produits.php
-```
-
-Pour un envoi en POST, on précise la méthode, l'en-tête et le corps :
-
-```sh
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"nom":"Tire sur la neige","prix":6}' \
-     http://localhost/api-produits.php
-``` */}
-
-<MarginNote type="lien">
-Ceci reste un aperçu. La conception des routes, le choix des codes de statut et les contraintes REST seront approfondis plus tard.
-</MarginNote>
-
 ## Récapitulatif
 
 - `$_GET` contient les paramètres de la chaîne de requête, quelle que soit la méthode HTTP.
 - `$_POST` contient les données des formulaires envoyés avec POST ; il est vide pour une requête GET.
 - `$_SERVER` contient des informations sur la requête et l'environnement, avec des clés prédéfinies comme `REQUEST_METHOD`.
 - Toute donnée provenant du client doit être validée avant son utilisation, puis échappée à l'affichage.
-- Une API renvoie les données seules, sans la présentation HTML, dans un format prévu pour les programmes : le JSON le plus souvent, parfois le XML ou le CSV.
-- On distingue une requête d'API par sa route et sa méthode ; un corps JSON se lit avec `php://input`, et non avec `$_POST`.
 - `GET` consulte, `POST` envoie, `PUT` remplace et `DELETE` supprime ; des outils comme Bruno, Postman ou `curl` permettent de tester ces requêtes.
 
 ## Quiz
@@ -618,16 +371,7 @@ Ceci reste un aperçu. La conception des routes, le choix des codes de statut et
   retour="Les champs d'un formulaire POST se trouvent dans $_POST, sous leur attribut name. $_GET garde les paramètres de l'URL, et $_SERVER les informations sur la requête."
 />
 
-<Quiz
-  client:visible
-  question="Comment répondre en JSON à un programme plutôt qu'en HTML ?"
-  options={[
-    { texte: "En envoyant json_encode($donnees) avec l'en-tête Content-Type: application/json", correct: true },
-    { texte: "En écrivant le tableau directement avec echo", correct: false },
-    { texte: "En renvoyant une page HTML contenant le tableau", correct: false },
-  ]}
-  retour="json_encode() transforme le tableau en texte JSON, et l'en-tête Content-Type annonce le format au programme qui appelle l'API."
-/>
+
 
 ## Références
 
