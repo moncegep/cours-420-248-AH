@@ -46,16 +46,15 @@ export default defineConfig({
 						{ label: 'Les fonctions en PHP', slug: 'exercices/02-fonctions' },
 						{ label: 'Création de site web en PHP', slug: 'exercices/03-navigation' },
 						{ label: 'Utilisation de formulaires', slug: 'exercices/04-formulaires' },
-						// { label: 'Session et accès BD en PHP ', slug: 'exercices/05-donnees' },
+						{ label: 'Session et accès BD en PHP ', slug: 'exercices/05-donnees' },
 					]
 				},
-				// {
-				// 	label: 'Travaux',
-				// 	items: [
-				// 		{ label: '01. Sélecteur de place', slug: 'tps/01-selecteur-place' },
-				// 		{ label: "02. Rencontre d'études", slug: 'tps/02-outil-dex' },
-				// 	]
-				// },
+				{
+					label: 'Travaux',
+					items: [
+						{ label: "01. Outil Dex", slug: 'tps/01-outil-dex' },
+					]
+				},
 				{
 					label: 'Reference',
 					items: [{

@@ -1,0 +1,646 @@
+---
+
+title: "TP1 — Dex : coordonner les rencontres d'étude d'un cours"
+description: "Premier travail pratique. Dex permet de coordonner des rencontres d'étude à partir des travaux d'un cours. Formulaires, validation, PDO et persistance en base de données."
+sidebar:
+  order: 1
+
+---
+
+import Aside from '../../../components/Aside.astro';
+import Highlight from '../../../components/Highlight.astro';
+import { Steps } from '@astrojs/starlight/components';
+
+Les cours requièrent souvent de réaliser des travaux en équipe. Pourtant, les plateformes utilisées pour distribuer le matériel de cours, comme Moodle ou Omnivox, ne proposent pas toujours d'outils simples pour coordonner les rencontres d'étude ou de travail d'équipe.
+
+Les étudiants doivent alors trouver eux-mêmes un moyen d'échanger leurs disponibilités et de déterminer un moment qui convient au plus grand nombre.
+
+Ce travail pratique (TP) vise à construire **Dex**, une petite application Web côté serveur qui s'intègre à une plateforme de cours pour aider les étudiants à s'organiser.
+
+À partir des travaux à faire, Dex permet à plusieurs étudiants d'indiquer leurs disponibilités et met en évidence le ou les moments qui conviennent au plus grand nombre, dans l'esprit d'un outil simple comme [when2meet](https://www.when2meet.com/).
+
+## Le scénario
+
+Chaque cours possède une liste de travaux à faire : travaux pratiques, laboratoires ou projets d'équipe.
+
+Chaque travail possède un titre, une description, un type (individuel ou en équipe), une date de disponibilité et une date de remise.
+
+**Ces informations proviennent normalement de la plateforme du cours.** <Highlight>Dans ce travail, la plateforme est simulée par les données fournies dans la base de données.</Highlight>
+
+Un étudiant ouvre Dex, choisit un travail en filtrant optionnellement les cours, saisit son matricule et son nom, puis coche les créneaux où il est libre.
+
+La page affiche ensuite, pour chaque créneau, combien d'étudiants sont disponibles et lesquels, puis met en évidence le ou les meilleurs moments. Les réponses enregistrées sont partagées : chaque utilisateur voit les disponibilités soumises par les autres.
+
+## Ce que vous devez construire
+
+Vous devez construire deux pages principales et organiser votre projet de façon à séparer les éléments partagés et la connexion à la base de données.
+
+### Page d'accueil : `index.php`
+
+La page d'accueil affiche la liste des travaux **ouverts**, regroupés par cours. Pour chaque travail, elle présente au minimum :
+
+- le titre ;
+- le type ;
+- la date de remise ;
+- un lien vers la page de coordination du travail.
+
+Un filtre de cours, placé avant la liste des travaux, permet de limiter l'affichage au cours sélectionné. Si aucun cours n'est sélectionné, tous les travaux ouverts de tous les cours sont affichés.
+
+### Page d'un travail : `travail.php?travail=<id>`
+
+Cette page joue deux rôles : elle affiche les détails du travail et les créneaux proposés, puis permet à un étudiant de soumettre ou de modifier ses disponibilités.
+
+#### Arrivée sur la page
+
+À l'arrivée sur la page, récupérez l'identifiant du travail transmis dans l'URL et vérifiez que ce travail existe dans la base de données.
+
+Si l'identifiant est absent ou si le travail n'existe pas, redirigez l'utilisateur vers la page d'accueil.
+
+#### Affichage des détails et des créneaux
+
+Si le travail existe, la page doit :
+
+- afficher les informations du travail : titre, description, type et date de remise ;
+- afficher les créneaux proposés ;
+- présenter un formulaire comprenant le matricule, le nom de l'étudiant et une case à cocher pour chaque créneau ;
+- afficher les disponibilités déjà enregistrées pour chaque créneau, même avant une nouvelle soumission.
+
+#### À la soumission
+
+Lorsque le formulaire est soumis, le serveur doit :
+
+1. vérifier que le matricule et le nom ne sont pas vides ;
+2. vérifier qu'au moins un créneau a été sélectionné ;
+3. vérifier que chaque identifiant de créneau reçu existe et appartient bien au travail courant ;
+4. si la saisie est invalide, ne modifier aucune disponibilité et réafficher le formulaire avec un message approprié ;
+5. si la saisie est valide, remplacer les anciennes disponibilités associées à ce matricule pour ce travail par les nouvelles ;
+6. après l'enregistrement, réafficher les disponibilités agrégées mises à jour pour chaque créneau : nombre d'étudiants disponibles et liste de leurs noms ;
+7. mettre en évidence le ou les **meilleurs créneaux**. En cas d'égalité, tous les créneaux ayant le nombre maximal de disponibilités sont considérés comme meilleurs.
+
+<Aside type="note" title="Comment identifier un étudiant ?">
+Aucun système de comptes ou d'authentification n'est demandé dans ce TP. Lors d'une soumission, l'étudiant fournit son **matricule** et son **nom**. Le matricule sert d'identifiant pour retrouver une réponse existante : une nouvelle soumission effectuée avec le même matricule pour un même travail remplace la précédente. Le nom sert à identifier l'étudiant dans l'affichage des disponibilités.
+</Aside>
+
+### Structure de l'outil
+
+#### Organisation des pages
+
+- Chaque page partage le même en-tête et le même pied de page.
+- L'en-tête possède un logo ou le nom **Dex** menant à la page d'accueil.
+- Le pied de page contient le nom de l'outil, votre nom et les droits d'auteur associés à la plateforme.
+
+#### Organisation du code
+
+Votre projet doit au minimum contenir :
+
+- un fichier distinct pour établir la connexion PDO à la base de données ;
+- des fichiers partagés pour l'en-tête et le pied de page, inclus dans les pages principales ;
+- `index.php` et `travail.php` ;
+- le script `init.php` servant à initialiser la base de données.
+
+Vous pouvez créer des fonctions ou des fichiers utilitaires supplémentaires si cela vous aide à éviter la répétition. **Aucune architecture orientée objet n'est exigée dans ce TP.**
+
+## La base de données : `DexBD`
+Toutes les données utilisées par Dex sont conservées dans la base de données **`DexBD`**. Elle contient les cours et travaux provenant de la plateforme simulée, les créneaux proposés et les disponibilités saisies dans Dex.
+
+Vous devez fournir un **script PHP d'initialisation** (`init.php`) qui se connecte à `DexBD` avec `PDO`, crée les tables décrites ci-dessous et insère le jeu de données initial fourni dans l'énoncé.
+
+Le script doit pouvoir être relancé sans produire d'erreurs ni dupliquer les données initiales. Vous pouvez notamment utiliser `CREATE TABLE IF NOT EXISTS` et une stratégie d'insertion qui évite de réinsérer les mêmes données.
+
+### Structure des tables
+
+#### Table `cours`
+
+<table>
+  <thead>
+    <tr>
+      <th>Champ</th>
+      <th>Type</th>
+      <th>Contraintes</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>clé primaire</td>
+    </tr>
+
+    <tr>
+      <td><code>titre</code></td>
+      <td><code>VARCHAR(100)</code></td>
+      <td>obligatoire</td>
+    </tr>
+  </tbody>
+</table>
+
+#### Table `travaux`
+
+<table>
+  <thead>
+    <tr>
+      <th>Champ</th>
+      <th>Type</th>
+      <th>Contraintes</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>clé primaire</td>
+    </tr>
+
+    <tr>
+      <td><code>cours_id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>obligatoire, référence <code>cours(id)</code></td>
+    </tr>
+
+    <tr>
+      <td><code>titre</code></td>
+      <td><code>VARCHAR(150)</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>description</code></td>
+      <td><code>TEXT</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>type</code></td>
+      <td><code>VARCHAR(20)</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>disponible</code></td>
+      <td><code>DATE</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>remise</code></td>
+      <td><code>DATETIME</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>ouvert</code></td>
+      <td><code>BOOLEAN</code></td>
+      <td>obligatoire</td>
+    </tr>
+  </tbody>
+</table>
+
+#### Table `creneaux`
+
+<table>
+  <thead>
+    <tr>
+      <th>Champ</th>
+      <th>Type</th>
+      <th>Contraintes</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>clé primaire</td>
+    </tr>
+
+    <tr>
+      <td><code>travail_id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>obligatoire, référence <code>travaux(id)</code></td>
+    </tr>
+
+    <tr>
+      <td><code>debut</code></td>
+      <td><code>DATETIME</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>fin</code></td>
+      <td><code>DATETIME</code></td>
+      <td>obligatoire</td>
+    </tr>
+  </tbody>
+</table>
+
+#### Table `disponibilites`
+<table>
+  <thead>
+    <tr>
+      <th>Champ</th>
+      <th>Type</th>
+      <th>Contraintes</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>id</code></td>
+      <td><code>INT</code></td>
+      <td>clé primaire, auto-incrémentée</td>
+    </tr>
+
+    <tr>
+      <td><code>travail_id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>obligatoire, référence <code>travaux(id)</code></td>
+    </tr>
+
+    <tr>
+      <td><code>creneau_id</code></td>
+      <td><code>VARCHAR(30)</code></td>
+      <td>obligatoire, référence <code>creneaux(id)</code></td>
+    </tr>
+
+    <tr>
+      <td><code>matricule</code></td>
+      <td><code>VARCHAR(20)</code></td>
+      <td>obligatoire</td>
+    </tr>
+
+    <tr>
+      <td><code>nom</code></td>
+      <td><code>VARCHAR(100)</code></td>
+      <td>obligatoire</td>
+    </tr>
+  </tbody>
+</table>
+
+Une combinaison `(travail_id, creneau_id, matricule)` doit être **unique** afin qu’un étudiant ne puisse pas apparaître deux fois pour le même créneau d’un même travail.
+
+Lorsqu'un étudiant modifie sa réponse, ses anciennes disponibilités pour ce travail sont remplacées par les nouvelles.
+
+<Aside type="note" title="Relations entre les tables">
+
+Un cours possède plusieurs travaux et un travail possède plusieurs créneaux. Les disponibilités associent le matricule et le nom d’un étudiant aux créneaux sélectionnés pour un travail.
+
+`cours` → `travaux` → `creneaux` → `disponibilites`
+
+</Aside>
+
+## Jeu de données initial
+
+Les données suivantes simulent les informations qui seraient normalement obtenues à partir d'une plateforme de cours. Elles doivent être insérées dans `DexBD` par votre script `init.php`.
+
+Les noms et codes de cours utilisés dans le jeu de données sont tirés du profil **Programmation Web et mobile (420.B1)** du Collège Ahuntsic. Les travaux et leurs dates sont fictifs et servent uniquement au scénario du TP.
+
+Les étudiants ne font pas partie du jeu de données initial : ils fournissent leur matricule et leur nom lorsqu'ils soumettent leurs disponibilités. Le matricule sert à retrouver et remplacer leurs réponses pour un même travail.
+
+### Cours
+
+<table>
+  <thead>
+    <tr>
+      <th><code>id</code></th>
+      <th>Titre</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>420-244-AH</code></td>
+      <td>Bases de données applicatives</td>
+    </tr>
+
+    <tr>
+      <td><code>420-245-AH</code></td>
+      <td>Programmation Web 1</td>
+    </tr>
+
+    <tr>
+      <td><code>420-248-AH</code></td>
+      <td>Programmation Web 2</td>
+    </tr>
+
+    <tr>
+      <td><code>420-253-AH</code></td>
+      <td>Projet de fin d'études</td>
+    </tr>
+  </tbody>
+</table>
+
+### Travaux
+
+<table>
+  <thead>
+    <tr>
+      <th><code>id</code></th>
+      <th>Cours</th>
+      <th>Titre</th>
+      <th>Description</th>
+      <th>Type</th>
+      <th>Disponible</th>
+      <th>Remise</th>
+      <th><code>ouvert</code></th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>web1-tp1</code></td>
+      <td><code>420-245-AH</code></td>
+      <td>TP1 — Catalogue de produits</td>
+      <td>Construire une première application PHP permettant d'afficher et de filtrer un catalogue.</td>
+      <td><code>individuel</code></td>
+      <td>2026-09-01</td>
+      <td>2026-09-20 23:59</td>
+      <td><code>false</code></td>
+    </tr>
+
+    <tr>
+      <td><code>web2-tp1</code></td>
+      <td><code>420-248-AH</code></td>
+      <td>TP1 — Gestion de réservations</td>
+      <td>Développer une application Web transactionnelle permettant d’enregistrer et de consulter des réservations.</td>
+      <td><code>equipe</code></td>
+      <td>2026-09-21</td>
+      <td>2026-10-18 23:59</td>
+      <td><code>true</code></td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-lab2</code></td>
+      <td><code>420-244-AH</code></td>
+      <td>Laboratoire 2 — Requêtes SQL</td>
+      <td>Écrire et tester des requêtes SQL sur une base de données relationnelle fournie.</td>
+      <td><code>individuel</code></td>
+      <td>2026-09-28</td>
+      <td>2026-10-12 23:59</td>
+      <td><code>true</code></td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-tp1</code></td>
+      <td><code>420-244-AH</code></td>
+      <td>TP1 — Modélisation d’une bibliothèque</td>
+      <td>Concevoir un modèle relationnel et produire le script SQL permettant de créer la base de données.</td>
+      <td><code>equipe</code></td>
+      <td>2026-10-05</td>
+      <td>2026-10-25 23:59</td>
+      <td><code>true</code></td>
+    </tr>
+
+    <tr>
+      <td><code>pfe-prototype</code></td>
+      <td><code>420-253-AH</code></td>
+      <td>Prototype fonctionnel</td>
+      <td>Produire une première version fonctionnelle du projet et préparer une démonstration à l'équipe enseignante.</td>
+      <td><code>equipe</code></td>
+      <td>2026-09-15</td>
+      <td>2026-10-09 23:59</td>
+      <td><code>true</code></td>
+    </tr>
+  </tbody>
+</table>
+
+### Créneaux proposés
+
+<table>
+  <thead>
+    <tr>
+      <th><code>travail_id</code></th>
+      <th><code>id</code> du créneau</th>
+      <th>Début</th>
+      <th>Fin</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>web1-tp1</code></td>
+      <td><code>web1-tp1-01</code></td>
+      <td>2026-09-15 18:00</td>
+      <td>2026-09-15 19:30</td>
+    </tr>
+
+    <tr>
+      <td><code>web1-tp1</code></td>
+      <td><code>web1-tp1-02</code></td>
+      <td>2026-09-16 12:00</td>
+      <td>2026-09-16 13:30</td>
+    </tr>
+
+    <tr>
+      <td><code>web1-tp1</code></td>
+      <td><code>web1-tp1-03</code></td>
+      <td>2026-09-17 17:00</td>
+      <td>2026-09-17 18:30</td>
+    </tr>
+
+    <tr>
+      <td><code>web2-tp1</code></td>
+      <td><code>web2-tp1-01</code></td>
+      <td>2026-10-05 18:00</td>
+      <td>2026-10-05 19:30</td>
+    </tr>
+
+    <tr>
+      <td><code>web2-tp1</code></td>
+      <td><code>web2-tp1-02</code></td>
+      <td>2026-10-06 12:00</td>
+      <td>2026-10-06 13:30</td>
+    </tr>
+
+    <tr>
+      <td><code>web2-tp1</code></td>
+      <td><code>web2-tp1-03</code></td>
+      <td>2026-10-07 17:00</td>
+      <td>2026-10-07 18:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-lab2</code></td>
+      <td><code>bdd-lab2-01</code></td>
+      <td>2026-10-01 16:00</td>
+      <td>2026-10-01 17:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-lab2</code></td>
+      <td><code>bdd-lab2-02</code></td>
+      <td>2026-10-02 12:00</td>
+      <td>2026-10-02 13:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-lab2</code></td>
+      <td><code>bdd-lab2-03</code></td>
+      <td>2026-10-04 10:00</td>
+      <td>2026-10-04 11:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-tp1</code></td>
+      <td><code>bdd-tp1-01</code></td>
+      <td>2026-10-13 18:00</td>
+      <td>2026-10-13 19:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-tp1</code></td>
+      <td><code>bdd-tp1-02</code></td>
+      <td>2026-10-14 12:00</td>
+      <td>2026-10-14 13:30</td>
+    </tr>
+
+    <tr>
+      <td><code>bdd-tp1</code></td>
+      <td><code>bdd-tp1-03</code></td>
+      <td>2026-10-15 17:00</td>
+      <td>2026-10-15 18:30</td>
+    </tr>
+
+    <tr>
+      <td><code>pfe-prototype</code></td>
+      <td><code>int-s1-01</code></td>
+      <td>2026-09-29 18:00</td>
+      <td>2026-09-29 20:00</td>
+    </tr>
+
+    <tr>
+      <td><code>pfe-prototype</code></td>
+      <td><code>int-s1-02</code></td>
+      <td>2026-09-30 17:00</td>
+      <td>2026-09-30 19:00</td>
+    </tr>
+
+    <tr>
+      <td><code>pfe-prototype</code></td>
+      <td><code>int-s1-03</code></td>
+      <td>2026-10-01 18:00</td>
+      <td>2026-10-01 20:00</td>
+    </tr>
+  </tbody>
+</table>
+
+Le champ `ouvert` est fourni dans les données initiales. **Vous n'avez pas à calculer l'état d'un travail à partir des dates** : la page d'accueil affiche uniquement les travaux pour lesquels `ouvert` vaut `true`. Les champs `disponible` et `remise` servent à représenter et à afficher les dates du travail, mais ne déterminent pas son état dans ce TP.
+
+Les identifiants (`id`) des cours, travaux et créneaux doivent être utilisés tels quels.
+
+## Traitement des disponibilités
+
+Les pages PHP communiquent avec `DexBD` à l'aide de **PDO**.
+
+Votre application doit effectuer les opérations nécessaires pour :
+
+- récupérer les cours et les travaux ouverts ;
+- filtrer les travaux selon le cours sélectionné ;
+- récupérer un travail et ses créneaux à partir de son identifiant ;
+- récupérer les disponibilités enregistrées pour un travail ;
+- remplacer les disponibilités d'un étudiant lorsqu'il soumet de nouveau le formulaire ;
+- produire les informations nécessaires à l'affichage agrégé des créneaux.
+
+Toute requête SQL contenant une valeur provenant de l'utilisateur doit utiliser une **requête préparée**.
+
+<Aside type="note" title="Base de données et état de l'application">
+
+Les disponibilités doivent être conservées dans `DexBD`. Elles ne doivent pas être stockées uniquement dans des variables PHP, des champs cachés du formulaire ou d'autres données propres à une seule requête. Les réponses doivent demeurer disponibles pour les autres utilisateurs et après un rechargement de la page.
+
+</Aside>
+
+### Après une soumission valide
+
+Après avoir enregistré les nouvelles disponibilités, il est recommandé de rediriger l'utilisateur vers la même page de travail avant d'afficher le résultat. Cette organisation évite qu'un simple rafraîchissement du navigateur soumette de nouveau le formulaire.
+
+Par exemple :
+
+```php
+header('Location: travail.php?travail=' . urlencode($travailId));
+exit;
+```
+
+## Bonus — retenir l'utilisateur courant avec une session
+
+Une fois le fonctionnement principal de Dex terminé, vous pouvez ajouter une **session PHP** pour améliorer l'expérience utilisateur.
+
+Le bonus consiste à :
+
+- démarrer une session ;
+- retenir le matricule et le nom utilisés lors d’une soumission valide ;
+- préremplir les champs `matricule` et `nom` lorsque cet utilisateur revient sur une page de travail ;
+- afficher, si désiré, le nom de l’utilisateur courant dans l’en-tête.
+
+<Aside type="note" title="Session ou base de données ?">
+
+La session sert ici à retenir une information propre à l'utilisateur courant. Les disponibilités, elles, restent dans la base de données puisqu'elles constituent un état partagé et durable de l'application.
+
+</Aside>
+
+## Contraintes techniques
+
+- **Base de données obligatoire** : les cours, travaux, créneaux et disponibilités sont conservés dans `DexBD` et accessibles avec PDO.
+- Un **script PHP d'initialisation** (`init.php`) crée les quatre tables, établit leurs relations et insère le jeu de données initial. Il doit pouvoir être relancé sans produire de doublons ni d'erreurs.
+- **Requêtes préparées** pour toute requête contenant une valeur provenant de l'utilisateur.
+- **Validation côté serveur** de toutes les données reçues par `GET` ou `POST` avant leur utilisation.
+- **Échappement systématique** des données affichées dans le HTML avec `htmlspecialchars` lorsque nécessaire.
+- Les identifiants de créneaux reçus lors d'une soumission doivent être vérifiés afin de confirmer qu'ils appartiennent au travail courant.
+- Les anciennes disponibilités d'un étudiant pour un travail doivent être **remplacées** par sa nouvelle réponse.
+- Structure de projet propre : connexion PDO dans un fichier distinct, en-tête et pied de page partagés avec `include` ou `require`.
+- La **session est facultative** et fait partie du bonus décrit plus haut.
+
+{/* ## Barème
+
+<table>
+  <thead>
+    <tr>
+      <th>Critère</th>
+      <th>Points</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Initialisation de <code>DexBD</code> : tables, relations et jeu de données</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Accueil : cours, travaux ouverts et filtre</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Accès à un travail : récupération, validation et redirection</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Formulaire de disponibilités et traitement de la soumission</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <td>Validation côté serveur, requêtes préparées et échappement</td>
+      <td>20</td>
+    </tr>
+    <tr>
+      <td>Persistance, modification des réponses, agrégation et meilleur créneau</td>
+      <td>20</td>
+    </tr>
+    <tr>
+      <td>Navigation, composition des pages et qualité du code</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td><strong>Total</strong></td>
+      <td><strong>100</strong></td>
+    </tr>
+  </tbody>
+</table> */}
+
+## Livrables
+
+<Steps>
+
+1. Une archive (`.zip` ou `.rar`) du projet, prête à déposer dans `htdocs`, contenant le code PHP, le fichier de connexion et les fichiers partagés utilisés par l'application.
+2. Le script PHP d'initialisation de la base (`init.php`), incluant la création des tables et l'insertion du jeu de données initial.
+3. Un court `README` expliquant la mise en place : démarrer MySQL, exécuter `init.php` (sur une base nommée `DexBD`), puis l'usage de l'outil.
+
+</Steps>

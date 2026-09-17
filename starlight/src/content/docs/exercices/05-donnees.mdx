@@ -1,9 +1,8 @@
 ---
 title: Exercices — Préserver les données
 description: Pratiquer les sessions à travers une boutique, un rappel de la programmation orientée objet, une page d'administration CRUD, puis une synthèse qui ajoute une base de données au premier travail pratique.
-draft: true
 sidebar:
-  order: 11
+  order: 6
 ---
 
 import Aside from '../../../components/Aside.astro';
@@ -12,12 +11,6 @@ import Highlight from '../../../components/Highlight.astro';
 import Checkpoint from '../../../components/Checkpoint.astro';
 import CarteProduit from '../../../components/react/CarteProduit.jsx';
 import TableProduitsAdmin from '../../../components/react/TableProduitsAdmin.jsx';
-
-Quatre parties : manipuler les sessions à travers une boutique, un rappel de la programmation orientée objet, une page d'administration pour gérer les produits, puis une synthèse qui rend le TP1 durable avec une base de données.
-
-<Aside type="prerequis" title="Avant de commencer">
-Cette série s'appuie sur le chapitre [Préserver les données](/cours/07-preservation) (`$_SESSION`, PDO), sur les [formulaires](/cours/05-formulaires) et sur le [travail pratique](/tps/01-selecteur-place). Testez chaque réponse dans un dossier de `htdocs`.
-</Aside>
 
 ## Partie 1 : Utilisation de session
 
@@ -252,7 +245,7 @@ return $produits;
 
 </Checkpoint> */}
 
-## Partie 2 : Premiers pas en programmation orientée objet
+{/* ## Partie 2 : Premiers pas en programmation orientée objet
 
 Jusqu'ici, les données vivaient dans des tableaux et le comportement dans des fonctions. 
 La programmation orientée objet réunit les deux : 
@@ -294,15 +287,15 @@ $compte->deposer(50);                // appeler une méthode avec ->
 echo $compte->solde();               // 150
 ```
 
-La visibilité `public` ou `private` contrôle l'accès : un attribut `private` ne se manipule que par les méthodes de la classe. On parle d'**encapsulation** : l'objet protège ses données et n'expose que ce qu'il choisit.
+La visibilité `public` ou `private` contrôle l'accès : un attribut `private` ne se manipule que par les méthodes de la classe. On parle d'**encapsulation** : l'objet protège ses données et n'expose que ce qu'il choisit. */}
 
-### Exercice 4 &ndash; Une première classe : Produit
+{/* ### Exercice 4 &ndash; Une première classe : Produit
 
 Écrivez une classe `Produit` avec deux attributs, `nom` et `prix`, un constructeur qui les reçoit, et une méthode `prixFormate()` qui retourne le prix à la québécoise. Créez ensuite un produit et affichez-le.
 
 <Checkpoint question="Indice">
 Le constructeur `__construct` reçoit les valeurs et les range dans l'objet courant avec `$this->nom = $nom`. Une méthode est une fonction déclarée dans la classe ; elle accède aux attributs par `$this->`. On instancie avec `new Produit(...)` et on appelle avec la flèche `->`.
-</Checkpoint>
+</Checkpoint> */}
 
 {/* <Checkpoint question="Solution">
 
@@ -331,13 +324,13 @@ echo htmlspecialchars($sirop->nom) . ' : ' . $sirop->prixFormate();
 
 </Checkpoint> */}
 
-### Exercice 5 &ndash; Une classe avec comportement : Panier
+{/* ### Exercice 5 &ndash; Une classe avec comportement : Panier
 
 Écrivez une classe `Panier` qui contient une liste de produits dans un attribut privé. Ajoutez trois méthodes : `ajouter(Produit $produit)`, `nombre()` qui retourne le nombre d'articles, et `total()` qui retourne la somme des prix.
 
 <Checkpoint question="Indice">
 Déclarez l'attribut `private array $articles = [];`. Étant privé, il ne se manipule que par les méthodes de la classe. `ajouter` ajoute au tableau, `nombre` renvoie `count(...)`, et `total` parcourt les produits en additionnant leur `prix`.
-</Checkpoint>
+</Checkpoint> */}
 
 {/* <Checkpoint question="Solution">
 
@@ -377,9 +370,11 @@ echo $panier->nombre() . ' articles, total : '
 
 </Checkpoint> */}
 
-## Partie 3 : Une page d'administration (CRUD)
+## Partie 2 : Une page d'administration (CRUD)
 
-Les produits sont maintenant en base de données (partie 1, exercice 3). Une page d'administration permet de les gérer directement, sans passer par phpMyAdmin. Elle réunit les quatre opérations de base, résumées par l'acronyme **CRUD** : créer (Create), lire (Read), modifier (Update) et supprimer (Delete).
+Les produits sont maintenant en base de données. 
+Une page d'administration permet de les gérer directement, sans passer par phpMyAdmin. 
+Elle réunit les quatre opérations de base, résumées par l'acronyme **CRUD** : créer (Create), lire (Read), modifier (Update) et supprimer (Delete).
 
 Voici à quoi la liste d'administration pourrait ressembler :
 
@@ -390,7 +385,7 @@ Ces exercices reprennent la table `produits` de l'exercice 3 et une connexion PD
 la gestion des accès dépasse le cadre de cette série d'exercice.
 </Aside>
 
-### Exercice 6 &ndash; Lister les produits (Read)
+### Exercice 4 &ndash; Lister les produits (Read)
 
 Créez `admin/produits.php` : la page liste tous les produits dans un tableau, avec un lien « Modifier » et « Supprimer » par ligne, et un lien pour ajouter un produit.
 
@@ -432,7 +427,7 @@ $produits = $pdo->query('SELECT id, nom, prix FROM produits ORDER BY nom')->fetc
 
 </Checkpoint> */}
 
-### Exercice 7 &ndash; Ajouter un produit (Create)
+### Exercice 5 &ndash; Ajouter un produit (Create)
 
 Créez `admin/ajouter.php` : un formulaire (nom et prix) qui, à l'envoi, valide les données et insère le produit, puis redirige vers la liste.
 
@@ -469,7 +464,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </Checkpoint> */}
 
-### Exercice 8 &ndash; Modifier un produit (Update)
+### Exercice 6 &ndash; Modifier un produit (Update)
 
 Créez `admin/modifier.php?id=...` : la page charge le produit visé, affiche un formulaire prérempli, puis enregistre les changements à l'envoi.
 
@@ -513,7 +508,7 @@ if ($produit === false) {
 
 </Checkpoint> */}
 
-### Exercice 9 &ndash; Supprimer un produit (Delete)
+### Exercice 7 &ndash; Supprimer un produit (Delete)
 
 Créez `admin/supprimer.php?id=...` : la page demande d'abord une confirmation, et supprime le produit seulement à l'envoi du formulaire.
 
