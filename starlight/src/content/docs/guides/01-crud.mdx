@@ -1,0 +1,1387 @@
+---
+title: "Guide : Opérations CRUD"
+description: Créer un fichier de connexion réutilisable, un script d'initialisation qui crée et peuple les tables, puis les quatre opérations de lecture et d'écriture avec validation et redirection.
+sidebar:
+  order: 1
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import Squelette from '../../../components/Squelette.astro';
+import EtapeCode from '../../../components/EtapeCode.astro';
+import OperationCard from '../../../components/OperationCard.astro';
+import CodeProgressif from '../../../components/CodeProgressif.astro';
+import MatriceCrud from '../../../components/react/MatriceCrud.jsx';
+
+
+<Aside type="prerequis" title="Contexte de départ">
+Ce guide prend la suite de [Préserver les données](./../cours/05-preservation.mdx), qui s'arrêtait à la connexion PDO et à une première lecture de la base de données (erabliere). 
+On reprend ici le même exemple en partant d'une base de données vide et on arrive à une page qui liste et permet d'ajouter, modifier et supprimer des produits.
+</Aside>
+
+## Organisation des fichiers du projet
+
+```text
+erabliere/
+├── includes/
+│   ├── db.php           connexion, chargée par toutes les pages
+│   ├── categories.php   liste blanche des catégories
+│   ├── validation.php   contrôles partagés
+│   ├── header.php       repris du chapitre sur la composition
+│   └── footer.php
+├── init.sql             structure et données de départ
+├── produits.php         liste, création, suppression
+└── produit-modifier.php édition d'un produit
+```
+
+#### Fichier `includes/categories.php`
+
+```php
+<?php
+
+return [
+    'sirop'      => 'Sirops',
+    'tartinade'  => 'Tartinades',
+    'confiserie' => 'Confiseries',
+    'coffret'    => 'Coffrets',
+];
+```
+
+## 1. Un fichier de connexion réutilisable
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+
+```text
+erabliere/
+├── includes/
+│   ├── db.php 📝         
+│   ├── categories.php ✅ 
+│   ├── validation.php   
+│   ├── header.php  ✅  
+│   └── footer.php  ✅
+├── init.sql             
+├── produits.php         
+└── produit-modifier.php 
+```
+</Checkpoint>
+
+Plutôt que de recopier les (mêmes) instructions de connexion à la base de données dans chaque page,
+il est préférable de les écrire une fois, dans un fichier distinct, puis de l'importer au besoin 
+dans les pages communicant avec la base de données.
+
+<Aside type='tip' title='Principe de programmation: DRY'>
+Le principe *Don’t repeat yourself* (DRY, en français : Ne vous répétez pas)
+consiste à éviter la redondance de code au sein d’une application afin de faciliter la maintenance, le test, le débogage et les évolutions de celle-ci.  
+Dans notre cas, recopier la connexion dans chaque page reviendrait à devoir modifier cinq fichiers le jour où le mot de passe change. 
+</Aside>
+
+#### Fichier de connexion `includes/db.php`
+
+```php
+<?php
+
+/**
+ * Ouvre la connexion à la base de données et définit la variable $pdo pour la 
+ * page appelante.
+ */
+
+const BD_HOTE         = 'localhost';
+const BD_NOM          = 'erabliere';
+const BD_UTILISATEUR  = 'root';
+const BD_MOT_DE_PASSE = '';
+
+// Identification de la base de données
+$dsn = 'mysql:host=' . BD_HOTE . ';dbname=' . BD_NOM . ';charset=utf8mb4';
+
+// Options utilisées par PDO lors de la communication avec la base de données
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+
+// Tentative de connexion à la base de données
+try {
+    $pdo = new PDO($dsn, BD_UTILISATEUR, BD_MOT_DE_PASSE, $options);
+} catch (PDOException $e) {
+    http_response_code(500); // indique au client (navigateur) que le serveur a rencontré une condition inattendue
+    exit('Connexion à la base de données impossible.');
+}
+```
+
+#### À quoi servent les options ?
+
+- `ERRMODE_EXCEPTION` demande à PDO de lever une exception lorsqu'une opération échoue. Elle est le comportement par défaut depuis PHP 8.
+- `DEFAULT_FETCH_MODE` évite de répéter `PDO::FETCH_ASSOC` à chaque lecture. Les lignes arrivent sous forme de tableaux associatifs, avec les noms de colonnes comme clés.
+- `EMULATE_PREPARES` à `false` demande que les requêtes préparées soient réellement préparées par le serveur, plutôt que reconstituées par PDO avant l'envoi.
+
+<Aside type="caution" title="Le message d'erreur en dit long">
+`$e->getMessage()` contient souvent le nom de la BD, celui de l'utilisateur et le détail de l'échec. 
+
+Durant le développement, l'afficher fait gagner du temps. Cependant, sur un site en ligne, 
+c'est de l'information en trop pour l'utilisateur et qui présente certains risques si l'utilisateur est mal intentionné.
+
+**La bonne pratique est de journaliser (écrire en *log*) le détail de l'erreur et afficher un message plus neutre à l'utilisateur.**
+</Aside>
+
+<MarginNote type="astuce" titre="Portée de $pdo">
+`require_once` insère le fichier dans la portée de l'endroit où il est appelé. Appelé au premier niveau d'une page, `$pdo` devient une variable ordinaire de cette page. Appelé à l'intérieur d'une fonction, il n'existerait que dans cette fonction.
+</MarginNote>
+
+## 2. Créer et peupler la base de données
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php   
+│   ├── header.php  ✅     
+│   └── footer.php  ✅
+├── init.sql  📝           
+├── produits.php         
+└── produit-modifier.php 
+```
+</Checkpoint>
+
+<Aside type="prerequis" title="Créer la base de données">
+Assurez-vous que la base de données `erabliere` existe dans votre instance MySQL,
+en vous rendant dans la page *phpMyAdmin*.
+</Aside>
+
+Nous allons créer la table `produits` et la peupler de quelques données pour faciliter le développement de nos pages CRUD.
+
+La structure de la table et les données de départ tiennent dans un fichier SQL, exécuté une fois depuis *phpMyAdmin*. 
+
+```sql
+-- init.sql
+-- Structure et données de départ. À exécuter dans la BD erabliere.
+
+DROP TABLE IF EXISTS produits;
+
+CREATE TABLE produits (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    nom       VARCHAR(100)  NOT NULL,
+    categorie VARCHAR(40)   NOT NULL,
+    prix      DECIMAL(6, 2) NOT NULL,
+    stock     INT           NOT NULL DEFAULT 0,
+    cree_le   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+INSERT INTO produits (nom, categorie, prix, stock) VALUES
+    ('Sirop d''érable doré 540 ml',  'sirop',      14.50, 12),
+    ('Sirop d''érable ambré 540 ml', 'sirop',      15.25,  7),
+    ('Beurre d''érable 250 g',       'tartinade',   9.95,  0),
+    ('Gelée d''érable 190 ml',       'tartinade',  11.00,  9),
+    ('Tire sur la neige',            'confiserie',  6.25, 30),
+    ('Coffret découverte',           'coffret',    39.00,  5);
+```
+
+#### Grandes étapes
+
+<Steps>
+
+1. Démarrez Apache et MySQL dans le panneau XAMPP.
+2. Ouvrez `http://localhost/phpmyadmin`, puis créez la base de données `erabliere` si elle n'existe pas, avec l'interclassement `utf8mb4_general_ci`.
+3. Sélectionnez la base de données, ouvrez l'onglet « SQL », collez le contenu de `init.sql` et exécutez.
+4. Vérifiez dans l'onglet « Parcourir » que les six produits apparaissent, avec leur date de création.
+
+</Steps>
+
+<MarginNote type='astuce' titre='Équivalent en ligne de commande'>
+En ligne de commande, la même chose s'écrit d'une traite.
+
+```bash
+mysql -u root erabliere < init.sql
+```
+</MarginNote>
+
+
+<Aside type="caution" title="Où placer le fichier init.sql ?">
+Un fichier `.sql` d'initialisation ne devrait pas être exécuté par le serveur web.  
+Si nous le plaçons directement dans le dossier du site, il restera lisible par quiconque connaît son adresse. 
+
+On le place à côté du projet plutôt qu'à l'intérieur de la racine publique.
+</Aside>
+
+## 3. Les quatre opérations : CRUD
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php    
+│   ├── header.php  ✅     
+│   └── footer.php  ✅
+├── init.sql  ✅           
+├── produits.php         
+└── produit-modifier.php 
+```
+</Checkpoint>
+
+**CRUD** est l'acronyme des quatre opérations de base sur des données persistantes : 
+
+- *create* (créer) : Ajouter une ou plusieurs nouvelles données. Utilise l'opération `INSERT`.
+- *read* (lire) : Récupérer des données complètes, agrégées ou filtrées. Utilise l'opération `SELECT`.
+- *update* (modifier) : Modifier une ou plusieurs données existantes. Utilise l'opération `UPDATE`.
+- *delete* (supprimer) : Supprimer une ou plusieurs données existantes. Utilise l'opération `DELETE`.
+
+<OperationCard
+  numero={1}
+  operation="Lire"
+  verbe="SELECT"
+  titre="Afficher la liste des produits"
+  intention="Voir ce que contient le catalogue, sans rien modifier."
+>
+  <Fragment slot="scenario">
+
+L'utilisateur ouvre la page. Le tableau se remplit avec les produits de la base de données, triés par nom.
+
+  </Fragment>
+  <Fragment slot="mecanique">
+
+<dl class="cmap">
+  <dt>Méthode d'accès</dt><dd>GET <code>produits.php</code></dd>
+  <dt>Requête SQL</dt><dd><code>SELECT … FROM produits ORDER BY nom</code></dd>
+  <dt>Valeur du client</dt><dd>aucune, donc ici <code>$pdo->query()</code> suffit</dd>
+</dl>
+
+  </Fragment>
+  <Fragment slot="code">
+
+```php
+$produits = $pdo
+    ->query('SELECT id, nom, categorie, prix, stock FROM produits ORDER BY nom')
+    ->fetchAll();
+```
+
+<p class="cnote">`fetchAll()` rapporte toutes les lignes d'un coup, ce qui convient à un catalogue de cette taille. Pour un très grand nombre de lignes, on paginerait avec `LIMIT` et `OFFSET`.</p>
+
+  </Fragment>
+</OperationCard>
+
+<OperationCard
+  numero={2}
+  operation="Créer"
+  verbe="INSERT"
+  titre="Ajouter un produit au catalogue"
+  intention="Enregistrer un nouveau produit à partir d'un formulaire."
+>
+  <Fragment slot="scenario">
+
+L'utilisateur remplit le formulaire en bas de la liste et l'envoie. Si tout est valide, le produit apparaît dans le tableau et un message le confirme. Sinon le formulaire revient, rempli, avec les messages d'erreur.
+
+  </Fragment>
+  <Fragment slot="mecanique">
+
+<dl class="cmap">
+  <dt>Méthode d'envoi</dt><dd>POST vers la même page (<code>produits.php</code>)</dd>
+  <dt>Requête SQL</dt><dd><code>INSERT INTO produits …</code></dd>
+  <dt>Après succès</dt><dd>redirection 303 vers <code>produits.php</code></dd>
+</dl>
+
+<ol class="csteps">
+  <li>Les champs arrivent dans <code>$_POST</code>.</li>
+  <li>La validation remplit la variable <code>$erreurs</code>.</li>
+  <li>S'il n'y a pas d'erreur, la requête SQL préparée insère la ligne dans la table.</li>
+  <li>La redirection évite qu'un rafraîchissement n'insère un doublon.</li>
+</ol>
+
+  </Fragment>
+  <Fragment slot="code">
+
+```php
+$insertion = $pdo->prepare(
+    'INSERT INTO produits (nom, categorie, prix, stock)
+     VALUES (:nom, :categorie, :prix, :stock)'
+);
+$insertion->execute([
+    'nom'       => $valeurs['nom'],
+    'categorie' => $valeurs['categorie'],
+    'prix'      => $valeurs['prix'],
+    'stock'     => $valeurs['stock'],
+]);
+
+$_SESSION['message'] = 'Produit ajouté.';
+header('Location: produits.php', true, 303);
+exit;
+```
+
+<p class="cnote">`$pdo->lastInsertId()` donne l'identifiant de la ligne qui vient d'être créée, utile pour rediriger vers la fiche du nouveau produit.</p>
+
+  </Fragment>
+</OperationCard>
+
+<OperationCard
+  numero={3}
+  operation="Modifier"
+  verbe="UPDATE"
+  titre="Corriger un produit existant"
+  intention="Charger les valeurs actuelles dans un formulaire, puis enregistrer les modifications."
+>
+  <Fragment slot="scenario">
+
+Depuis la liste, l'utilisateur clique sur « Modifier ». Le formulaire s'ouvre déjà rempli avec les valeurs actuelles. Il change ce qu'il veut et enregistre les nouvelles valeurs.
+
+  </Fragment>
+  <Fragment slot="mecanique">
+
+Deux requêtes distinctes, dans deux méthodes différentes.
+
+<dl class="cmap">
+  <dt>Charger</dt><dd>GET <code>produit-modifier.php?id=7</code>, puis <code>SELECT … WHERE id = :id</code></dd>
+  <dt>Enregistrer</dt><dd>POST vers la même adresse, puis <code>UPDATE … WHERE id = :id</code></dd>
+  <dt>Après succès</dt><dd>redirection 303 vers la liste</dd>
+</dl>
+
+<p class="cnote">L'identifiant voyage dans l'adresse pour le chargement, et dans un champ caché pour l'enregistrement. Dans les deux cas, il est revalidé : une adresse se modifie à la main.</p>
+
+  </Fragment>
+  <Fragment slot="code">
+
+```php
+$mise_a_jour = $pdo->prepare(
+    'UPDATE produits
+        SET nom = :nom, categorie = :categorie, prix = :prix, stock = :stock
+      WHERE id = :id'
+);
+$mise_a_jour->execute([
+    'nom'       => $valeurs['nom'],
+    'categorie' => $valeurs['categorie'],
+    'prix'      => $valeurs['prix'],
+    'stock'     => $valeurs['stock'],
+    'id'        => $id,
+]);
+```
+
+<p class="cnote">La clause `WHERE id = :id` n'est pas facultative : sans elle, l'`UPDATE` s'appliquerait à toutes les lignes de la table.</p>
+
+  </Fragment>
+</OperationCard>
+
+<OperationCard
+  numero={4}
+  operation="Supprimer"
+  verbe="DELETE"
+  titre="Retirer un produit du catalogue"
+  intention="Supprimer une ligne sans utiliser une requête GET susceptible d'être déclenchée par le simple suivi d'un lien."
+>
+  <Fragment slot="scenario">
+
+Chaque ligne du tableau a un bouton « Supprimer » mis dans un formulaire. L'envoi du formulaire retire la ligne, et la liste revient avec un message.
+
+  </Fragment>
+  <Fragment slot="mecanique">
+
+<dl class="cmap">
+  <dt>Méthode d'envoi</dt><dd>POST vers <code>produits.php</code>, jamais un lien</dd>
+  <dt>Requête SQL</dt><dd><code>DELETE FROM produits WHERE id = :id</code></dd>
+  <dt>Après l'envoi</dt><dd>redirection 303 vers la liste</dd>
+</dl>
+
+<p class="cnote">Le formulaire transporte deux champs cachés : l'identifiant, et une valeur <code>action</code> qui indique à la page laquelle de ses deux branches exécuter.</p>
+
+  </Fragment>
+  <Fragment slot="code">
+
+```php
+$suppression = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+$suppression->execute(['id' => $id]);
+
+$_SESSION['message'] = $suppression->rowCount() === 1
+    ? 'Produit supprimé.'
+    : "Ce produit n'existait plus.";
+```
+
+<p class="cnote">`rowCount()` indique combien de lignes ont été touchées. Zéro signifie que l'identifiant ne correspondait à rien, ce qui arrive quand deux onglets suppriment le même produit.</p>
+
+  </Fragment>
+</OperationCard>
+
+
+## 4. Les fonctions de contrôle partagées
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php 📝   
+│   ├── header.php  ✅     
+│   └── footer.php  ✅
+├── init.sql  ✅           
+├── produits.php         
+└── produit-modifier.php 
+```
+</Checkpoint>
+
+
+La création et la modification vérifient les mêmes champs, et leurs deux formulaires réaffichent les valeurs et les messages de la même façon. Plutôt que d'écrire deux fois les mêmes conditions, on met les trois fonctions dans un fichier chargé par les deux pages.
+
+<CodeProgressif fichier="includes/validation.php" resume="Les trois fonctions partagées par la création et la modification.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li><b>Responsabilités :</b> Règles communes à l'ajout et à la correction d'un produit.</li>
+  <li>
+    `Fonction` Validation des champs du formulaire  :
+    <ul style={{marginBottom: 0}}>
+      <li>Nom : obligatoire, 100 caractères au plus.</li>
+      <li>Catégorie : doit figurer dans la liste admise.</li>
+      <li>Prix : nombre décimal positif ou nul.</li>
+      <li>Stock : nombre entier positif ou nul.</li>
+      <li style={{listStyle: "none", marginLeft: "-24px"}}>**`=>`** Rend les erreurs ou anomalies rattachées à leur champ, et les valeurs converties dans leur type approprié (décimal, entier, etc.).</li>
+    </ul>
+  </li>
+  <li>`Fonction` Fournit la valeur à réafficher dans un champ.</li>
+  <li>`Fonction` Fournit le message d'erreur (si présent) associé à un champ.</li>
+  <li>N'interroge pas la base de données et n'effectue pas de redirection.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="VALIDER LES DONNÉES SOUMISES (Fonction <code style='text-transform: none'>validerProduit</code>)" libelle="préparer deux tableaux vides pour suivre (1) les erreurs ou anomalies et (2) les valeurs converties">
+
+```php
+$erreurs = [];
+$valeurs = [];
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="normalisation et vérification du nom : retirer les espaces de bordure puis vérifier que la valeur n'excède pas 100 caractères">
+
+```php
+$valeurs['nom'] = trim($donnees['nom'] ?? '');
+
+if ($valeurs['nom'] === '') {
+    $erreurs['nom'] = 'Le nom est obligatoire.';
+} elseif (mb_strlen($valeurs['nom']) > 100) {
+    $erreurs['nom'] = 'Le nom ne devrait pas dépasser 100 caractères.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="vérification de la catégorie : vérifier que la valeur (représentant une clé) fait partie de la liste admise">
+
+```php
+$valeurs['categorie'] = trim($donnees['categorie'] ?? '');
+
+if (!array_key_exists($valeurs['categorie'], $categories)) {
+    $erreurs['categorie'] = 'Choisissez une catégorie de la liste.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="vérification du prix : convertir en décimal, puis vérifier que la valeur est positive ou nul">
+
+```php
+$prix = filter_var(trim($donnees['prix'] ?? ''), FILTER_VALIDATE_FLOAT);
+
+if ($prix === false || $prix < 0) {
+    $erreurs['prix'] = 'Le prix doit être un nombre positif.';
+}
+
+$valeurs['prix'] = $prix === false ? 0.0 : $prix;
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="vérification du stock : convertir en entier, puis vérifier que la valeur est positive ou nul">
+
+```php
+$stock = filter_var(trim($donnees['stock'] ?? ''), FILTER_VALIDATE_INT);
+
+if ($stock === false || $stock < 0) {
+    $erreurs['stock'] = 'Le stock doit être un entier positif ou nul.';
+}
+
+$valeurs['stock'] = $stock === false ? 0 : $stock;
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="retourner les deux tableaux">
+
+```php
+return [$erreurs, $valeurs];
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="AFFICHER LES DONNÉES ET ERREURS (Fonctions utilitaires)" libelle="valeur d'un champ du formulaire : retourner celle qui vient d'être envoyée, sinon une valeur de repli (par défaut)">
+
+```php
+function valeurSoumise(string $champ, string $defaut = ''): string
+{
+    return htmlspecialchars(trim($_POST[$champ] ?? $defaut));
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="message d'un champ : afficher le message seulement si une erreur ou anomalie est associée au champ">
+
+```php
+function messageErreur(array $erreurs, string $champ): void
+{
+    if (isset($erreurs[$champ])) {
+        echo '<p class="erreur">' . htmlspecialchars($erreurs[$champ]) . '</p>';
+    }
+}
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+
+/**
+ * Contrôle les champs d'un produit.
+ * Retourne deux tableaux : les erreurs par champ, et les valeurs converties.
+ */
+function validerProduit(array $donnees, array $categories): array
+{
+    $erreurs = [];
+    $valeurs = [];
+
+    $valeurs['nom'] = trim($donnees['nom'] ?? '');
+    if ($valeurs['nom'] === '') {
+        $erreurs['nom'] = 'Le nom est obligatoire.';
+    } elseif (mb_strlen($valeurs['nom']) > 100) {
+        $erreurs['nom'] = 'Le nom ne devrait pas dépasser 100 caractères.';
+    }
+
+    $valeurs['categorie'] = trim($donnees['categorie'] ?? '');
+    if (!array_key_exists($valeurs['categorie'], $categories)) {
+        $erreurs['categorie'] = 'Choisissez une catégorie de la liste.';
+    }
+
+    $prix = filter_var(trim($donnees['prix'] ?? ''), FILTER_VALIDATE_FLOAT);
+    if ($prix === false || $prix < 0) {
+        $erreurs['prix'] = 'Le prix doit être un nombre positif.';
+    }
+    $valeurs['prix'] = $prix === false ? 0.0 : $prix;
+
+    $stock = filter_var(trim($donnees['stock'] ?? ''), FILTER_VALIDATE_INT);
+    if ($stock === false || $stock < 0) {
+        $erreurs['stock'] = 'Le stock doit être un entier positif ou nul.';
+    }
+    $valeurs['stock'] = $stock === false ? 0 : $stock;
+
+    return [$erreurs, $valeurs];
+}
+
+/**
+ * Valeur à réafficher dans un champ : celle qui vient d'être soumise,
+ * ou à défaut celle fournie en second argument.
+ */
+function valeurSoumise(string $champ, string $defaut = ''): string
+{
+    return htmlspecialchars(trim($_POST[$champ] ?? $defaut));
+}
+
+/**
+ * Affiche le message d'erreur d'un champ, s'il y en a un.
+ */
+function messageErreur(array $erreurs, string $champ): void
+{
+    if (isset($erreurs[$champ])) {
+        echo '<p class="erreur">' . htmlspecialchars($erreurs[$champ]) . '</p>';
+    }
+}
+```
+
+  </Fragment>
+</CodeProgressif>
+
+
+## 5. La page liste, création et suppression
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php ✅   
+│   ├── header.php  ✅   
+│   └── footer.php  ✅
+├── init.sql ✅           
+├── produits.php 📝        
+└── produit-modifier.php 
+```
+</Checkpoint>
+
+
+<CodeProgressif fichier="produits.php" resume="L'affichage de la liste de produits, le formulaire d'ajout et la suppression; dans un seul fichier.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>
+  <b>Responsabilités :</b> affichage, ajout et suppression
+    <ul style={{marginBottom: 0}}>
+      <li>Affiche les informations des produits triés par nom, avec le prix mis en forme.</li>
+      <li>Permet d'ajouter un produit et d'en retirer un.</li>
+    </ul>
+  </li>
+  <li>Une suppression (retrait de produit) exige l'envoi d'un formulaire, jamais le suivi d'un lien.</li>
+  <li>Ajout refusé : l'écran revient avec les anomalies et les valeurs saisies.</li>
+  <li>Ajout ou retrait accepté : la liste de produits mise à jour revient avec une confirmation (affichée une seule fois).</li>
+  <li>Recharger l'écran après une opération ne la répète pas.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+#### Structure de la page
+<Squelette>
+
+  <EtapeCode section="PRÉPARATION" libelle="ouvrir la connexion à la base de données, charger (importer) les fonctions contrôles et les catégories admises">
+
+```php
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/validation.php';
+
+session_start(); // démarrage de session
+
+$categories = require __DIR__ . '/includes/categories.php';
+$erreurs    = []; // accumulateur d'erreurs
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="TRAITEMENT, VÉRIFIER SI LA REQUÊTE EST UNE SOUMISSION (<code>POST</code>)" libelle="distinguer l'intention transmise : ajout ou suppression">
+
+```php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    // une branche par intention
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="CAS AJOUT" libelle="valider les données et poursuivre avec l'ajout seulement s'il n'y a aucune erreur">
+
+```php
+if ($action === 'creer') {
+    [$erreurs, $valeurs] = validerProduit($_POST, $categories);
+
+    if (!$erreurs) {
+        // enregistrement, confirmation, renvoi
+    }
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="enregistrer en BD, créer un message de confirmation et rediriger le navigateur vers la (nouvelle) liste">
+
+```php
+$insertion = $pdo->prepare(
+    'INSERT INTO produits (nom, categorie, prix, stock)
+     VALUES (:nom, :categorie, :prix, :stock)'
+);
+$insertion->execute($valeurs);
+
+$_SESSION['message'] = 'Produit « ' . $valeurs['nom'] . ' » ajouté.';
+header('Location: produits.php', true, 303);
+exit;
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="CAS SUPPRESSION" libelle="valider l'existence du produit (avec l'identifiant), puis supprimer la ligne en BD; rediriger le navigateur vers la liste dans tous les cas (avec ou sans erreur)">
+
+```php
+if ($action === 'supprimer') {
+    $id = filter_var($_POST['id'] ?? '', FILTER_VALIDATE_INT);
+
+    if ($id !== false) {
+        $suppression = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+        $suppression->execute(['id' => $id]);
+
+        $_SESSION['message'] = $suppression->rowCount() === 1
+            ? 'Produit supprimé.'
+            : "Ce produit n'existait plus.";
+    }
+
+    header('Location: produits.php', true, 303);
+    exit;
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="LECTURE DES PRODUITS" libelle="récupérer tout le catalogue trié par nom et relever le message de confirmation si présent">
+
+```php
+$produits = $pdo
+    ->query('SELECT id, nom, categorie, prix, stock FROM produits ORDER BY nom')
+    ->fetchAll();
+
+$message = $_SESSION['message'] ?? null;
+unset($_SESSION['message']); // nettoyage pour prochaine soumission ou chargement
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="AFFICHAGE" libelle="le message de confirmation, s'il y en a un">
+
+```php
+<?php if ($message !== null): ?>
+  <p class="message"><?php echo htmlspecialchars($message); ?></p>
+<?php endif; ?>
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="la liste des produits avec pour chacun, le lien de modification et la commande de suppression">
+
+```php
+<td>
+  <a href="produit-modifier.php?id=<?php echo (int) $produit['id']; ?>">Modifier</a>
+
+  <form method="post" action="produits.php">
+    <input type="hidden" name="action" value="supprimer">
+    <input type="hidden" name="id" value="<?php echo (int) $produit['id']; ?>">
+    <button type="submit">Supprimer</button>
+  </form>
+</td>
+```
+
+  </EtapeCode>
+
+   <EtapeCode section="FORMULAIRE D'AJOUT" libelle="le formulaire pour créer un nouveau produit">
+
+```php
+<h3>Ajouter un produit</h3>
+
+<form method="post" action="produits.php">
+  <input type="hidden" name="action" value="creer">
+
+  // champs et leur message d'erreur associé
+
+  <button type="submit">Ajouter</button>
+</form>
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="chaque champ du formulaire d'ajout : sa valeur réaffichée, puis les éventuelles erreurs qui y sont associées">
+
+```php
+<label>
+  Nom
+  <input type="text" name="nom" required maxlength="100"
+         value="<?php echo valeurSoumise('nom'); ?>">
+</label>
+<?php messageErreur($erreurs, 'nom'); ?>
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/validation.php';
+
+session_start();
+
+$categories = require __DIR__ . '/includes/categories.php';
+
+$erreurs = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'creer') {
+        [$erreurs, $valeurs] = validerProduit($_POST, $categories);
+
+        if (!$erreurs) {
+            $insertion = $pdo->prepare(
+                'INSERT INTO produits (nom, categorie, prix, stock)
+                 VALUES (:nom, :categorie, :prix, :stock)'
+            );
+            $insertion->execute($valeurs);
+
+            $_SESSION['message'] = 'Produit « ' . $valeurs['nom'] . ' » ajouté.';
+            header('Location: produits.php', true, 303);
+            exit;
+        }
+    }
+
+    if ($action === 'supprimer') {
+        $id = filter_var($_POST['id'] ?? '', FILTER_VALIDATE_INT);
+
+        if ($id !== false) {
+            $suppression = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+            $suppression->execute(['id' => $id]);
+
+            $_SESSION['message'] = $suppression->rowCount() === 1
+                ? 'Produit supprimé.'
+                : "Ce produit n'existait plus.";
+        }
+
+        header('Location: produits.php', true, 303);
+        exit;
+    }
+}
+
+$produits = $pdo
+    ->query('SELECT id, nom, categorie, prix, stock FROM produits ORDER BY nom')
+    ->fetchAll();
+
+$message = $_SESSION['message'] ?? null;
+unset($_SESSION['message']);
+
+$titre = 'Produits';
+include __DIR__ . '/includes/header.php';
+?>
+
+<h2>Produits</h2>
+
+<?php if ($message !== null): ?>
+  <p class="message"><?php echo htmlspecialchars($message); ?></p>
+<?php endif; ?>
+
+<table>
+  <tr>
+    <th>Nom</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th></th>
+  </tr>
+  <?php foreach ($produits as $produit): ?>
+    <tr>
+      <td><?php echo htmlspecialchars($produit['nom']); ?></td>
+      <td><?php echo htmlspecialchars($categories[$produit['categorie']] ?? $produit['categorie']); ?></td>
+      <td><?php echo number_format((float) $produit['prix'], 2, ',', ' '); ?> $</td>
+      <td><?php echo (int) $produit['stock']; ?></td>
+      <td>
+        <a href="produit-modifier.php?id=<?php echo (int) $produit['id']; ?>">Modifier</a>
+
+        <form method="post" action="produits.php">
+          <input type="hidden" name="action" value="supprimer">
+          <input type="hidden" name="id" value="<?php echo (int) $produit['id']; ?>">
+          <button type="submit">Supprimer</button>
+        </form>
+      </td>
+    </tr>
+  <?php endforeach; ?>
+</table>
+
+<h3>Ajouter un produit</h3>
+
+<form method="post" action="produits.php">
+  <input type="hidden" name="action" value="creer">
+
+  <label>
+    Nom
+    <input type="text" name="nom" required maxlength="100"
+           value="<?php echo valeurSoumise('nom'); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'nom'); ?>
+
+  <label>
+    Catégorie
+    <select name="categorie" required>
+      <option value="">Choisir…</option>
+      <?php foreach ($categories as $cle => $libelle): ?>
+        <option value="<?php echo htmlspecialchars($cle); ?>"
+          <?php echo ($_POST['categorie'] ?? '') === $cle ? 'selected' : ''; ?>>
+          <?php echo htmlspecialchars($libelle); ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+  </label>
+  <?php messageErreur($erreurs, 'categorie'); ?>
+
+  <label>
+    Prix
+    <input type="number" name="prix" step="0.05" min="0" required
+           value="<?php echo valeurSoumise('prix'); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'prix'); ?>
+
+  <label>
+    Stock
+    <input type="number" name="stock" step="1" min="0" required
+           value="<?php echo valeurSoumise('stock', '0'); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'stock'); ?>
+
+  <button type="submit">Ajouter</button>
+</form>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
+```
+
+  </Fragment>
+</CodeProgressif>
+
+<Aside type="definition" title="Le champ caché « action »">
+Cette page traite deux types d'envoi (soumission) : création et suppression.  
+Un champ caché (`hidden`) nommé `action` porte l'intention de la requête : `creer` ou `supprimer`. 
+Le script lit ce champ afin de choisir comment traiter la requête. 
+Sans cette indication explicite, il faudrait deviner à partir des champs présents, ce qui devient rapidement fragile.
+</Aside>
+
+<Aside type="tip" title="Pourquoi utilise-t-on require_once ici ?">
+Le script `validation.php` (chargé dans la page) déclare des fonctions. 
+Le charger deux fois provoquerait une erreur de redéclaration, d'où la variante `_once`. 
+Pour le script `categories.php`, qui retourne simplement une valeur, `require` suffit. 
+Il n'y a aucune conséquence à charger plusieurs fois une valeur.
+</Aside>
+
+<Aside type="tip" title="Pourquoi utilise-t-on un formulaire plutôt qu'un lien pour la suppression ?">
+Utiliser un lien comme `<a href="supprimer.php?id=7">Supprimer</a>` serait plus court, et fonctionnerait à l'essai. 
+Cependant, un lien annonce une ressource à consulter, et plusieurs mécanismes comme le préchargement dont disposent 
+certains navigateurs ou les robots d'indexation le suivent sans que personne n'ait cliqué. Aucun de ces mécanismes 
+ne s'attend à détruire quoi que ce soit. Utiliser un formulaire protège de ce genre de comportements inattendus.
+</Aside>
+
+
+<Aside type="tip" title="Le message après la redirection">
+La redirection règle le problème du doublon, mais fait perdre tout ce que le script avait en mémoire, 
+y compris le message de confirmation. La session sert précisément à palier cela : on y dépose le message 
+avant de rediriger. La page suivante lit la variable de session puis l'efface.
+
+```php
+// Avant la redirection
+$_SESSION['message'] = 'Produit ajouté.';
+header('Location: produits.php', true, 303);
+exit;
+```
+
+```php
+// Au chargement de la page d'arrivée
+$message = $_SESSION['message'] ?? null;
+unset($_SESSION['message']);
+```
+</Aside>
+
+<Checkpoint question="La suppression passe par POST et se termine par une redirection. La redirection est-elle encore utile, puisqu'un second DELETE ne supprimerait rien de plus ?">
+Elle reste utile, pour une autre raison que le doublon. Sans elle, la page affichée est la réponse à un POST : la rafraîchir fait réapparaître la demande de confirmation du navigateur, et revenir dessus par l'historique renvoie le même envoi. La redirection ramène l'utilisateur sur une page consultable en GET, dont le rafraîchissement n'est qu'une relecture.
+</Checkpoint>
+
+## 6. La page de modification
+
+<Checkpoint title="État des fichiers à ce stade (Progression)" type="preview">
+
+✅ Fichier(s) complété(s) à ce stade  
+📝 Fichier(s) travaillé(s) dans cette section
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php ✅   
+│   ├── header.php  ✅     
+│   └── footer.php  ✅
+├── init.sql ✅           
+├── produits.php ✅        
+└── produit-modifier.php 📝
+```
+</Checkpoint>
+
+
+<CodeProgressif fichier="produit-modifier.php" resume="Charger un produit par son identifiant, puis enregistrer les changements.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li><b>Responsabilités :</b> Modifie un produit désigné par son identifiant.</li>
+  <li>
+  Validation de l'identifiant:
+  <ul style={{marginBottom: 0}}>
+    <li>Identifiant n'est pas un entier : refus avant toute requête.</li>
+    <li>Identifiant sans produit correspondant : écran « introuvable ».</li>
+  </ul>
+  </li>
+  <li>L'identifiant est transmis à l'arrivée et au renvoi, et vérifié les deux fois.</li>
+  <li>
+  Enregistrement des nouvelles données
+  <ul style={{marginBottom: 0}}>
+  <li>Enregistrement refusé : le formulaire revient avec les anomalies et les valeurs saisies.</li>
+  <li>Enregistrement accepté : retour à la liste avec une confirmation.</li>
+  </ul>
+  </li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="PRÉPARATION" libelle="ouvrir la connexion à la base de données, charger (importer) les fonctions contrôles et les catégories admises">
+
+```php
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/validation.php';
+
+session_start(); // démarrage de session
+
+$categories = require __DIR__ . '/includes/categories.php';
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="IDENTIFICATION" libelle="récupérer l'identifiant qu'importe la méthode utilisé (GET OU POST) pour atteindre à la page, terminer tout de suite si l'identifiant n'est pas un entier">
+
+```php
+$source = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
+$id     = filter_var($source['id'] ?? '', FILTER_VALIDATE_INT);
+
+if ($id === false) {
+    http_response_code(400);
+    exit('Identifiant invalide.');
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="tenter de récupérer le produit en BD avec l'identifiant ; s'il n'existe pas, afficher l'écran « introuvable » et s'arrêter">
+
+```php
+$lecture = $pdo->prepare(
+    'SELECT id, nom, categorie, prix, stock FROM produits WHERE id = :id'
+);
+$lecture->execute(['id' => $id]);
+$produit = $lecture->fetch();
+
+if ($produit === false) {
+    http_response_code(404);
+    // écran « introuvable », puis exit
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="TRAITEMENT, SI LA REQUÊTE EST UN ENVOI" libelle="contrôler les données ; s'il reste des anomalies, ne rien écrire">
+
+```php
+$erreurs = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    [$erreurs, $valeurs] = validerProduit($_POST, $categories);
+
+    if (!$erreurs) {
+        // enregistrement, confirmation, renvoi
+    }
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="enregistrer les changements en BD, produire un message de confirmation, rediriger le navigateur vers la liste">
+
+```php
+$mise_a_jour = $pdo->prepare(
+    'UPDATE produits
+        SET nom = :nom, categorie = :categorie, prix = :prix, stock = :stock
+      WHERE id = :id'
+);
+$mise_a_jour->execute($valeurs + ['id' => $id]);
+
+$_SESSION['message'] = 'Produit mis à jour.';
+header('Location: produits.php', true, 303);
+exit;
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="FORMULAIRE DE MODIFICATION" libelle="le formulaire pour modifier un produit avec l'identifiant en champ caché">
+
+```php
+<h2>Modifier « <?php echo htmlspecialchars($produit['nom']); ?> »</h2>
+
+<form method="post" action="produit-modifier.php">
+  <input type="hidden" name="id" value="<?php echo (int) $produit['id']; ?>">
+
+  // champs et leur message d'erreur associé
+
+  <button type="submit">Enregistrer</button>
+  <a href="produits.php">Annuler</a>
+</form>
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="chaque champ du formulaire : valeur envoyée ou valeur lue en BD, puis les éventuelles erreurs qui y sont associées">
+
+```php
+<label>
+  Nom
+  <input type="text" name="nom" required maxlength="100"
+         value="<?php echo valeurSoumise('nom', $produit['nom']); ?>">
+</label>
+<?php messageErreur($erreurs, 'nom'); ?>
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="la liste déroulante des catégories, positionné sur la catégorie actuelle">
+
+```php
+<?php $courante = $_POST['categorie'] ?? $produit['categorie']; ?>
+
+<?php foreach ($categories as $cle => $libelle): ?>
+  <option value="<?php echo htmlspecialchars($cle); ?>"
+    <?php echo $cle === $courante ? 'selected' : ''; ?>>
+    <?php echo htmlspecialchars($libelle); ?>
+  </option>
+<?php endforeach; ?>
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/validation.php';
+session_start();
+
+$categories = require __DIR__ . '/includes/categories.php';
+
+// L'identifiant arrive par l'adresse au chargement, par un champ caché à l'envoi.
+$source = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
+$id     = filter_var($source['id'] ?? '', FILTER_VALIDATE_INT);
+
+if ($id === false) {
+    http_response_code(400);
+    exit('Identifiant invalide.');
+}
+
+$lecture = $pdo->prepare(
+    'SELECT id, nom, categorie, prix, stock FROM produits WHERE id = :id'
+);
+$lecture->execute(['id' => $id]);
+$produit = $lecture->fetch();
+
+if ($produit === false) {
+    http_response_code(404);
+    $titre = 'Produit introuvable';
+    include __DIR__ . '/includes/header.php';
+    echo '<h2>Produit introuvable</h2>';
+    echo '<p><a href="produits.php">Retour à la liste</a></p>';
+    include __DIR__ . '/includes/footer.php';
+    exit;
+}
+
+$erreurs = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    [$erreurs, $valeurs] = validerProduit($_POST, $categories);
+
+    if (!$erreurs) {
+        $mise_a_jour = $pdo->prepare(
+            'UPDATE produits
+                SET nom = :nom, categorie = :categorie, prix = :prix, stock = :stock
+              WHERE id = :id'
+        );
+        $mise_a_jour->execute($valeurs + ['id' => $id]);
+
+        $_SESSION['message'] = 'Produit mis à jour.';
+        header('Location: produits.php', true, 303);
+        exit;
+    }
+}
+
+$titre = 'Modifier un produit';
+include __DIR__ . '/includes/header.php';
+?>
+
+<h2>Modifier « <?php echo htmlspecialchars($produit['nom']); ?> »</h2>
+
+<form method="post" action="produit-modifier.php">
+  <input type="hidden" name="id" value="<?php echo (int) $produit['id']; ?>">
+
+  <label>
+    Nom
+    <input type="text" name="nom" required maxlength="100"
+           value="<?php echo valeurSoumise('nom', $produit['nom']); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'nom'); ?>
+
+  <label>
+    Catégorie
+    <select name="categorie" required>
+      <?php $courante = $_POST['categorie'] ?? $produit['categorie']; ?>
+      <?php foreach ($categories as $cle => $libelle): ?>
+        <option value="<?php echo htmlspecialchars($cle); ?>"
+          <?php echo $cle === $courante ? 'selected' : ''; ?>>
+          <?php echo htmlspecialchars($libelle); ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+  </label>
+  <?php messageErreur($erreurs, 'categorie'); ?>
+
+  <label>
+    Prix
+    <input type="number" name="prix" step="0.05" min="0" required
+           value="<?php echo valeurSoumise('prix', (string) $produit['prix']); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'prix'); ?>
+
+  <label>
+    Stock
+    <input type="number" name="stock" step="1" min="0" required
+           value="<?php echo valeurSoumise('stock', (string) $produit['stock']); ?>">
+  </label>
+  <?php messageErreur($erreurs, 'stock'); ?>
+
+  <button type="submit">Enregistrer</button>
+  <a href="produits.php">Annuler</a>
+</form>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
+```
+
+  </Fragment>
+</CodeProgressif>
+
+<Aside type="syntaxe" title="L'union de tableaux">
+`$valeurs + ['id' => $id]` réunit les deux tableaux en un seul, sans écraser les clés déjà présentes dans `$valeurs`. C'est une façon compacte d'ajouter l'identifiant aux paramètres de la requête préparée.
+</Aside>
+
+<Aside type="astuce" title="Charger avant de décider">
+La lecture du produit a lieu avant le traitement du POST, et sert dans les deux cas : elle fournit les valeurs du formulaire au chargement, et elle vérifie que la ligne visée existe encore au moment de l'enregistrement. Un identifiant supprimé entre-temps conduit alors à la page « introuvable » plutôt qu'à un `UPDATE` sans effet.
+</Aside>
+
+{/* ## 9. Erreurs prévisibles
+
+Certaines situations se produiront en classe, mieux vaut les reconnaître.
+
+| Symptôme | Cause habituelle |
+| --- | --- |
+| `SQLSTATE[42S02] … table doesn't exist` | `init.sql` n'a pas été exécuté, ou `db.php` désigne une autre base de données |
+| `SQLSTATE[42S22] … unknown column 'categorie'` | une ancienne table `produits` subsiste, ou seule une partie de `init.sql` était sélectionnée au moment de l'exécuter |
+| `Headers already sent` | une sortie précède `session_start()` ou `header()`, souvent une ligne vide avant `<?php` |
+| Le message de confirmation revient à chaque page | `unset($_SESSION['message'])` manquant après la lecture |
+| Le prix s'affiche `14.50` au lieu de `14,50` | `number_format()` oublié ; MySQL rend les `DECIMAL` sous forme de chaînes |
+| `Invalid parameter number` | un nom de paramètre du tableau ne correspond pas à ceux de la requête |
+
+<Aside type="astuce" title="Valider d'abord, attraper ensuite">
+La validation traite ce qui est prévisible : un champ vide, un prix négatif, une catégorie inconnue. Le bloc `try`/`catch` traite ce qui ne l'est pas : base arrêtée, disque plein, contrainte violée. Les deux se complètent plutôt que de se remplacer, et attraper une exception ne dispense pas de valider en amont.
+</Aside> */}
+
+## 7. Liste de vérification
+
+```text
+erabliere/
+├── includes/
+│   ├── db.php ✅         
+│   ├── categories.php ✅ 
+│   ├── validation.php ✅   
+│   ├── header.php  ✅     
+│   └── footer.php  ✅
+├── init.sql ✅           
+├── produits.php ✅        
+└── produit-modifier.php ✅
+```
+
+- Après exécution de `init.sql`, la table `produits` contient six lignes.
+- La liste affiche les produits triés, avec le libellé de catégorie et non sa clé.
+- Un formulaire de création vide affiche toutes les erreurs d'un coup, et conserve les valeurs correctes.
+- Après un ajout réussi, l'adresse est `produits.php` et le rafraîchissement n'ajoute rien.
+- Le message de confirmation apparaît une fois, puis disparaît.
+- `produit-modifier.php?id=9999` affiche une page « introuvable » et non une erreur PHP.
+- `produit-modifier.php?id=abc` est refusé avant toute requête vers la base de données.
+- Un nom contenant `<b>gras</b>` s'affiche tel quel dans la liste.
+- Aucune requête n'assemble de valeur par concaténation dans la chaîne SQL.
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Pourquoi la suppression passe-t-elle par un formulaire POST plutôt que par un lien ?"
+  options={[
+    { texte: "Parce qu'un lien ne peut pas transmettre d'identifiant", correct: false },
+    { texte: "Parce qu'un lien peut être suivi sans intention, par un préchargement ou un robot", correct: true },
+    { texte: "Parce que SQL interdit un DELETE déclenché par un GET", correct: false },
+  ]}
+  retour="Un lien annonce une ressource à consulter. Plusieurs mécanismes le suivent sans clic humain, et aucun ne s'attend à détruire des données."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi confier la création de la table à un fichier SQL plutôt qu'à une page PHP ?"
+  options={[
+    { texte: "Parce que PHP ne sait pas exécuter une instruction CREATE TABLE", correct: false },
+    { texte: "Parce que le schéma reste lisible d'un bloc, et qu'aucune adresse publique ne peut le déclencher", correct: true },
+    { texte: "Parce que phpMyAdmin refuse les tables créées depuis PHP", correct: false },
+  ]}
+  retour="PHP exécuterait très bien un CREATE TABLE avec exec(). Le choix tient à la lisibilité du schéma et au fait qu'une page web capable de créer ou de détruire des tables est une adresse que n'importe qui peut appeler."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi effacer le message de session juste après l'avoir lu ?"
+  options={[
+    { texte: "Pour libérer de la mémoire sur le serveur", correct: false },
+    { texte: "Pour qu'il ne réapparaisse pas sur chaque page consultée ensuite", correct: true },
+    { texte: "Parce qu'une valeur de session ne peut être lue qu'une fois", correct: false },
+  ]}
+  retour="La session dure toute la visite. Sans effacement, la valeur reste et le message s'affiche indéfiniment."
+/>
+
+<Quiz
+  client:visible
+  question="Dans quel cas query() convient-il, plutôt que prepare() suivi de execute() ?"
+  options={[
+    { texte: "Quand la requête ne contient aucune valeur venue du client", correct: true },
+    { texte: "Quand la requête est une lecture", correct: false },
+    { texte: "Quand la requête ne retourne qu'une seule ligne", correct: false },
+  ]}
+  retour="C'est l'origine des valeurs qui décide, pas la nature de la requête. Une lecture filtrée par un paramètre reçu passe par une requête préparée."
+/>
+
+## Références
+
+- [PDO, manuel PHP](https://www.php.net/manual/fr/book.pdo.php)
+- [Requêtes préparées](https://www.php.net/manual/fr/pdo.prepared-statements.php)
+- [filter_var et ses filtres de validation](https://www.php.net/manual/fr/function.filter-var.php)

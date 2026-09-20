@@ -1,0 +1,81 @@
+---
+/**
+ * Squelette.astro
+ *
+ * Liste d'étapes de résolution. Chaque étape révèle le code correspondant
+ * au survol, au focus clavier, ou d'un clic qui l'épingle.
+ *
+ * Usage :
+ *   <Squelette>
+ *     <EtapeCode section="PRÉPARATION" libelle="ouvrir la connexion">
+ *       ```php
+ *       ...
+ *       ```
+ *     </EtapeCode>
+ *   </Squelette>
+ */
+
+interface Props {
+  /** Remplace la consigne affichée au-dessus de la liste. */
+  consigne?: string;
+}
+
+const {
+  consigne = "Survolez une étape pour voir le code correspondant. Un clic l'épingle.",
+} = Astro.props;
+---
+
+<div class="sq" data-squelette>
+  <p class="sq__consigne">{consigne}</p>
+  <ol class="sq__liste"><slot /></ol>
+</div>
+
+<script>
+  function initSquelette(root: HTMLElement) {
+    root.addEventListener("click", (e) => {
+      const bouton = (e.target as HTMLElement).closest<HTMLButtonElement>(".sq__libelle");
+      if (!bouton) return;
+
+      const etape = bouton.closest<HTMLElement>(".sq__etape");
+      if (!etape) return;
+
+      const epinglee = etape.classList.contains("sq__etape--epinglee");
+
+      root.querySelectorAll(".sq__etape--epinglee").forEach((autre) => {
+        autre.classList.remove("sq__etape--epinglee");
+        autre.querySelector(".sq__libelle")?.setAttribute("aria-expanded", "false");
+      });
+
+      if (!epinglee) {
+        etape.classList.add("sq__etape--epinglee");
+        bouton.setAttribute("aria-expanded", "true");
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>("[data-squelette]").forEach(initSquelette);
+</script>
+
+<style>
+  .sq {
+    --sq-accent: var(--sl-color-accent, #4f46e5);
+    --sq-border: var(--sl-color-gray-5, #e2e0db);
+    --sq-muted: var(--sl-color-gray-3, #6b6b80);
+  }
+  .sq__consigne {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--sq-muted);
+  }
+  .sq__liste {
+    counter-reset: sq;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 2px solid color-mix(in srgb, var(--sq-accent) 28%, transparent);
+  }
+  @media print {
+    .sq__consigne { display: none; }
+  }
+</style>

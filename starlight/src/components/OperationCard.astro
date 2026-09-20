@@ -1,0 +1,392 @@
+---
+/**
+ * OperationCard.astro
+ *
+ * Variante de FluxCard pour les opérations d'une base de données.
+ * Trois niveaux progressifs :
+ *   1. Scénario  — ce que la personne fait dans le navigateur
+ *   2. Mécanique — méthode HTTP, adresse, requête SQL
+ *   3. Code      — le PHP correspondant
+ *
+ * Usage :
+ *   <OperationCard
+ *     numero={1}
+ *     operation="Lire"
+ *     verbe="SELECT"
+ *     titre="Afficher la liste des produits"
+ *     intention="Voir ce que contient le catalogue, sans rien modifier."
+ *   >
+ *     <Fragment slot="scenario">...</Fragment>
+ *     <Fragment slot="mecanique">...</Fragment>
+ *     <Fragment slot="code">...</Fragment>
+ *   </OperationCard>
+ *
+ * Classes utilitaires disponibles dans les panneaux :
+ *   .cmap    liste de correspondances (dl > dt/dd)
+ *   .csteps  étapes numérotées (ol)
+ *   .cnote   précision en retrait
+ */
+
+interface Props {
+  numero: number;
+  operation: string;
+  verbe: "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+  titre: string;
+  intention: string;
+}
+
+const { numero, operation, verbe, titre, intention } = Astro.props;
+const uid = `opc-${numero}-${Math.random().toString(36).slice(2, 7)}`;
+---
+
+<article class="opc" data-opcard data-verbe={verbe}>
+  <header class="opc__head">
+    <span class="opc__num">{String(numero).padStart(2, "0")}</span>
+    <h3 class="opc__titre">{titre}</h3>
+  </header>
+
+  <div class="opc__meta">
+    <div class="opc__etiquettes">
+      <span class="opc__operation">{operation}</span>
+      <span class="opc__verbe">{verbe}</span>
+    </div>
+    <p class="opc__intention">{intention}</p>
+  </div>
+
+  <div class="opc__stepper" role="tablist" aria-label="Niveaux de détail">
+    <button class="opc__step opc__step--active" data-level="1" aria-selected="true" id={`${uid}-t1`}>
+      <span class="opc__step-dot"></span>
+      <span class="opc__step-label">Scénario</span>
+    </button>
+    <span class="opc__step-line" data-line="1"></span>
+    <button class="opc__step" data-level="2" aria-selected="false" id={`${uid}-t2`}>
+      <span class="opc__step-dot"></span>
+      <span class="opc__step-label">Mécanique</span>
+    </button>
+    <span class="opc__step-line" data-line="2"></span>
+    <button class="opc__step" data-level="3" aria-selected="false" id={`${uid}-t3`}>
+      <span class="opc__step-dot"></span>
+      <span class="opc__step-label">Code</span>
+    </button>
+  </div>
+
+  <div class="opc__panels">
+    <section class="opc__panel opc__panel--active" data-panel="1" aria-labelledby={`${uid}-t1`}>
+      <slot name="scenario" />
+    </section>
+    <section class="opc__panel" data-panel="2" aria-labelledby={`${uid}-t2`} hidden>
+      <div class="opc__panel-tag opc__panel-tag--mecanique">Méthode, adresse, SQL</div>
+      <slot name="mecanique" />
+    </section>
+    <section class="opc__panel" data-panel="3" aria-labelledby={`${uid}-t3`} hidden>
+      <div class="opc__panel-tag opc__panel-tag--code">Code PHP</div>
+      <slot name="code" />
+    </section>
+  </div>
+
+  <footer class="opc__nav">
+    <button class="opc__nav-btn opc__nav-btn--prev" data-prev hidden>← Précédent</button>
+    <button class="opc__nav-btn opc__nav-btn--next" data-next>Voir la mécanique →</button>
+  </footer>
+</article>
+
+<script>
+  function initOperationCard(root: HTMLElement) {
+    const steps = root.querySelectorAll<HTMLButtonElement>("[data-level]");
+    const lines = root.querySelectorAll<HTMLElement>("[data-line]");
+    const panels = root.querySelectorAll<HTMLElement>("[data-panel]");
+    const prevBtn = root.querySelector<HTMLButtonElement>("[data-prev]");
+    const nextBtn = root.querySelector<HTMLButtonElement>("[data-next]");
+
+    const labels = ["Voir la mécanique →", "Voir le code →", ""];
+
+    let current = 1;
+    const max = 3;
+
+    function show(level: number) {
+      current = level;
+
+      steps.forEach((s) => {
+        const l = Number(s.dataset.level);
+        s.classList.toggle("opc__step--active", l <= level);
+        s.classList.toggle("opc__step--current", l === level);
+        s.setAttribute("aria-selected", String(l === level));
+      });
+
+      lines.forEach((ln) => {
+        const l = Number(ln.dataset.line);
+        ln.classList.toggle("opc__step-line--active", l < level);
+      });
+
+      panels.forEach((p) => {
+        const l = Number(p.dataset.panel);
+        const active = l === level;
+        p.classList.toggle("opc__panel--active", active);
+        p.hidden = !active;
+      });
+
+      if (prevBtn) prevBtn.hidden = level === 1;
+      if (nextBtn) {
+        nextBtn.hidden = level === max;
+        nextBtn.textContent = labels[level - 1] || "";
+      }
+    }
+
+    steps.forEach((s) =>
+      s.addEventListener("click", () => show(Number(s.dataset.level)))
+    );
+    nextBtn?.addEventListener("click", () => show(Math.min(current + 1, max)));
+    prevBtn?.addEventListener("click", () => show(Math.max(current - 1, 1)));
+  }
+
+  document.querySelectorAll<HTMLElement>("[data-opcard]").forEach(initOperationCard);
+</script>
+
+<style>
+  .opc {
+    --opc-accent: #2563eb;
+    --opc-surface: var(--sl-color-bg, #ffffff);
+    --opc-raised: var(--sl-color-gray-7, #f8f7f4);
+    --opc-border: var(--sl-color-gray-5, #e2e0db);
+    --opc-text: var(--sl-color-text, #1a1a2e);
+    --opc-muted: var(--sl-color-gray-3, #6b6b80);
+
+    margin: 2rem 0;
+    border: 1px solid var(--opc-border);
+    border-radius: 16px;
+    background: var(--opc-surface);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Une couleur par verbe SQL, reprise par le jeton et le stepper */
+  .opc[data-verbe="SELECT"] { --opc-accent: #2563eb; }
+  .opc[data-verbe="INSERT"] { --opc-accent: #16a34a; }
+  .opc[data-verbe="UPDATE"] { --opc-accent: #d97706; }
+  .opc[data-verbe="DELETE"] { --opc-accent: #dc2626; }
+
+  .opc__head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 20px 24px 0;
+  }
+  .opc__num {
+    font-family: var(--sl-font-mono, "JetBrains Mono", monospace);
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--opc-border);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .opc__titre {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.3;
+    color: var(--opc-text);
+  }
+
+  .opc__meta { padding: 12px 24px 18px; }
+  .opc__etiquettes {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .opc__operation,
+  .opc__verbe {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 11px;
+    border-radius: 100px;
+    letter-spacing: 0.01em;
+    background: color-mix(in srgb, var(--opc-accent) 12%, transparent);
+    color: var(--opc-accent);
+  }
+  .opc__verbe {
+    font-family: var(--sl-font-mono, monospace);
+    background: none;
+    border: 1px solid color-mix(in srgb, var(--opc-accent) 35%, transparent);
+  }
+  .opc__intention {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--opc-muted);
+  }
+
+  .opc__stepper {
+    display: flex;
+    align-items: center;
+    padding: 0 24px 18px;
+    gap: 0;
+  }
+  .opc__step {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 2px;
+    font: inherit;
+    color: var(--opc-muted);
+    transition: color 0.2s;
+  }
+  .opc__step-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid var(--opc-border);
+    background: var(--opc-surface);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+  }
+  .opc__step-label { font-size: 0.78rem; font-weight: 600; }
+  .opc__step--active { color: var(--opc-text); }
+  .opc__step--active .opc__step-dot {
+    border-color: var(--opc-accent);
+    background: var(--opc-accent);
+  }
+  .opc__step--current .opc__step-dot {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--opc-accent) 18%, transparent);
+  }
+  .opc__step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--opc-border);
+    margin: 0 8px;
+    transition: background 0.3s;
+  }
+  .opc__step-line--active { background: var(--opc-accent); }
+
+  .opc__panels {
+    border-top: 1px solid var(--opc-border);
+    background: var(--opc-raised);
+  }
+  .opc__panel {
+    padding: 20px 24px;
+    animation: opc-fade 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .opc__panel[hidden] { display: none; }
+  @keyframes opc-fade {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .opc__panel { animation: none; }
+    .opc__step-dot, .opc__step-line { transition: none; }
+  }
+  .opc__panel-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    background: color-mix(in srgb, var(--opc-accent) 14%, transparent);
+    color: var(--opc-accent);
+  }
+
+  .opc__nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--opc-border);
+    background: var(--opc-surface);
+  }
+  .opc__nav-btn {
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.18s;
+    border: 1px solid transparent;
+  }
+  .opc__nav-btn--next {
+    background: var(--opc-text);
+    color: var(--opc-surface);
+    margin-left: auto;
+  }
+  .opc__nav-btn--next:hover { transform: translateX(2px); opacity: 0.9; }
+  .opc__nav-btn--prev {
+    background: none;
+    color: var(--opc-muted);
+    border-color: var(--opc-border);
+  }
+  .opc__nav-btn--prev:hover { color: var(--opc-text); border-color: var(--opc-muted); }
+  .opc__nav-btn[hidden] { display: none; }
+
+  /* Contenu des slots */
+  .opc__panel :global(.cmap) {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 6px 12px;
+    margin: 4px 0 12px;
+    font-size: 0.9rem;
+  }
+  .opc__panel :global(.cmap dt) {
+    color: var(--opc-muted);
+    margin-top: 0;
+    font-size: 0.82rem;
+    text-align: right;
+    padding-top: 1px;
+  }
+  .opc__panel :global(.cmap dd) { margin: 0; }
+  .opc__panel :global(.csteps) {
+    counter-reset: cs;
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    border-left: 2px solid color-mix(in srgb, var(--opc-accent) 30%, transparent);
+  }
+  .opc__panel :global(.csteps > li) {
+    counter-increment: cs;
+    position: relative;
+    padding: 6px 0 14px 22px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+  .opc__panel :global(.csteps > li::before) {
+    content: counter(cs);
+    position: absolute;
+    left: -10px;
+    top: 6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--opc-accent);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--sl-font-mono, monospace);
+  }
+  .opc__panel :global(.cnote) {
+    color: var(--opc-muted);
+    font-size: 0.82rem;
+    margin-top: 3px;
+  }
+
+  @media (max-width: 600px) {
+    .opc__head { padding: 16px 18px 0; }
+    .opc__meta { padding: 10px 18px 14px; }
+    .opc__stepper { padding: 0 18px 14px; }
+    .opc__step-label { display: none; }
+    .opc__step-line { margin: 0 4px; }
+    .opc__panel { padding: 16px 18px; }
+    .opc__nav { padding: 12px 18px; }
+    .opc__nav-btn { font-size: 0.8rem; padding: 7px 12px; }
+    .opc__panel :global(.cmap) { grid-template-columns: 1fr; gap: 2px; }
+    .opc__panel :global(.cmap dt) { text-align: left; margin-top: 8px; }
+  }
+</style>

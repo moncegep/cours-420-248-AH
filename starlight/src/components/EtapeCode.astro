@@ -1,0 +1,150 @@
+---
+/**
+ * EtapeCode.astro
+ *
+ * Une étape du squelette. Le libellé est du pseudocode ; le contenu du slot
+ * est le code correspondant, replié tant que l'étape n'est ni survolée, ni
+ * atteinte au clavier, ni épinglée. À l'impression, tout est déplié.
+ *
+ * Props :
+ *   libelle  — l'étape, en français, sans nom de fonction ni de variable
+ *   section  — intertitre facultatif affiché juste avant l'étape
+ */
+
+interface Props {
+  libelle: string;
+  section?: string;
+}
+
+const { libelle, section } = Astro.props;
+---
+
+{section && <li class="sq__section" set:html={section}></li>}
+
+<li class="sq__etape">
+  <button class="sq__libelle" type="button" aria-expanded="false">
+    <span class="sq__texte">{libelle}</span>
+    <span class="sq__indice" aria-hidden="true">code</span>
+  </button>
+  <div class="sq__volet">
+    <div class="sq__interieur">
+      <slot />
+    </div>
+  </div>
+</li>
+
+<style>
+  .sq__section {
+    list-style: none;
+    margin: 16px 0 6px;
+    padding: 0 0 0 18px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3, #6b6b80);
+  }
+  .sq__section:first-child { margin-top: 0; }
+
+  .sq__etape {
+    counter-increment: sq;
+    list-style: none;
+    position: relative;
+    margin: 0;
+    padding: 0 0 4px 18px;
+  }
+
+  .sq__libelle {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--sl-color-text, #1a1a2e);
+    padding: 5px 9px 5px 10px;
+    transition: background 0.15s;
+  }
+  .sq__libelle::before {
+    content: counter(sq);
+    position: absolute;
+    left: -10px;
+    top: 8px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--sl-color-accent, #4f46e5);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--sl-font-mono, monospace);
+  }
+  .sq__etape:hover .sq__libelle,
+  .sq__etape:focus-within .sq__libelle {
+    background: color-mix(in srgb, var(--sl-color-accent, #4f46e5) 8%, transparent);
+  }
+  .sq__libelle:focus-visible {
+    outline: 2px solid var(--sl-color-accent, #4f46e5);
+    outline-offset: 1px;
+  }
+
+  .sq__texte { flex: 1; min-width: 0; }
+  .sq__indice {
+    flex: 0 0 auto;
+    font-family: var(--sl-font-mono, monospace);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 1px 7px;
+    border-radius: 100px;
+    border: 1px solid var(--sl-color-gray-5, #e2e0db);
+    color: var(--sl-color-gray-3, #6b6b80);
+    opacity: 0.55;
+    transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .sq__etape:hover .sq__indice,
+  .sq__etape:focus-within .sq__indice,
+  .sq__etape--epinglee .sq__indice {
+    opacity: 1;
+    color: var(--sl-color-accent, #4f46e5);
+    border-color: color-mix(in srgb, var(--sl-color-accent, #4f46e5) 40%, transparent);
+  }
+  .sq__etape--epinglee .sq__indice::after { content: " épinglé"; }
+
+  /* Repli sans saut de mise en page : seul ce qui est sous l'étape se décale. */
+  .sq__volet {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .sq__interieur { overflow: hidden; min-height: 0; }
+  .sq__etape:hover .sq__volet,
+  .sq__etape:focus-within .sq__volet,
+  .sq__etape--epinglee .sq__volet {
+    grid-template-rows: 1fr;
+  }
+  .sq__interieur :global(pre) {
+    margin: 6px 0 10px;
+    font-size: 0.82rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sq__volet { transition: none; }
+  }
+
+  @media print {
+    .sq__volet { grid-template-rows: 1fr; }
+    .sq__indice { display: none; }
+    .sq__libelle { background: none; }
+  }
+</style>

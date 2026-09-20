@@ -1,0 +1,344 @@
+---
+/**
+ * CodeProgressif.astro
+ *
+ * Frère de OperationCard, pour les fichiers longs. Trois niveaux :
+ *   1. Plan          — la spécification : ce que la page doit faire, sans
+ *                     nommer les fonctions ni les variables à écrire
+ *   2. Squelette     — les étapes de résolution, en pseudocode
+ *   3. Code complet  — le fichier tel quel
+ *
+ * Le niveau 1 est affiché à l'ouverture. À l'impression, les trois panneaux
+ * sont dépliés : un PDF du guide contient donc tout le code.
+ *
+ * Usage :
+ *   <CodeProgressif fichier="produits.php" resume="Liste, création, suppression.">
+ *     <Fragment slot="plan">...</Fragment>
+ *     <Fragment slot="squelette">...</Fragment>
+ *     <Fragment slot="complet">...</Fragment>
+ *   </CodeProgressif>
+ *
+ * Classes utilitaires disponibles dans les panneaux :
+ *   .cspec   liste à puces de la spécification (ul)
+ *   .cplan   liste numérotée des étapes (ol)
+ *   .cnote   précision en retrait
+ */
+
+interface Props {
+  fichier: string;
+  resume?: string;
+}
+
+const { fichier, resume } = Astro.props;
+const uid = `cpg-${fichier.replace(/[^a-z0-9]+/gi, "-")}`;
+---
+
+<article class="cpg" data-codeprog>
+  <header class="cpg__head">
+    <span class="cpg__fichier">{fichier}</span>
+    {resume && <p class="cpg__resume">{resume}</p>}
+  </header>
+
+  <div class="cpg__stepper" role="tablist" aria-label="Niveau de détail">
+    <button class="cpg__step cpg__step--active cpg__step--current" data-level="1" aria-selected="true" id={`${uid}-t1`}>
+      <span class="cpg__step-dot"></span>
+      <span class="cpg__step-label">Plan</span>
+    </button>
+    <span class="cpg__step-line" data-line="1"></span>
+    <button class="cpg__step" data-level="2" aria-selected="false" id={`${uid}-t2`}>
+      <span class="cpg__step-dot"></span>
+      <span class="cpg__step-label">Squelette</span>
+    </button>
+    <span class="cpg__step-line" data-line="2"></span>
+    <button class="cpg__step" data-level="3" aria-selected="false" id={`${uid}-t3`}>
+      <span class="cpg__step-dot"></span>
+      <span class="cpg__step-label">Code complet</span>
+    </button>
+  </div>
+
+  <div class="cpg__panels">
+    <section class="cpg__panel cpg__panel--active" data-panel="1" aria-labelledby={`${uid}-t1`}>
+      <div class="cpg__tag">La spécification</div>
+      <slot name="plan" />
+    </section>
+    <section class="cpg__panel" data-panel="2" aria-labelledby={`${uid}-t2`} hidden>
+      <div class="cpg__tag">Les étapes de résolution</div>
+      <slot name="squelette" />
+    </section>
+    <section class="cpg__panel" data-panel="3" aria-labelledby={`${uid}-t3`} hidden>
+      <div class="cpg__tag">À recopier tel quel</div>
+      <slot name="complet" />
+    </section>
+  </div>
+
+  <footer class="cpg__nav">
+    <button class="cpg__nav-btn cpg__nav-btn--prev" data-prev hidden>← Revenir</button>
+    <button class="cpg__nav-btn cpg__nav-btn--next" data-next>Voir le squelette →</button>
+  </footer>
+</article>
+
+<script>
+  function initCodeProgressif(root: HTMLElement) {
+    const steps = root.querySelectorAll<HTMLButtonElement>("[data-level]");
+    const lines = root.querySelectorAll<HTMLElement>("[data-line]");
+    const panels = root.querySelectorAll<HTMLElement>("[data-panel]");
+    const prevBtn = root.querySelector<HTMLButtonElement>("[data-prev]");
+    const nextBtn = root.querySelector<HTMLButtonElement>("[data-next]");
+
+    const suivant = ["Voir le squelette →", "Voir le code complet →", ""];
+    let courant = 1;
+    const max = 3;
+
+    function montrer(niveau: number) {
+      courant = niveau;
+
+      steps.forEach((s) => {
+        const n = Number(s.dataset.level);
+        s.classList.toggle("cpg__step--active", n <= niveau);
+        s.classList.toggle("cpg__step--current", n === niveau);
+        s.setAttribute("aria-selected", String(n === niveau));
+      });
+
+      lines.forEach((l) => {
+        l.classList.toggle("cpg__step-line--active", Number(l.dataset.line) < niveau);
+      });
+
+      panels.forEach((p) => {
+        const actif = Number(p.dataset.panel) === niveau;
+        p.classList.toggle("cpg__panel--active", actif);
+        p.hidden = !actif;
+      });
+
+      if (prevBtn) prevBtn.hidden = niveau === 1;
+      if (nextBtn) {
+        nextBtn.hidden = niveau === max;
+        nextBtn.textContent = suivant[niveau - 1] || "";
+      }
+    }
+
+    steps.forEach((s) => s.addEventListener("click", () => montrer(Number(s.dataset.level))));
+    nextBtn?.addEventListener("click", () => montrer(Math.min(courant + 1, max)));
+    prevBtn?.addEventListener("click", () => montrer(Math.max(courant - 1, 1)));
+  }
+
+  document.querySelectorAll<HTMLElement>("[data-codeprog]").forEach(initCodeProgressif);
+</script>
+
+<style>
+  .cpg {
+    --cpg-accent: var(--sl-color-accent, #4f46e5);
+    --cpg-surface: var(--sl-color-bg, #ffffff);
+    --cpg-raised: var(--sl-color-gray-7, #f8f7f4);
+    --cpg-border: var(--sl-color-gray-5, #e2e0db);
+    --cpg-text: var(--sl-color-text, #1a1a2e);
+    --cpg-muted: var(--sl-color-gray-3, #6b6b80);
+
+    margin: 2rem 0;
+    border: 1px solid var(--cpg-border);
+    border-radius: 14px;
+    background: var(--cpg-surface);
+    overflow: hidden;
+  }
+
+  .cpg__head { padding: 16px 20px 0; }
+  .cpg__fichier {
+    font-family: var(--sl-font-mono, "JetBrains Mono", monospace);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--cpg-text);
+  }
+  .cpg__resume {
+    margin: 5px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--cpg-muted);
+  }
+
+  .cpg__stepper {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+  }
+  .cpg__step {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 2px;
+    font: inherit;
+    color: var(--cpg-muted);
+    transition: color 0.2s;
+  }
+  .cpg__step-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid var(--cpg-border);
+    background: var(--cpg-surface);
+    flex-shrink: 0;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .cpg__step-label { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .cpg__step--active { color: var(--cpg-text); }
+  .cpg__step--active .cpg__step-dot {
+    border-color: var(--cpg-accent);
+    background: var(--cpg-accent);
+  }
+  .cpg__step--current .cpg__step-dot {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--cpg-accent) 18%, transparent);
+  }
+  .cpg__step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--cpg-border);
+    margin: 0 8px;
+    transition: background 0.3s;
+  }
+  .cpg__step-line--active { background: var(--cpg-accent); }
+
+  .cpg__panels {
+    border-top: 1px solid var(--cpg-border);
+    background: var(--cpg-raised);
+  }
+  .cpg__panel {
+    padding: 16px 20px;
+    animation: cpg-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .cpg__panel[hidden] { display: none; }
+  @keyframes cpg-fade {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cpg__panel { animation: none; }
+    .cpg__step-dot, .cpg__step-line { transition: none; }
+  }
+  .cpg__tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    background: color-mix(in srgb, var(--cpg-accent) 12%, transparent);
+    color: var(--cpg-accent);
+  }
+
+  .cpg__nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--cpg-border);
+    background: var(--cpg-surface);
+  }
+  .cpg__nav-btn {
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 7px 15px;
+    border-radius: 9px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.18s;
+  }
+  .cpg__nav-btn--next {
+    background: var(--cpg-text);
+    color: var(--cpg-surface);
+    margin-left: auto;
+  }
+  .cpg__nav-btn--next:hover { opacity: 0.9; transform: translateX(2px); }
+  .cpg__nav-btn--prev {
+    background: none;
+    color: var(--cpg-muted);
+    border-color: var(--cpg-border);
+  }
+  .cpg__nav-btn--prev:hover { color: var(--cpg-text); border-color: var(--cpg-muted); }
+  .cpg__nav-btn[hidden] { display: none; }
+
+  /* Contenu des slots */
+  .cpg__panel :global(.cspec) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .cpg__panel :global(.cspec > li) {
+    position: relative;
+    padding: 4px 0 10px 20px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+  .cpg__panel :global(.cspec > li::before) {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 13px;
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--cpg-accent);
+  }
+
+  .cpg__panel :global(.cplan) {
+    counter-reset: cp;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 2px solid color-mix(in srgb, var(--cpg-accent) 30%, transparent);
+  }
+  .cpg__panel :global(.cplan > li) {
+    counter-increment: cp;
+    position: relative;
+    padding: 5px 0 12px 22px;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+  .cpg__panel :global(.cplan > li::before) {
+    content: counter(cp);
+    position: absolute;
+    left: -10px;
+    top: 5px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--cpg-accent);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--sl-font-mono, monospace);
+  }
+  .cpg__panel :global(.cnote) {
+    color: var(--cpg-muted);
+    font-size: 0.85rem;
+    margin-top: 10px;
+  }
+  .cpg__panel :global(pre) { margin: 0; }
+
+  /* À l'impression, tout est déplié : le PDF du guide contient le code complet. */
+  @media print {
+    .cpg { break-inside: avoid; }
+    .cpg__stepper,
+    .cpg__nav { display: none; }
+    .cpg__panel[hidden] { display: block !important; }
+    .cpg__panel { animation: none; border-top: 1px solid var(--cpg-border); }
+    .cpg__panels > .cpg__panel:first-child { border-top: 0; }
+  }
+
+  @media (max-width: 600px) {
+    .cpg__head { padding: 14px 16px 0; }
+    .cpg__stepper { padding: 12px 16px; }
+    .cpg__step-label { font-size: 0.72rem; }
+    .cpg__step-line { margin: 0 5px; }
+    .cpg__panel { padding: 14px 16px; }
+    .cpg__nav { padding: 10px 16px; }
+    .cpg__nav-btn { font-size: 0.8rem; padding: 6px 12px; }
+  }
+</style>
