@@ -34,6 +34,8 @@ export default defineConfig({
 							{ label: 'Formulaire', slug: 'cours/04-formulaire' },
 							// { label: 'Superglobales', slug: 'cours/05-superglobals' },
 							{ label: 'Préservation de session et données', slug: 'cours/05-preservation' },
+							{ label: 'Programmation orienté objet en PHP ', slug: 'cours/06-poo' },
+							{ label: 'POO avancée en PHP ', slug: 'cours/06-poo-avancee' },
 							// { label: 'Programmation orientée objet', slug: 'cours/08-poo' },
 							// { label: 'MVC', slug: 'cours/10-mvc' },
 						] },

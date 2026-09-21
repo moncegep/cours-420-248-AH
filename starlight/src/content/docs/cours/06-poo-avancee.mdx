@@ -1,0 +1,1115 @@
+---
+title: "Des objets qui collaborent : composition, héritage et interfaces"
+description: Composition, héritage, classes abstraites et interfaces, polymorphisme, injection par le constructeur, illustrés en JavaScript, en PHP et en Java.
+sidebar:
+  order: 10
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+La programmation orientée objet prend son sens lorsqu'on fait collaborer nos objets. 
+Dans une véritable application, c'est généralement le cas. 
+Une commande contient des lignes, une ligne désigne un produit, un calcul de taxes s'applique au total. 
+
+Cette page montre comment des objets collaborent, comment une classe peut en spécialiser
+une autre, comment plusieurs classes peuvent respecter un même contrat et comment limiter 
+les dépendances entre les objets qui composent une application.
+
+## La composition
+
+Une commande ne connaît pas elle-même le prix des produits qui la composent : elle le demande au produit concerné. Elle **contient** donc des objets d'une autre classe, et s'appuie sur leurs méthodes pour faire son propre travail.
+
+<Aside type="definition" title="Composition">
+Relation dans laquelle un objet en contient un ou plusieurs autres et s'en sert pour remplir sa fonction. On la reconnaît à la formule « a un » ou « contient » : une commande *a des* lignes, une ligne *a un* produit.
+</Aside>
+
+On reprend la classe `Produit` de la page précédente, avec son accesseur `getPrix()`.
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class LigneCommande {
+  #produit;
+  #quantite;
+
+  constructor(produit, quantite) {
+    this.#produit = produit;
+    this.#quantite = quantite;
+  }
+
+  sousTotal() {
+    return this.#produit.getPrix() * this.#quantite;
+  }
+}
+
+class Commande {
+  #lignes = [];
+
+  ajouter(produit, quantite) {
+    this.#lignes.push(new LigneCommande(produit, quantite));
+  }
+
+  total() {
+    return this.#lignes.reduce((somme, ligne) => somme + ligne.sousTotal(), 0);
+  }
+}
+
+const commande = new Commande();
+commande.ajouter(new Produit("Sirop d'érable 540 ml", 14.50), 2);
+console.log(commande.total()); // 29
+```
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+class LigneCommande
+{
+    private Produit $produit;
+    private int $quantite;
+
+    public function __construct(Produit $produit, int $quantite)
+    {
+        $this->produit  = $produit;
+        $this->quantite = $quantite;
+    }
+
+    public function sousTotal(): float
+    {
+        return $this->produit->getPrix() * $this->quantite;
+    }
+}
+
+class Commande
+{
+    /** @var LigneCommande[] */
+    private array $lignes = [];
+
+    public function ajouter(Produit $produit, int $quantite): void
+    {
+        $this->lignes[] = new LigneCommande($produit, $quantite);
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this->lignes as $ligne) {
+            $total += $ligne->sousTotal();
+        }
+        return $total;
+    }
+}
+
+$commande = new Commande();
+$commande->ajouter(new Produit("Sirop d'érable 540 ml", 14.50), 2);
+echo $commande->total(); // 29
+```
+
+- Un attribut peut avoir pour **type une classe** : `private Produit $produit`.
+- Le commentaire `@var LigneCommande[]` précise ce que contient le tableau, que PHP ne sait pas typer lui-même.
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class LigneCommande {
+    private Produit produit;
+    private int quantite;
+
+    public LigneCommande(Produit produit, int quantite) {
+        this.produit = produit;
+        this.quantite = quantite;
+    }
+
+    public double sousTotal() {
+        return produit.getPrix() * quantite;
+    }
+}
+
+public class Commande {
+    private List<LigneCommande> lignes = new ArrayList<>();
+
+    public void ajouter(Produit produit, int quantite) {
+        lignes.add(new LigneCommande(produit, quantite));
+    }
+
+    public double total() {
+        double total = 0;
+        for (LigneCommande ligne : lignes) {
+            total += ligne.sousTotal();
+        }
+        return total;
+    }
+}
+
+// Utilisation (dans une méthode main)
+Commande commande = new Commande();
+commande.ajouter(new Produit("Sirop d'érable 540 ml", 14.50), 2);
+System.out.println(commande.total()); // 29.0
+```
+
+</TabItem>
+</Tabs>
+
+<Highlight couleur='ambre'>Chaque objet a une responsabilité et collabore avec les autres pour fournir l'information nécessaire à son niveau :</Highlight> 
+la ligne calcule son sous-total et la commande calcule son total en additionnant les sous-totaux de ses lignes.
+
+## L'héritage : L'idée de famille
+
+Tous les produits ne sont pas toujours traités de la même façon et peuvent avoir des règles ou attributs qui diffèrent de l'ensemble des produits. 
+
+Par exemple, un produit en promotion a un rabais et une règle de calcul; un produit périssable a une date de péremption; un produit renouvelable a une fréquence de renouvellement.
+Chacun reste un produit, avec les mêmes caractéristiques de base (nom, prix, disponibilité), mais ajoute ou adapte quelque chose.
+Plutôt que de recopier la classe `Produit`, on crée une classe spécialisée (ex: `ProduitPerissable`) qui en **hérite**.
+
+<Highlight>Un `ProduitPerissable` **est un** `Produit`</Highlight>. Il doit donc pouvoir être utilisé partout où un Produit est attendu, tout en ajoutant ou spécialisant certains comportements.
+
+{/* Une classe qui hérite reprend toute la structure de la classe générale et la complète: elle reprend ses attributs et ses méthodes, puis en ajoute ou en redéfinit. */}
+
+<Aside type="definition" title="Héritage">
+Relation dans laquelle une classe **enfant** reprend les attributs et les méthodes d'une classe **parente**, peut en ajouter, et peut en **redéfinir** certaines pour adapter leur comportement. On la reconnaît à la formule « est un » : un produit périssable *est un* produit.
+</Aside>
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class ProduitPerissable extends Produit {
+  #dateLimite;
+
+  constructor(nom, prix, dateLimite) {
+    super(nom, prix);
+    this.#dateLimite = dateLimite;
+  }
+
+  estPerime(aujourdhui) {
+    return aujourdhui > this.#dateLimite;
+  }
+
+  prixFormate() {
+    return super.prixFormate() + ` (à consommer avant le ${this.#dateLimite})`;
+  }
+}
+
+const tire = new ProduitPerissable("Tire sur la neige", 6.25, "2026-04-30");
+console.log(tire.estPerime("2026-05-02")); // true
+```
+
+- `extends` désigne la classe parente.
+- `super(...)` appelle le constructeur parent ; `super.methode()` appelle la version parente d'une méthode redéfinie.
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+class ProduitPerissable extends Produit
+{
+    private string $dateLimite;
+
+    public function __construct(string $nom, float $prix, string $dateLimite)
+    {
+        parent::__construct($nom, $prix);
+        $this->dateLimite = $dateLimite;
+    }
+
+    public function estPerime(string $aujourdhui): bool
+    {
+        return $aujourdhui > $this->dateLimite;
+    }
+
+    public function prixFormate(): string
+    {
+        return parent::prixFormate() . ' (à consommer avant le ' . $this->dateLimite . ')';
+    }
+}
+
+$tire = new ProduitPerissable('Tire sur la neige', 6.25, '2026-04-30');
+var_dump($tire->estPerime('2026-05-02')); // bool(true)
+echo $tire->prixFormate(); // "6,25 $ (à consommer avant le 2026-04-30)"
+```
+
+- `extends` désigne la classe parente.
+- `parent::__construct(...)` appelle le constructeur parent ; `parent::methode()` appelle la version parente d'une méthode redéfinie.
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public class ProduitPerissable extends Produit {
+    private String dateLimite;
+
+    public ProduitPerissable(String nom, double prix, String dateLimite) {
+        super(nom, prix);
+        this.dateLimite = dateLimite;
+    }
+
+    public boolean estPerime(String aujourdhui) {
+        return aujourdhui.compareTo(dateLimite) > 0;
+    }
+
+    @Override
+    public String prixFormate() {
+        return super.prixFormate() + " (à consommer avant le " + dateLimite + ")";
+    }
+}
+
+// Utilisation (dans une méthode main)
+ProduitPerissable tire = new ProduitPerissable("Tire sur la neige", 6.25, "2026-04-30");
+System.out.println(tire.estPerime("2026-05-02")); // true
+```
+
+- `extends` désigne la classe parente.
+- `super(...)` appelle le constructeur parent ; `@Override` signale une redéfinition, et le compilateur vérifie qu'une méthode parente correspond bien.
+
+</TabItem>
+</Tabs>
+
+La classe enfant fait deux choses différentes. Elle **ajoute** une méthode, `estPerime()`, que `Produit` n'a pas. Elle **redéfinit** `prixFormate()`, en réutilisant la version parente puis en la complétant.
+
+<Aside type="syntaxe" title="private, protected et l'héritage">
+En **PHP et en Java**, un attribut `private` de la classe parente n'est pas accessible directement depuis la classe enfant. 
+On peut utiliser `protected` lorsqu'il doit rester caché de l'extérieur tout en étant accessible aux sous-classes.
+En **JavaScript**, il n'existe pas de visibilité `protected` native : un champ `#prive` reste inaccessible depuis la sous-classe.
+</Aside>
+
+<MarginNote type="rappel" titre="Un seul parent">
+En PHP comme en Java et en JavaScript, une classe n'hérite que d'une seule classe parente. C'est l'une des raisons pour lesquelles les interfaces, présentées plus bas, existent.
+</MarginNote>
+
+<Highlight couleur="ambre">La composition se lit « a un », l'héritage « est un ». Quand la relation « est un » est douteuse, la composition s'avère le plus souvent plus souple.</Highlight>
+
+Une commande n'*est* pas une liste de lignes : elle *en a*. La faire hériter d'une classe de liste lui donnerait des méthodes sans rapport avec une commande, comme trier ou vider, alors que la composition ne lui confie que ce dont elle a besoin.
+
+## Classe abstraite et interface
+
+L'héritage fait apparaître deux besoins voisins, que les langages outillent de deux façons différentes.
+
+### Classe abstraite 
+
+Une **famille** de classes partage du code, mais la classe de tête (à la racine) n'a pas toujours de sens seule. 
+Une remise en pourcentage et une remise d'un montant fixe se décrivent de la même façon, mais « une remise » sans précision ne sait pas calculer un prix. C'est le rôle d'une **classe abstraite**.
+
+<Aside type="definition" title="Classe abstraite">
+Classe qu'on ne peut pas instancier directement avec `new`. Elle peut contenir des attributs et des méthodes complètes, partagés par ses sous-classes, ainsi que des méthodes **abstraites**, déclarées sans corps, que chaque sous-classe est obligée de fournir.
+</Aside>
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class Remise {
+  constructor(libelle) {
+    if (new.target === Remise) {
+      throw new Error("Remise est abstraite : utilisez une sous-classe.");
+    }
+    this.libelle = libelle;
+  }
+
+  appliquer(prix) {
+    throw new Error("appliquer() doit être redéfinie par la sous-classe.");
+  }
+
+  decrire(prix) {
+    return `${this.libelle} : ${this.appliquer(prix).toFixed(2)} $`;
+  }
+}
+
+class RemisePourcentage extends Remise {
+  #taux;
+
+  constructor(libelle, taux) {
+    super(libelle);
+    this.#taux = taux;
+  }
+
+  appliquer(prix) {
+    return Math.round(prix * (1 - this.#taux) * 100) / 100;
+  }
+}
+
+const soldes = new RemisePourcentage("Soldes du printemps", 0.20);
+console.log(soldes.decrire(14.50)); // "Soldes du printemps : 11.60 $"
+```
+
+- JavaScript n'a pas de mot-clé `abstract`. On imite le comportement : `new.target` refuse l'instanciation directe, et la méthode non redéfinie lève une erreur.
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+abstract class Remise
+{
+    protected string $libelle;
+
+    public function __construct(string $libelle)
+    {
+        $this->libelle = $libelle;
+    }
+
+    abstract public function appliquer(float $prix): float;
+
+    public function decrire(float $prix): string
+    {
+        return $this->libelle . ' : ' . number_format($this->appliquer($prix), 2, ',', ' ') . ' $';
+    }
+}
+
+class RemisePourcentage extends Remise
+{
+    private float $taux;
+
+    public function __construct(string $libelle, float $taux)
+    {
+        parent::__construct($libelle);
+        $this->taux = $taux;
+    }
+
+    public function appliquer(float $prix): float
+    {
+        return round($prix * (1 - $this->taux), 2);
+    }
+}
+
+$soldes = new RemisePourcentage('Soldes du printemps', 0.20);
+echo $soldes->decrire(14.50); // "Soldes du printemps : 11,60 $"
+```
+
+- `abstract class` interdit `new Remise(...)`.
+- `abstract public function` déclare une méthode sans corps : toute sous-classe doit la fournir, sinon elle est elle-même abstraite.
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public abstract class Remise {
+    protected String libelle;
+
+    public Remise(String libelle) {
+        this.libelle = libelle;
+    }
+
+    public abstract double appliquer(double prix);
+
+    public String decrire(double prix) {
+        return libelle + " : " + String.format("%.2f $", appliquer(prix));
+    }
+}
+
+public class RemisePourcentage extends Remise {
+    private double taux;
+
+    public RemisePourcentage(String libelle, double taux) {
+        super(libelle);
+        this.taux = taux;
+    }
+
+    @Override
+    public double appliquer(double prix) {
+        return Math.round(prix * (1 - taux) * 100) / 100.0;
+    }
+}
+
+// Utilisation (dans une méthode main)
+Remise soldes = new RemisePourcentage("Soldes du printemps", 0.20);
+System.out.println(soldes.decrire(14.50)); // "Soldes du printemps : 11.60 $"
+```
+
+- `abstract class` interdit `new Remise(...)` ; la vérification a lieu à la compilation.
+
+</TabItem>
+</Tabs>
+
+`decrire()` est écrite une seule fois, dans la classe abstraite, et s'appuie sur `appliquer()` sans savoir comment chaque sous-classe la calcule. Une `RemiseMontant`, qui retire un montant fixe, n'aurait qu'à fournir sa propre version de `appliquer()`.
+
+### Interface 
+
+Des classes **sans lien de parenté** peuvent avoir des comportements (capacités) communs. 
+Un produit et une commande n'ont rien en commun du point de vue de l'héritage, mais tous deux doivent pouvoir s'exporter en JSON. C'est le rôle d'une **interface**.
+
+<Aside type="definition" title="Interface">
+Une interface décrit un contrat qu'un objet s'engage à respecter. Elle précise principalement les opérations que cet objet doit offrir, sans imposer sa classe concrète.
+</Aside>
+
+<Tabs syncKey="langage">
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+// JavaScript n'a pas de mot-clé interface : un objet convient
+// dès qu'il possède la méthode attendue.
+class Produit {
+  // attributs et constructeur comme avant
+
+  versTableau() {
+    return { nom: this.nom, prix: this.prix };
+  }
+}
+
+class Commande {
+  // lignes et méthodes comme avant
+
+  versTableau() {
+    return { total: this.total() };
+  }
+}
+
+function exporterEnJson(objet) {
+  return JSON.stringify(objet.versTableau());
+}
+```
+
+- Sans interface, rien ne vérifie à l'avance qu'un objet possède `versTableau()` : l'erreur n'apparaît qu'à l'appel.
+
+</TabItem>
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+interface Exportable
+{
+    public function versTableau(): array;
+}
+
+class Produit implements Exportable
+{
+    // attributs et constructeur comme avant
+
+    public function versTableau(): array
+    {
+        return ['nom' => $this->nom, 'prix' => $this->prix];
+    }
+}
+
+class Commande implements Exportable
+{
+    // lignes et méthodes comme avant
+
+    public function versTableau(): array
+    {
+        return ['total' => $this->total()];
+    }
+}
+
+function exporterEnJson(Exportable $objet): string
+{
+    return json_encode($objet->versTableau());
+}
+```
+
+- `implements` engage la classe à fournir toutes les méthodes de l'interface ; en oublier une provoque une erreur dès le chargement de la classe.
+- Le paramètre typé `Exportable` accepte n'importe quel objet qui implémente l'interface, quelle que soit sa classe.
+
+</TabItem>
+<TabItem label="Java" icon='seti:java'>
+
+```java
+import java.util.Map;
+
+public interface Exportable {
+    Map<String, Object> versTableau();
+}
+
+public class Produit implements Exportable {
+    // attributs et constructeur comme avant
+
+    @Override
+    public Map<String, Object> versTableau() {
+        return Map.of("nom", nom, "prix", prix);
+    }
+}
+
+public class Commande implements Exportable {
+    // lignes et méthodes comme avant
+
+    @Override
+    public Map<String, Object> versTableau() {
+        return Map.of("total", total());
+    }
+}
+```
+
+- `implements` engage la classe ; le compilateur refuse une classe qui n'a pas fourni toutes les méthodes.
+
+</TabItem>
+</Tabs>
+
+<MarginNote type="rappel" titre="Et TypeScript ?">
+JavaScript n'offre ni classe abstraite ni interface. TypeScript, qui lui ajoute des types, propose les deux mots-clés, vérifiés avant l'exécution.
+</MarginNote>
+
+| | Classe abstraite | Interface |
+| --- | --- | --- |
+| Instanciable avec `new` | non | non |
+| Attributs | oui | pas d'attribut ordinaire |
+| Méthodes | oui | oui |
+| Méthodes avec leur code | oui, à côté des méthodes abstraites | en général, non ; possible avec certains langages |
+| Usage par classe (enfant) | une seule, par `extends` | plusieurs, par `implements` |
+| Relation exprimée | « est une sorte de » | « sait faire » |
+| Exemple de cette page | `Remise` | `Exportable` |
+
+<Checkpoint question="Une classe peut-elle hériter d'une classe abstraite et implémenter une interface en même temps ?">
+Oui, et c'est fréquent. `class RemiseSaisonniere extends Remise implements Exportable` reprend le code commun des remises et s'engage en plus à pouvoir s'exporter. Les deux mécanismes répondent à des questions différentes : ce que la classe *est*, et ce qu'elle *sait faire*. La limite porte seulement sur l'héritage, qui n'admet qu'un parent ; les interfaces, elles, peuvent être multiples.
+</Checkpoint>
+
+<Aside type="astuce" title="Choisir entre les deux">
+La question utile est souvent celle du code partagé. Si les classes concernées ont une implémentation commune à mettre en facteur, une classe abstraite évite de la recopier. Si elles ne partagent qu'une promesse, sans rien de commun par ailleurs, une interface convient mieux, et leur laisse la liberté d'hériter d'autre chose.
+</Aside>
+
+## Le polymorphisme : un même contrat, plusieurs comportements
+
+Une interface devient particulièrement utile lorsqu'on cesse de se préoccuper de la **classe exacte** d'un objet pour travailler plutôt avec ce qu'il sait faire.
+
+Dans la section précédente, `Produit` et `Commande` implémentent toutes deux `Exportable`. Une fonction peut donc recevoir un objet `Exportable` sans avoir besoin de savoir s'il s'agit d'un produit, d'une commande ou d'une autre classe.
+
+<Aside type="definition" title="Polymorphisme">
+
+Le **polymorphisme** permet d'utiliser des objets de classes différentes de la même façon lorsqu'ils partagent un même contrat ou une même classe parente. La méthode réellement exécutée dépend de l'objet reçu.
+
+</Aside>
+
+<Tabs syncKey="langage">
+
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+function afficherExport(objet) {
+  console.log(JSON.stringify(objet.versTableau()));
+}
+
+const produit = new Produit("Sirop d'érable 540 ml", 14.50);
+const commande = new Commande();
+
+afficherExport(produit);
+afficherExport(commande);
+```
+
+`afficherExport()` utilise uniquement la méthode `versTableau()`. Elle n'a pas besoin de savoir quelle classe a créé l'objet.
+
+JavaScript ne vérifie cependant pas ce contrat à l'avance. Si l'objet reçu ne possède pas `versTableau()`, l'erreur apparaîtra au moment de l'exécution.
+
+</TabItem>
+
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+<?php
+
+function afficherExport(Exportable $objet): void
+{
+    echo exporterEnJson($objet) . PHP_EOL;
+}
+
+$produit = new Produit("Sirop d'érable 540 ml", 14.50);
+$commande = new Commande();
+
+afficherExport($produit);
+afficherExport($commande);
+```
+
+Le paramètre est déclaré `Exportable`, et non `Produit` ou `Commande`.
+
+PHP accepte donc n'importe quel objet qui respecte ce contrat.
+
+Lorsque `exporterEnJson()` appelle :
+
+```php
+$objet->versTableau();
+```
+
+PHP exécute la version de `versTableau()` correspondant à l'objet réellement reçu.
+
+</TabItem>
+
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public static void afficherExport(Exportable objet) {
+    System.out.println(objet.versTableau());
+}
+
+// Utilisation
+Produit produit = new Produit("Sirop d'érable 540 ml", 14.50);
+Commande commande = new Commande();
+
+afficherExport(produit);
+afficherExport(commande);
+```
+
+Le paramètre est de type `Exportable`, mais l'objet reçu peut appartenir à n'importe quelle classe qui implémente cette interface.
+
+La version de `versTableau()` exécutée dépend de l'objet réellement fourni.
+
+</TabItem>
+
+</Tabs>
+
+<Highlight couleur="ambre">
+Le polymorphisme permet d'écrire du code qui dépend d'un **contrat** plutôt que d'une classe précise. On peut alors ajouter de nouvelles implémentations sans devoir modifier tout le code qui utilise ce contrat.
+</Highlight>
+
+Par exemple, si une nouvelle classe `Facture` implémente `Exportable`, `afficherExport()` pourra immédiatement l'utiliser :
+
+```php
+afficherExport($facture);
+```
+
+Il n'est pas nécessaire d'ajouter une condition comme :
+
+```php
+if ($objet instanceof Produit) {
+    // ...
+} elseif ($objet instanceof Commande) {
+    // ...
+} elseif ($objet instanceof Facture) {
+    // ...
+}
+```
+
+Chaque objet sait lui-même comment réaliser l'opération demandée.
+
+<Checkpoint question="Pourquoi afficherExport() n'a-t-elle pas besoin de connaître les classes Produit et Commande ?">
+
+Parce qu'elle dépend uniquement du contrat `Exportable`. Toute classe qui implémente cette interface peut être utilisée à sa place. C'est le type réel de l'objet qui détermine quelle version de `versTableau()` sera exécutée.
+
+</Checkpoint>
+
+
+## Dépendances et injection par le constructeur
+
+Les objets d'une application ne travaillent généralement pas seuls.
+
+**Faisons maintenant évoluer notre classe `Commande`**. 
+Jusqu'ici, elle savait calculer le sous-total de ses lignes. 
+Nous voulons maintenant lui permettre de calculer également les taxes.
+
+On dit alors que le **calculateur de taxes est une dépendance de `Commande`**.
+
+<Aside type="definition" title="Dépendance">
+
+Un objet est une **dépendance** lorsqu'une autre classe a besoin de lui pour accomplir une partie de son travail.
+
+</Aside>
+
+Une première possibilité serait de créer directement le calculateur dans `Commande` :
+
+```php
+class Commande
+{
+    private CalculateurTaxesPourcentage $calculateurTaxes;
+
+    public function __construct()
+    {
+        $this->calculateurTaxes = new CalculateurTaxesPourcentage(0.14975);
+    }
+}
+```
+
+Cette solution fonctionne, mais `Commande` décide maintenant elle-même :
+
+- quel calculateur utiliser ;
+- comment le construire ;
+- quel taux lui transmettre.
+
+La classe est donc fortement liée à cette implémentation particulière.
+
+Si les règles de taxes changent, si une autre région utilise un calcul différent ou si nous voulons effectuer un test sans taxes, il faudra intervenir directement dans `Commande`.
+
+Une autre possibilité consiste à **recevoir la dépendance de l'extérieur**.
+
+C'est ce qu'on appelle l'**injection de dépendances**.
+
+<Aside type="definition" title="Injection de dépendances">
+
+L'**injection de dépendances** consiste à fournir à un objet les autres objets dont il a besoin plutôt que de lui demander de les créer lui-même.
+
+Lorsqu'elles sont reçues comme paramètres du constructeur, on parle d'**injection par le constructeur**.
+
+</Aside>
+
+On commence par décrire ce qu'un calculateur de taxes doit savoir faire.
+
+<Tabs syncKey="langage">
+
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+JavaScript n'impose pas d'interface formelle. `Commande` utilisera simplement tout objet possédant une méthode `calculer()`.
+
+```js
+class CalculateurTaxes {
+  #taux;
+
+  constructor(taux) {
+    this.#taux = taux;
+  }
+
+  calculer(montant) {
+    return montant * this.#taux;
+  }
+}
+
+class Commande {
+  #lignes = [];
+  #calculateurTaxes;
+
+  constructor(calculateurTaxes) {
+    this.#calculateurTaxes = calculateurTaxes;
+  }
+
+  ajouter(produit, quantite) {
+    this.#lignes.push(new LigneCommande(produit, quantite));
+  }
+
+  sousTotal() {
+    return this.#lignes.reduce(
+      (somme, ligne) => somme + ligne.sousTotal(),
+      0
+    );
+  }
+
+  total() {
+    const sousTotal = this.sousTotal();
+    const taxes = this.#calculateurTaxes.calculer(sousTotal);
+
+    return sousTotal + taxes;
+  }
+}
+
+const taxes = new CalculateurTaxes(0.14975);
+const commande = new Commande(taxes);
+
+commande.ajouter(
+  new Produit("Sirop d'érable 540 ml", 14.50),
+  2
+);
+
+console.log(commande.total());
+```
+
+`Commande` reçoit son calculateur dans son constructeur :
+
+```js
+new Commande(taxes);
+```
+
+Elle sait l'utiliser, mais elle ne sait pas comment il a été créé.
+
+</TabItem>
+
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+On peut utiliser une interface pour éviter que `Commande` dépende d'une classe précise.
+
+```php
+<?php
+
+interface CalculateurTaxes
+{
+    public function calculer(float $montant): float;
+}
+```
+
+Une première implémentation peut appliquer un taux donné :
+
+```php
+class CalculateurTaxesPourcentage implements CalculateurTaxes
+{
+    private float $taux;
+
+    public function __construct(float $taux)
+    {
+        $this->taux = $taux;
+    }
+
+    public function calculer(float $montant): float
+    {
+        return $montant * $this->taux;
+    }
+}
+```
+
+`Commande` reçoit maintenant son calculateur dans son constructeur :
+
+```php
+class Commande
+{
+    /** @var LigneCommande[] */
+    private array $lignes = [];
+
+    private CalculateurTaxes $calculateurTaxes;
+
+    public function __construct(CalculateurTaxes $calculateurTaxes)
+    {
+        $this->calculateurTaxes = $calculateurTaxes;
+    }
+
+    public function ajouter(Produit $produit, int $quantite): void
+    {
+        $this->lignes[] = new LigneCommande($produit, $quantite);
+    }
+
+    public function sousTotal(): float
+    {
+        $total = 0.0;
+
+        foreach ($this->lignes as $ligne) {
+            $total += $ligne->sousTotal();
+        }
+
+        return $total;
+    }
+
+    public function total(): float
+    {
+        $sousTotal = $this->sousTotal();
+        $taxes = $this->calculateurTaxes->calculer($sousTotal);
+
+        return $sousTotal + $taxes;
+    }
+}
+```
+
+La création des objets se fait maintenant à l'extérieur de `Commande` :
+
+```php
+$taxes = new CalculateurTaxesPourcentage(0.14975);
+
+$commande = new Commande($taxes);
+
+$commande->ajouter(
+    new Produit("Sirop d'érable 540 ml", 14.50),
+    2
+);
+
+echo $commande->total();
+```
+
+`Commande` connaît seulement l'interface `CalculateurTaxes`.
+
+Elle ignore quelle classe concrète effectue le calcul et comment celle-ci a été configurée.
+
+</TabItem>
+
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public interface CalculateurTaxes {
+    double calculer(double montant);
+}
+```
+
+```java
+public class CalculateurTaxesPourcentage implements CalculateurTaxes {
+
+    private double taux;
+
+    public CalculateurTaxesPourcentage(double taux) {
+        this.taux = taux;
+    }
+
+    @Override
+    public double calculer(double montant) {
+        return montant * taux;
+    }
+}
+```
+
+`Commande` reçoit ensuite la dépendance :
+
+```java
+public class Commande {
+
+    private List<LigneCommande> lignes = new ArrayList<>();
+    private CalculateurTaxes calculateurTaxes;
+
+    public Commande(CalculateurTaxes calculateurTaxes) {
+        this.calculateurTaxes = calculateurTaxes;
+    }
+
+    public void ajouter(Produit produit, int quantite) {
+        lignes.add(new LigneCommande(produit, quantite));
+    }
+
+    public double sousTotal() {
+        double total = 0;
+
+        for (LigneCommande ligne : lignes) {
+            total += ligne.sousTotal();
+        }
+
+        return total;
+    }
+
+    public double total() {
+        double sousTotal = sousTotal();
+
+        return sousTotal
+            + calculateurTaxes.calculer(sousTotal);
+    }
+}
+```
+
+```java
+CalculateurTaxes taxes =
+    new CalculateurTaxesPourcentage(0.14975);
+
+Commande commande = new Commande(taxes);
+```
+
+`Commande` dépend de l'interface `CalculateurTaxes`, et non de `CalculateurTaxesPourcentage`.
+
+</TabItem>
+
+</Tabs>
+
+### Pourquoi injecter la dépendance ?
+
+Supposons maintenant qu'une commande particulière ne doive payer aucune taxe.
+
+Il suffit de fournir un autre calculateur :
+
+<Tabs syncKey="langage">
+
+<TabItem label="JavaScript" icon='seti:javascript'>
+
+```js
+class SansTaxes {
+  calculer(montant) {
+    return 0;
+  }
+}
+
+const commande = new Commande(new SansTaxes());
+```
+
+</TabItem>
+
+<TabItem label="PHP ⭐" icon='seti:php'>
+
+```php
+class SansTaxes implements CalculateurTaxes
+{
+    public function calculer(float $montant): float
+    {
+        return 0;
+    }
+}
+
+$commande = new Commande(new SansTaxes());
+```
+
+</TabItem>
+
+<TabItem label="Java" icon='seti:java'>
+
+```java
+public class SansTaxes implements CalculateurTaxes {
+
+    @Override
+    public double calculer(double montant) {
+        return 0;
+    }
+}
+
+Commande commande = new Commande(new SansTaxes());
+```
+
+</TabItem>
+
+</Tabs>
+
+Nous avons changé le comportement de la commande **sans modifier la classe `Commande`**.
+
+C'est ici que polymorphisme et injection de dépendances se rejoignent :
+
+1. `Commande` dépend d'un **contrat** : `CalculateurTaxes`.
+2. Plusieurs classes peuvent respecter ce contrat.
+3. Le programme choisit l'objet à fournir à `Commande`.
+4. `Commande` utilise cet objet sans connaître sa classe concrète.
+
+<Highlight couleur="ambre">
+Une classe devrait généralement connaître **ce dont elle a besoin**, mais pas nécessairement décider **quel objet concret créer** pour répondre à ce besoin.
+</Highlight>
+
+L'injection par le constructeur rend également les dépendances visibles :
+
+```php
+new Commande($calculateurTaxes);
+```
+
+En lisant cette instruction, on voit immédiatement qu'une commande ne peut pas fonctionner sans calculateur de taxes.
+
+<Checkpoint question="Pourquoi transmettre le calculateur de taxes au constructeur de Commande plutôt que de le créer à l'intérieur ?">
+
+Parce que `Commande` peut alors travailler avec différentes implémentations de `CalculateurTaxes` sans être modifiée. Le choix et la configuration du calculateur sont effectués à l'extérieur de la classe.
+
+</Checkpoint>
+
+
+## Récapitulatif
+
+- La **composition** permet à un objet d'en utiliser d'autres pour faire son travail : une commande contient des lignes, une ligne désigne un produit.
+- L'**héritage** permet à une classe enfant de reprendre une classe parente, d'y **ajouter** des méthodes et d'en **redéfinir** certaines. Une classe n'a qu'un seul parent.
+- Un attribut `protected` reste caché de l'extérieur mais visible des sous-classes, contrairement à un attribut `private`.
+- Une **classe abstraite** ne s'instancie pas ; elle met en commun du code et impose à ses sous-classes les méthodes déclarées `abstract`.
+- Une **interface** décrit un contrat que les classes qui l'implémentent s'engagent à respecter.
+- Le **polymorphisme** permet d'utiliser des objets de classes différentes à travers un même contrat. Le comportement exécuté dépend de l'objet réellement utilisé.
+- Une **dépendance** est un objet dont une autre classe a besoin pour accomplir son travail.
+- L'**injection de dépendances** consiste à fournir ces objets de l'extérieur plutôt qu'à les créer directement dans la classe. Avec l'**injection par le constructeur**, les dépendances nécessaires apparaissent explicitement parmi les paramètres du constructeur.
+
+## Quiz
+
+
+<Quiz
+  client:visible
+  question="ProduitPerissable est déclarée avec extends Produit. Que peut-elle faire ?"
+  options={[
+    { texte: "Utiliser les méthodes publiques de Produit, en ajouter et en redéfinir", correct: true },
+    { texte: "Lire directement les attributs private de Produit", correct: false },
+    { texte: "Hériter en plus d'une seconde classe parente", correct: false },
+  ]}
+  retour="Un attribut private reste inaccessible aux sous-classes ; il faudrait le déclarer protected. Et une classe n'hérite que d'un seul parent."
+/>
+
+<Quiz
+  client:visible
+  question="Produit et Commande, sans lien de parenté, doivent toutes deux pouvoir s'exporter en JSON. Que choisir ?"
+  options={[
+    { texte: "Une interface que les deux classes implémentent", correct: true },
+    { texte: "Une classe abstraite dont les deux classes héritent", correct: false },
+    { texte: "Faire hériter Commande de Produit", correct: false },
+  ]}
+  retour="Les deux classes ne partagent qu'une capacité, pas de code ni de relation « est un ». Une interface exprime ce contrat sans leur imposer de parent commun."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi transmettre le calculateur de taxes au constructeur de Commande plutôt que de le créer à l'intérieur ?"
+  options={[
+    { texte: "Pour que le programme s'exécute plus vite", correct: false },
+    { texte: "Pour pouvoir changer de calculateur sans modifier la classe Commande", correct: true },
+    { texte: "Parce qu'une classe ne peut pas créer d'objet dans son constructeur", correct: false },
+  ]}
+  retour="Une classe qui reçoit sa dépendance ignore comment elle a été configurée. Changer de taux, ou utiliser un calculateur sans taxes, se fait alors à l'extérieur."
+/>
+
+<Quiz
+  client:visible
+  question="Une fonction reçoit un paramètre de type Exportable. Que peut-on lui transmettre ?"
+  options={[
+    { texte: "Seulement un objet créé directement à partir de Exportable", correct: false },
+    { texte: "N'importe quel objet dont la classe implémente Exportable", correct: true },
+    { texte: "Seulement un Produit ou une Commande", correct: false },
+  ]}
+  retour="Le code travaille avec le contrat Exportable plutôt qu'avec une classe concrète. Toute nouvelle classe qui respecte ce contrat peut donc être utilisée."
+/>
