@@ -1,11 +1,9 @@
 ---
-title: API
-description: Introduction aux réponses JSON pour les API.
-draft: true
+title: "Concevoir une API"
+description: Pourquoi et comment ouvrir son application à d'autres programmes, les principes de l'architecture REST, les méthodes HTTP, la lecture du corps d'une requête en PHP, la réécriture d'adresses avec .htaccess, et une API complète pour le catalogue.
 sidebar:
-  order: 7
+  order: 12
 ---
-
 
 import Aside from '../../../components/Aside.astro';
 import MarginNote from '../../../components/MarginNote.astro';
@@ -13,259 +11,991 @@ import Highlight from '../../../components/Highlight.astro';
 import Checkpoint from '../../../components/Checkpoint.astro';
 import Quiz from '../../../components/react/Quiz.jsx';
 import FluxSequence from '../../../components/react/FluxSequence.jsx';
-import RequeteInspecteur from '../../../components/react/RequeteInspecteur.jsx';
+import CodeProgressif from '../../../components/CodeProgressif.astro';
+import Squelette from '../../../components/Squelette.astro';
+import EtapeCode from '../../../components/EtapeCode.astro';
 
-## Aperçu des API : répondre à un programme
+Jusqu'à date, nous construisions des applications web complètent, mais fermés 
+sur eux même. Grâce à la puissance de PHP, un script pouvait s'occuper de traiter 
+la requête, se connecter à la base de données et formuler des requêtes, puis créer 
+le contenu HTML dynamique.
 
-### Pourquoi pas du HTML, et dans quel format
+Ici, nous voyons comment ouvrir son application à d'autres programmes, de façon 
+organisée et prévisible. Ceci permettra de centraliser la logique métier et l'accès
+aux données tout en laissant flexible l'exploitation et la présentation de ceux-ci.
 
-Une page renvoie du HTML, ce qui convient à un navigateur dont le rôle est de l'**afficher**. Le HTML mêle cependant les données et leur présentation : balises de structure, libellés, mise en forme. Un programme qui veut seulement une donnée précise, par exemple le prix d'un produit, devrait alors l'extraire de ce HTML, une opération fragile qui se brise au moindre changement de présentation.
+## Pourquoi des API
 
-Une API permet de renvoyer les **données seules**, dans un format prévu pour les programmes. 
-Le format de données **JSON** est le plus répandu, mais ce n'est pas le seul :
+<Aside type="definition" title="API">
+Une **API**, pour *Application Programming Interface* (interface de programmation d'application), est l'ensemble des opérations qu'un logiciel met à la disposition d'autres logiciels, avec leurs entrées, leurs sorties et leurs règles d'usage. Le logiciel qui utilise l'API s'appelle le **client**.
+</Aside>
 
-- le **XML**, présent dans de nombreux systèmes établis et certains domaines réglementés ;
-- le **CSV**, commode pour des données tabulaires destinées à un tableur ;
-- le **texte brut**, pour une réponse simple.
+### Ce qui motive une API
 
-Une même liste de produits prend ainsi plusieurs formes selon le client. Pour un navigateur, du HTML à présenter :
+Revenons à notre exemple du catalogue de L'Érablière dorée. 
+Nous avons construit un site web présentant ses produits, mais ce n'est pas nécessairement
+le seule client qui pourrait présenter ou exploiter le catalogue.  
+Une application mobile pourrait également afficher les produits, un partenaire pourrait vouloir les revendre, 
+un script d'un administrateur système pourrait voiloir mettre les stocks à jour. 
 
-```html
-<ul>
-  <li>Sirop d'érable 540 ml : 14,50 $</li>
-  <li>Beurre d'érable 250 g : 9,95 $</li>
-</ul>
-```
+Sans API, chacun devrait soit accéder directement à la base de données, 
+soit extraire les données du HTML des pages, ce qui n'est pas commode. 
+De plus, le moindre changement au niveau de la base de données ou dans le
+rendu pourrait briser les clients.
 
-Pour un programme, les mêmes données en JSON :
+Une API vient répondre à quelques besoins récurrents :
 
-```json
-[
-  { "nom": "Sirop d'érable 540 ml", "prix": 14.5 },
-  { "nom": "Beurre d'érable 250 g", "prix": 9.95 }
-]
-```
+- **plusieurs clients** pour les mêmes données et les mêmes règles ;
+- **des rythmes séparés** : le client et le serveur évoluent chacun de leur côté, parfois écrits par des équipes différentes, dans des langages différents ;
+- **une seule mise en œuvre** des règles métier, au lieu d'une copie par client ;
+- **exposer une capacité sans exposer l'implémentation** : le client n'a besoin de connaître ni la base, ni le code, ni l'organisation des fichiers.
 
-Ou en XML, si le client l'attend ainsi :
+### Une API est une interface
 
-```xml
-<produits>
-  <produit><nom>Sirop d'érable 540 ml</nom><prix>14.50</prix></produit>
-  <produit><nom>Beurre d'érable 250 g</nom><prix>9.95</prix></produit>
-</produits>
-```
+Dans les [notions avancées du POO](/cours/06-poo-2), on définissait une interface 
+comme un contrat au niveau des classes qui énumère des méthodes, sans se fournir
+leur implémentation (code). 
 
-### Fonctionnement d'une API
+Une API est exactement cela, à l'échelle d'un système : elle énumère des opérations, 
+leurs paramètres et leurs résultats, sans rien dire de la façon dont elles sont réalisées.
 
-Jusqu'ici, une requête GET atteignait une page complète :
+### Plusieurs sortes d'API
 
-```sh
-GET /index.php?page=produits
-```
+Le mot *API* désigne des choses de tailles très différentes.
 
-Le serveur répondait avec toute la page : en-tête, menu, liste des produits, pied de page.
+| Sorte d'API | Exemple | Comment on l'utilise |
+| --- | --- | --- |
+| De bibliothèque ou de langage | les fonctions fournis par PHP comme `json_encode()`, l'API du DOM du navigateur | par un appel de fonction, dans le même programme |
+| De système d'exploitation | ouvrir un fichier, lancer un processus | par un appel système, que le langage enveloppe |
+| Web | un service de météo, de paiement, de cartographie | par des requêtes HTTP, à travers le réseau |
 
-Certains clients ne veulent pas cette page complète, mais demandent le **contenu sans la présentation**, afin de garder le contrôle sur la mise en forme.
+Parmi les API web, plusieurs styles coexistent: 
+- Une API **REST**, présentée plus bas, organise tout autour de ressources désignées par des adresses. 
+- **GraphQL** laisse le client décrire, dans une requête unique, la forme exacte des données qu'il veut recevoir. 
+- Le style **RPC** consiste à appeler des procédures nommées à distance, comme `ajouterProduit`. 
 
-Pour servir une telle requête, plusieurs éléments doivent être réunis :
+Aucun n'est universellement supérieur ; REST reste le plus répandu pour les API publiques simples, et c'est lui que la suite de la page développe.
 
-1. distinguer cette requête d'une requête de page ordinaire, par une adresse dédiée (un fichier comme `api-produits.php`, ou une route `?page=api-produits`) ;
-2. produire une réponse qui ne contient que les données, sans le gabarit HTML ;
-3. annoncer le format avec l'en-tête `Content-Type: application/json` ;
-4. encoder les données avec `json_encode`.
+## L'architecture REST
 
-L'exemple d'un tel point d'accès en lecture :
+<Aside type="definition" title="REST">
+**REST**, pour *Representational State Transfer*, est un style d'architecture décrit par Roy Fielding en 2000. Ce n'est ni un protocole ni une norme, mais un ensemble de principes qui s'appuient sur HTTP.
+</Aside>
+
+Les principes REST (Representational State Transfer) décrivent un style architectural 
+pour concevoir des systèmes distribués, notamment des API Web. 
+
+REST définit plusieurs contraintes architecturales. Pour concevoir notre première API, nous en retiendrons principalement trois.
+
+1. Communication client–serveur : le client gère principalement la présentation et les interactions; le serveur gère les ressources, les données et la logique associée. Cette séparation permet aux deux d'évoluer plus indépendamment.
+2. Sans état (stateless) : chaque requête contient toute l'information nécessaire pour être comprise et traitée. Le serveur ne dépend pas d'un état de conversation conservé entre deux requêtes d'un même client.
+3. Interface uniforme : les ressources sont manipulées suivant des conventions communes et prévisibles. C'est probablement la contrainte la plus importante de REST. Elle implique notamment :
+    - l'identification des ressources, généralement par des URI;
+    - la manipulation des ressources à travers leurs représentations (JSON, XML, etc.);
+    - des messages suffisamment explicites pour être compris;
+    - idéalement, des liens permettant au client de découvrir les actions ou ressources accessibles (HATEOAS).
+
+<Aside type="caution" title="REST, ou à peu près">
+Beaucoup d'API qui se disent REST n'en respectent qu'une partie. Ce n'est pas nécessairement un défaut : l'essentiel, pour un client, est que l'API soit cohérente et documentée. Les principes ci-dessus décrivent une cible raisonnable plutôt qu'un examen à réussir.
+</Aside>
+
+### Application à l'Érablière
+
+Si nous appliquons REST au catalogue de l'Érablière, nous obtenons les cinq points d'accès suivants.
+
+| Méthode | Adresse | Action | Réponse en cas de succès |
+| --- | --- | --- | --- |
+| `GET` | `/api/produits` | lister les produits | 200, la liste |
+| `GET` | `/api/produits/7` | lire un produit | 200, le produit |
+| `POST` | `/api/produits` | créer un produit | 201, le produit, et son adresse dans `Location` |
+| `PUT` | `/api/produits/7` | remplacer un produit | 200, le produit modifié |
+| `DELETE` | `/api/produits/7` | supprimer un produit | 204, sans corps |
+
+Et quatre réponses d'erreur, chacune pour une raison distincte.
+
+| Statut | Signification | Exemple |
+| --- | --- | --- |
+| 400 | la requête est illisible | le corps n'est pas du JSON valide |
+| 404 | la ressource n'existe pas | `/api/produits/99`, ou `/api/clients` |
+| 405 | la méthode ne convient pas à cette ressource | `DELETE /api/produits`, sur la collection entière |
+| 422 | la requête est lisible, mais refusée | un prix négatif |
+
+<Aside type="astuce" title="Nommer les ressources">
+Quelques conventions répandues rendent une API prévisible : des noms plutôt que des verbes, au pluriel pour les collections, en minuscules, avec des traits d'union si le nom est composé. `/lignes-commande` se devine ; `/getLigneCommandeList` non.
+</Aside>
+
+<Checkpoint question="Pourquoi préférer DELETE /api/produits/7 à GET /api/supprimerProduit?id=7 ?">
+Pour deux raisons. La première est la clarté du contrat : l'adresse désigne toujours la même ressource, et la méthode seule indique l'action, si bien qu'un client qui connaît `/api/produits/7` sait déjà comment la lire, la remplacer et la supprimer. La seconde est la sécurité, déjà rencontrée avec les formulaires : une requête GET peut être déclenchée sans intention, par un préchargement ou un robot, et ne devrait rien modifier.
+</Checkpoint>
+
+## Retour sur les superglobales
+
+La [page sur les formulaires](/cours/04-formulaire) présentait `$_GET`, `$_POST` et `$_SERVER`. Une API en fait un usage différent, et l'une d'elles réserve une surprise.
+
+- `$_SERVER['REQUEST_METHOD']` contient la méthode, quelle qu'elle soit : `PUT` et `DELETE` compris.
+- `$_GET` contient les paramètres de la chaîne de requête, quelle que soit la méthode.
+- `$_POST` n'est rempli que pour une requête `POST` **encodée comme un formulaire**. Un corps JSON, ou n'importe quel corps envoyé avec `PUT`, n'y apparaît pas.
+
+<Highlight couleur="ambre">Pour une API qui reçoit du JSON, `$_POST` reste vide : le corps se lit ailleurs.</Highlight>
+
+| Requête | `$_GET` | `$_POST` | `php://input` |
+| --- | --- | --- | --- |
+| `GET /api/produits?page=2` | `page` | vide | vide |
+| `POST` d'un formulaire HTML | paramètres de l'adresse | les champs | le corps brut |
+| `POST` avec un corps JSON | paramètres de l'adresse | vide | le JSON |
+| `PUT` avec un corps JSON | paramètres de l'adresse | vide | le JSON |
+
+Le corps brut d'une requête se lit par le flux `php://input`, puis se décode avec `json_decode()`.
 
 ```php
 <?php
-// api-produits.php
-$produits = [
-    ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50],
-    ["nom" => "Beurre d'érable 250 g", "prix" => 9.95],
-];
+$corps   = file_get_contents('php://input');
+$donnees = json_decode($corps, true);
 
-header('Content-Type: application/json; charset=utf-8');
-echo json_encode($produits, JSON_UNESCAPED_UNICODE);
+if (!is_array($donnees)) {
+    // corps absent, vide, ou JSON mal formé
+}
 ```
+
+<Aside type="syntaxe" title="Le second argument de json_decode">
+Avec `true`, `json_decode()` rend des tableaux associatifs ; sans lui, il rend des objets. Les tableaux s'emploient comme `$_POST`, ce qui permet de transmettre les données au service sans rien changer à celui-ci.
+</Aside>
+
+<MarginNote type="rappel" titre="Une exception">
+Pour un formulaire qui téléverse des fichiers, encodé en `multipart/form-data`, `php://input` reste vide : PHP a déjà réparti le contenu entre `$_POST` et `$_FILES`.
+</MarginNote>
+
+<Checkpoint question="Votre API reçoit un PUT avec un corps JSON correct, mais le code lit $_POST['nom'] et obtient une erreur. Pourquoi ?">
+Parce que `$_POST` n'est rempli que pour un `POST` encodé comme un formulaire. Avec `PUT`, ou avec un corps JSON quelle que soit la méthode, le contenu reste dans le corps brut de la requête. Il faut le lire par `file_get_contents('php://input')`, puis le décoder avec `json_decode(..., true)`.
+</Checkpoint>
+
+## Créer l'API du catalogue
+
+L'API réutilise tout ce qui existe déjà : le fichier d'amorçage, `CatalogueService`, le dépôt et le validateur. 
+Elle s'organise comme une petite application Express : un routeur reçoit chaque requête, et la confie à l'action 
+d'un contrôleur, qui reçoit deux objets, la requête et la réponse.
+
+```text
+erabliere/
+├── api/
+│   ├── .htaccess                      réécriture vers index.php
+│   └── index.php                      point d'entrée unique : le routeur
+├── src/
+│   ├── Core/
+│   │   ├── Request.php                la requête, comme req en Express
+│   │   └── Response.php               la réponse, comme res en Express
+│   ├── Controleur/
+│   │   └── ProduitController.php      les actions sur les produits
+│   └── …                              modèle et service, inchangés
+└── …
+```
+
+Voici le trajet d'une création, de la requête du client jusqu'à la réponse.
 
 <FluxSequence
   client:visible
-  titre="Une requête d'API en lecture"
+  titre="Créer un produit par l'API"
   acteurs={[
-    { key: "prog", label: "Programme client", icone: "laptop" },
-    { key: "serveur", label: "Serveur PHP", icone: "server" },
+    { key: 'client', label: 'Client', icone: 'laptop' },
+    { key: 'apache', label: 'Apache', icone: 'server' },
+    { key: 'routeur', label: 'index.php' },
+    { key: 'controleur', label: 'Contrôleur' },
+    { key: 'modele', label: 'Modèle', icone: 'database' },
   ]}
   etapes={[
-    { de: 0, vers: 1, texte: "GET", note: "/api-produits.php" },
-    { de: 1, vers: 0, texte: "Réponse : un corps JSON", statut: 200 },
+    { de: 0, vers: 1, texte: 'POST /api/produits', mono: true, note: 'corps JSON' },
+    { de: 1, vers: 2, texte: 'index.php', mono: true, note: 'réécrit par .htaccess' },
+    { de: 2, vers: 2, texte: 'POST + produits → creer' },
+    { de: 2, vers: 3, texte: 'creer($req, $res)', mono: true },
+    { de: 3, vers: 4, texte: 'ajouter($req->body)', mono: true },
+    { de: 4, vers: 3, texte: 'Produit numéroté' },
+    { de: 3, vers: 0, texte: 'Location: produits/7', statut: 201 },
   ]}
 />
 
-### Envoyer des données : la requête POST
+### Trouver les classes
 
-Un programme peut aussi **envoyer** des données, par exemple pour créer un produit. Il emploie alors la méthode POST. Le corps de la requête arrive de deux façons selon son format :
-
-- un corps de **formulaire**, comme celui d'un formulaire HTML, se trouve dans `$_POST` ;
-- un corps **JSON**, fréquent entre programmes, se lit avec `php://input`, puis `json_decode` le transforme en tableau.
-
-Pour traiter un tel envoi, on vérifie la méthode, on lit et valide les données, puis on répond avec un statut adapté, par exemple `201 Created` :
+Le routeur utilise huit classes, réparties dans autant de fichiers. 
+C'est le chargeur automatique, présenté dans la page sur les objets qui collaborent, 
+qui permet à PHP de les trouver sans un `require_once` par fichier.
 
 ```php
 <?php
-// api-produits.php  (méthode POST)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $donnees = json_decode(file_get_contents('php://input'), true);
+// src/autoload.php
 
-    if (!is_array($donnees) || !isset($donnees['nom'], $donnees['prix'])) {
-        http_response_code(400);
-        echo json_encode(['erreur' => 'Données invalides']);
-        exit;
+spl_autoload_register(function (string $classe): void {
+    $prefixe = 'App\\';
+
+    if (!str_starts_with($classe, $prefixe)) {
+        return;
     }
 
-    // ... enregistrer le produit ...
+    $relatif = substr($classe, strlen($prefixe));
+    $fichier = __DIR__ . '/' . str_replace('\\', '/', $relatif) . '.php';
 
-    http_response_code(201);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($donnees, JSON_UNESCAPED_UNICODE);
+    if (is_file($fichier)) {
+        require $fichier;
+    }
+});
+```
+
+La convention est la même pour toutes les classes : le nom complet reproduit le chemin du fichier, à partir de `src/`. 
+`App\Core\Request` se trouve donc dans `src/Core/Request.php`, et `App\Controleur\ProduitController` dans `src/Controleur/ProduitController.php`. 
+Ajouter une classe ne demande aucune ligne de plus dans le routeur, pourvu qu'elle respecte cette règle.
+
+### Le routeur
+
+<CodeProgressif fichier="api/index.php" resume="Reçoit toutes les requêtes et les confie à la bonne action.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Point d'entrée unique de toutes les requêtes adressées à l'API.</li>
+  <li>Assemble le service, puis construit la requête, la réponse et le contrôleur.</li>
+  <li>Associe chaque couple méthode et motif d'adresse à une action.</li>
+  <li>Extrait de l'adresse les paramètres désignés dans le motif.</li>
+  <li>Adresse connue, méthode non prévue : 405, avec les méthodes admises.</li>
+  <li>Adresse inconnue : 404.</li>
+  <li>Aucune logique propre à une ressource.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="PRÉPARATION" libelle="charger les classes et la connexion, assembler le service, construire la requête, la réponse et le contrôleur">
+
+```php
+require_once __DIR__ . '/../src/autoload.php';
+require_once __DIR__ . '/../includes/db.php';
+
+$catalogue = new CatalogueService(
+    new ProduitRepository($pdo),
+    new ValidateurProduit(require __DIR__ . '/../includes/categories.php')
+);
+
+$req      = new Request();
+$res      = new Response();
+$produits = new ProduitController($catalogue);
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="ROUTES" libelle="déclarer chaque route : méthode, motif d'adresse, action">
+
+```php
+$routes = [
+    ['GET',    'produits',      [$produits, 'lister']],
+    ['POST',   'produits',      [$produits, 'creer']],
+    ['GET',    'produits/{id}', [$produits, 'afficher']],
+    ['PUT',    'produits/{id}', [$produits, 'remplacer']],
+    ['DELETE', 'produits/{id}', [$produits, 'supprimer']],
+];
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="CORRESPONDANCE" libelle="pour chaque route, transformer le motif en expression régulière et l'essayer sur l'adresse">
+
+```php
+foreach ($routes as [$methode, $motif, $action]) {
+    $regex = '#^' . preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $motif) . '$#';
+
+    if (!preg_match($regex, $req->path, $trouve)) {
+        continue;
+    }
+
+    // suite : comparaison de la méthode
 }
 ```
 
-La requête correspondante précise sa méthode, son en-tête de format et son corps :
+  </EtapeCode>
 
-```http
-POST /api-produits.php
-Content-Type: application/json
-
-{ "nom": "Tire sur la neige", "prix": 6 }
-```
-
-<Highlight couleur="ambre">Un corps JSON n'arrive pas dans `$_POST`, qui est réservé aux corps de formulaire. On le lit avec `php://input`, puis on le décode avec `json_decode`.</Highlight>
-
-### Remplacer et supprimer : PUT et DELETE
-
-Deux autres méthodes complètent l'ensemble. **PUT** remplace une ressource existante, **DELETE** la supprime. On les traite comme POST, en consultant `$_SERVER['REQUEST_METHOD']` :
+  <EtapeCode libelle="méthode différente : la retenir pour un éventuel 405 ; sinon extraire les paramètres et appeler l'action">
 
 ```php
-<?php
-$methode = $_SERVER['REQUEST_METHOD'];
+foreach ($routes as [$methode, $motif, $action]) {
+    // correspondance de l'adresse, ci-dessus
 
-if ($methode === 'PUT') {
-    // remplacer la ressource visée
-} elseif ($methode === 'DELETE') {
-    // supprimer la ressource visée
+    if ($methode !== $req->method) {
+        $permises[] = $methode;
+        continue;
+    }
+
+    $req->params = array_filter($trouve, 'is_string', ARRAY_FILTER_USE_KEY);
+    $action($req, $res);
+    exit;
 }
 ```
 
-Un formulaire HTML ne peut émettre que GET et POST. Les requêtes PUT et DELETE proviennent donc d'un programme ou d'un outil de test, présentés plus bas.
+  </EtapeCode>
 
-### Configuration de XAMPP au besoin
+  <EtapeCode section="AUCUNE ROUTE" libelle="adresse connue sous d'autres méthodes : 405 ; adresse inconnue : 404">
 
-Apache, fourni avec XAMPP, traite GET et POST sans réglage particulier, et PHP reçoit PUT et DELETE de la même façon. Deux besoins peuvent toutefois demander une configuration :
+```php
+if ($permises) {
+    $res->methodNotAllowed($permises);
+} else {
+    $res->notFound('Ressource introuvable.');
+}
+```
 
-- pour des adresses propres comme `/api/produits` au lieu de `?page=api-produits`, activez le module de réécriture (`LoadModule rewrite_module modules/mod_rewrite.so` dans `httpd.conf`) et autorisez les fichiers `.htaccess` avec `AllowOverride All` sur le dossier du projet ;
-- pour recevoir un corps volumineux, les directives `post_max_size` et `upload_max_filesize` de `php.ini` fixent la taille acceptée.
+  </EtapeCode>
 
-Après toute modification de `httpd.conf` ou de `php.ini`, redémarrez Apache depuis le panneau de contrôle de XAMPP.
+</Squelette>
 
-### Un exemple complet à tester
-
-Voici les morceaux précédents réunis en un seul fichier autonome. Déposez-le dans `htdocs`, sous le nom `api-produits.php`, et il répond aux requêtes GET et POST. La persistance des données (base de données ou session) viendra plus tard ; ici, la création renvoie simplement le produit reçu.
+  </Fragment>
+  <Fragment slot="complet">
 
 ```php
 <?php
-// api-produits.php, un point d'accès d'API minimal et complet.
+// api/index.php : point d'entrée unique et routeur de l'API
+use App\Controleur\ProduitController;
+use App\Core\Request;
+use App\Core\Response;
+use App\Modele\ProduitRepository;
+use App\Modele\ValidateurProduit;
+use App\Service\CatalogueService;
 
-header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../src/autoload.php';
+require_once __DIR__ . '/../includes/db.php';
 
-// Données de départ (plus tard : une base de données).
-$produits = [
-    ["nom" => "Sirop d'érable 540 ml", "prix" => 14.50],
-    ["nom" => "Beurre d'érable 250 g", "prix" => 9.95],
-    ["nom" => "Tire sur la neige",     "prix" => 6.00],
+$catalogue = new CatalogueService(
+    new ProduitRepository($pdo),
+    new ValidateurProduit(require __DIR__ . '/../includes/categories.php')
+);
+
+
+$req      = new Request();
+$res      = new Response();
+$produits = new ProduitController($catalogue);
+
+// Méthode, motif d'adresse, action
+$routes = [
+    ['GET',    'produits',      [$produits, 'lister']],
+    ['POST',   'produits',      [$produits, 'creer']],
+    ['GET',    'produits/{id}', [$produits, 'afficher']],
+    ['PUT',    'produits/{id}', [$produits, 'remplacer']],
+    ['DELETE', 'produits/{id}', [$produits, 'supprimer']],
 ];
 
-$methode = $_SERVER['REQUEST_METHOD'];
+$permises = [];
 
-if ($methode === 'GET') {
-    // Lire : renvoyer la liste des produits.
-    echo json_encode($produits, JSON_UNESCAPED_UNICODE);
-    exit;
-}
+foreach ($routes as [$methode, $motif, $action]) {
+    // {id} devient un groupe nommé qui n'accepte que des chiffres
+    $regex = '#^' . preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $motif) . '$#';
 
-if ($methode === 'POST') {
-    // Créer : lire le corps JSON, valider, répondre.
-    $donnees = json_decode(file_get_contents('php://input'), true);
-
-    if (!is_array($donnees) || !isset($donnees['nom'], $donnees['prix'])) {
-        http_response_code(400); // 400 Bad Request
-        echo json_encode(['erreur' => 'Le nom et le prix sont requis.']);
-        exit;
+    if (!preg_match($regex, $req->path, $trouve)) {
+        continue;
     }
 
-    $nouveau = [
-        'nom'  => (string) $donnees['nom'],
-        'prix' => (float) $donnees['prix'],
-    ];
+    if ($methode !== $req->method) {
+        $permises[] = $methode;
+        continue;
+    }
 
-    http_response_code(201); // 201 Created
-    echo json_encode($nouveau, JSON_UNESCAPED_UNICODE);
+    $req->params = array_filter($trouve, 'is_string', ARRAY_FILTER_USE_KEY);
+    $action($req, $res);
     exit;
 }
 
-// Toute autre méthode n'est pas prise en charge.
-http_response_code(405); // 405 Method Not Allowed
-echo json_encode(['erreur' => "Méthode $methode non prise en charge."]);
+if ($permises) {
+    $res->methodNotAllowed($permises);
+} else {
+    $res->notFound('Ressource introuvable.');
+}
 ```
 
-Une fois le fichier en place, la lecture s'obtient avec une requête GET, et la création avec une requête POST accompagnée d'un corps JSON. La sous-section suivante montre comment envoyer ces deux requêtes.
+  </Fragment>
+</CodeProgressif>
 
-### Tester l'API avec Bruno ou Postman
+<Aside type="syntaxe" title="Du motif à l'expression régulière">
+`preg_replace()` remplace chaque `{nom}` du motif par un groupe nommé qui n'accepte que des chiffres : 
+`produits/{id}` devient l'expression `#^produits/(?P<id>\d+)$#`. 
+Quand elle correspond, `preg_match()` range la valeur trouvée sous la clé `id`, que le routeur recopie 
+dans `$req->params`. Une adresse comme `produits/abc` ne correspond à aucune route, d'où un 404 sans code supplémentaire.
+</Aside>
 
-**Bruno** et **Postman** sont des clients d'API qui permettent de composer une requête (méthode, adresse, en-têtes, corps) et examiner la réponse (statut, en-têtes, corps) sans écrire de code.
+Le routeur ne sait rien des produits, et le contrôleur ne sait rien des adresses : 
+ajouter une ressource revient à écrire un contrôleur et à déclarer ses routes. 
+Ni l'un ni l'autre ne contient de règle métier ; tout cela reste dans le service, 
+que les pages HTML et l'API partagent désormais.
 
-- **Postman** est très répandu et conserve les requêtes dans un espace de travail, souvent partagé en ligne.
-- **Bruno** est léger et ouvert ; il enregistre les requêtes dans des fichiers locaux, faciles à versionner avec le code du projet.
+{/* <Aside type="caution" title="Ouvrir l'API à une autre origine">
+Si une page servie ailleurs, par exemple le site du cours en `localhost:4321`, appelle cette API avec `fetch()`, le navigateur bloquera la réponse faute d'autorisation CORS. Une ligne en tête de `index.php` l'accorde à une origine précise : `header('Access-Control-Allow-Origin: http://localhost:4321');`. Les requêtes `PUT` et `DELETE` demandent en outre de répondre à une requête préalable de méthode `OPTIONS`, que le navigateur envoie pour vérifier l'autorisation. Autoriser toutes les origines avec `*` est tentant, mais laisse n'importe quel site utiliser l'API au nom de la personne qui le visite.
+</Aside> */}
 
-Pour tester l'API des produits avec l'un de ces outils, une requête GET vers `http://localhost/api-produits.php` affiche la réponse JSON. 
-Une requête POST vers la même adresse, avec l'en-tête `Content-Type: application/json` et un corps JSON, crée un produit.
+<Aside type="definition" title="curl">
+Outil en ligne de commande qui envoie des requêtes HTTP et affiche la réponse. L'option `-i` montre les en-têtes, `-X` choisit la méthode, `-H` ajoute un en-tête et `-d` fournit le corps. Il est installé d'office sous macOS, sous la plupart des distributions Linux et sous les versions récentes de Windows.
+</Aside>
 
-{/* Une fois la requête mise au point, **`curl`** produit le même résultat en une ligne, pratique pour un test rapide ou un script :
+### Le contrôleur
 
-```sh
-curl http://localhost/api-produits.php
+<CodeProgressif fichier="src/Controleur/ProduitController.php" resume="Les cinq actions de l'API sur les produits.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Traite les opérations de l'API sur la ressource des produits.</li>
+  <li>Reçoit le service du catalogue à la construction.</li>
+  <li>Chaque action reçoit la requête et la réponse, et envoie une seule réponse.</li>
+  <li>Produit absent, en consultation, remplacement ou suppression : 404.</li>
+  <li>Création et remplacement : un objet JSON est exigé, sinon 400 ; données refusées : 422, avec les anomalies par champ.</li>
+  <li>Création réussie : 201, avec l'adresse du nouveau produit.</li>
+  <li>Suppression réussie : 204, sans corps.</li>
+  <li>Aucune règle métier propre : toute opération passe par le service.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="CONSTRUCTION" libelle="recevoir le service du catalogue">
+
+```php
+public function __construct(private CatalogueService $catalogue) {}
 ```
 
-L'option `-i` ajoute les en-têtes de la réponse, ce qui permet de vérifier le `Content-Type` :
+  </EtapeCode>
 
-```sh
-curl -i http://localhost/api-produits.php
+  <EtapeCode section="CONSULTATION" libelle="lister : rendre la représentation de chaque produit">
+
+```php
+public function lister(Request $req, Response $res): void
+{
+    $res->json(array_map(fn(Produit $p) => $this->versTableau($p), $this->catalogue->lister()));
+}
 ```
 
-Pour un envoi en POST, on précise la méthode, l'en-tête et le corps :
+  </EtapeCode>
 
-```sh
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"nom":"Tire sur la neige","prix":6}' \
-     http://localhost/api-produits.php
-``` */}
+  <EtapeCode libelle="afficher : trouver le produit désigné par l'adresse, ou répondre 404">
 
-<MarginNote type="lien">
-Ceci reste un aperçu. La conception des routes, le choix des codes de statut et les contraintes REST seront approfondis plus tard.
+```php
+public function afficher(Request $req, Response $res): void
+{
+    $produit = $this->catalogue->trouver((int) $req->params['id']);
+
+    if ($produit === null) {
+        $res->notFound('Produit introuvable.');
+        return;
+    }
+
+    $res->json($this->versTableau($produit));
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="ÉCRITURE" libelle="créer : exiger un objet JSON, confier l'ajout au service, répondre 201 avec l'adresse">
+
+```php
+public function creer(Request $req, Response $res): void
+{
+    if (!$req->hasJsonBody) {
+        $res->badRequest('Le corps de la requête doit être un objet JSON.');
+        return;
+    }
+
+    try {
+        $produit = $this->catalogue->ajouter($req->body);
+    } catch (DonneesInvalides $e) {
+        $res->unprocessable($e->getErreurs());
+        return;
+    }
+
+    $res->status(201)
+        ->header('Location', 'produits/' . $produit->getId())
+        ->json($this->versTableau($produit));
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="remplacer : vérifier l'existence, exiger un objet JSON, confier la modification au service">
+
+```php
+public function remplacer(Request $req, Response $res): void
+{
+    $id = (int) $req->params['id'];
+
+    if ($this->catalogue->trouver($id) === null) {
+        $res->notFound('Produit introuvable.');
+        return;
+    }
+
+    if (!$req->hasJsonBody) {
+        $res->badRequest('Le corps de la requête doit être un objet JSON.');
+        return;
+    }
+
+    try {
+        $this->catalogue->modifier($id, $req->body);
+    } catch (DonneesInvalides $e) {
+        $res->unprocessable($e->getErreurs());
+        return;
+    }
+
+    $res->json($this->versTableau($this->catalogue->trouver($id)));
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="supprimer : répondre 204 si un produit a disparu, 404 sinon">
+
+```php
+public function supprimer(Request $req, Response $res): void
+{
+    if (!$this->catalogue->retirer((int) $req->params['id'])) {
+        $res->notFound('Produit introuvable.');
+        return;
+    }
+
+    $res->sendStatus(204);
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="REPRÉSENTATION" libelle="transformer un produit en tableau pour le JSON">
+
+```php
+private function versTableau(Produit $produit): array
+{
+    return [
+        'id'        => $produit->getId(),
+        'nom'       => $produit->getNom(),
+        'categorie' => $produit->getCategorie(),
+        'prix'      => $produit->getPrix(),
+        'stock'     => $produit->getStock(),
+    ];
+}
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+
+namespace App\Controleur;
+
+use App\Core\Request;
+use App\Core\Response;
+use App\Modele\Produit;
+use App\Service\CatalogueService;
+use App\Service\DonneesInvalides;
+
+/**
+ * Actions de l'API sur la ressource « produits ».
+ * Chaque action reçoit la requête et la réponse, comme un gestionnaire Express.
+ */
+class ProduitController
+{
+    public function __construct(private CatalogueService $catalogue) {}
+
+    /** GET /produits */
+    public function lister(Request $req, Response $res): void
+    {
+        $res->json(array_map(fn(Produit $p) => $this->versTableau($p), $this->catalogue->lister()));
+    }
+
+    /** GET /produits/{id} */
+    public function afficher(Request $req, Response $res): void
+    {
+        $produit = $this->catalogue->trouver((int) $req->params['id']);
+
+        if ($produit === null) {
+            $res->notFound('Produit introuvable.');
+            return;
+        }
+
+        $res->json($this->versTableau($produit));
+    }
+
+    /** POST /produits */
+    public function creer(Request $req, Response $res): void
+    {
+        if (!$req->hasJsonBody) {
+            $res->badRequest('Le corps de la requête doit être un objet JSON.');
+            return;
+        }
+
+        try {
+            $produit = $this->catalogue->ajouter($req->body);
+        } catch (DonneesInvalides $e) {
+            $res->unprocessable($e->getErreurs());
+            return;
+        }
+
+        $res->status(201)
+            ->header('Location', 'produits/' . $produit->getId())
+            ->json($this->versTableau($produit));
+    }
+
+    /** PUT /produits/{id} */
+    public function remplacer(Request $req, Response $res): void
+    {
+        $id = (int) $req->params['id'];
+
+        if ($this->catalogue->trouver($id) === null) {
+            $res->notFound('Produit introuvable.');
+            return;
+        }
+
+        if (!$req->hasJsonBody) {
+            $res->badRequest('Le corps de la requête doit être un objet JSON.');
+            return;
+        }
+
+        try {
+            $this->catalogue->modifier($id, $req->body);
+        } catch (DonneesInvalides $e) {
+            $res->unprocessable($e->getErreurs());
+            return;
+        }
+
+        $res->json($this->versTableau($this->catalogue->trouver($id)));
+    }
+
+    /** DELETE /produits/{id} */
+    public function supprimer(Request $req, Response $res): void
+    {
+        if (!$this->catalogue->retirer((int) $req->params['id'])) {
+            $res->notFound('Produit introuvable.');
+            return;
+        }
+
+        $res->sendStatus(204);
+    }
+
+    /** Représentation d'un produit, telle que l'API la transmet. */
+    private function versTableau(Produit $produit): array
+    {
+        return [
+            'id'        => $produit->getId(),
+            'nom'       => $produit->getNom(),
+            'categorie' => $produit->getCategorie(),
+            'prix'      => $produit->getPrix(),
+            'stock'     => $produit->getStock(),
+        ];
+    }
+}
+```
+
+  </Fragment>
+</CodeProgressif>
+
+Chaque action se termine par un `return` dès qu'une réponse est envoyée. C'est ce qui garantit qu'elle n'en envoie qu'une : `Response` ignore d'ailleurs tout second envoi, mais compter sur ce garde-fou masquerait une erreur de logique.
+
+<MarginNote type="astuce" titre="Une variante par interface">
+PHP fournit une interface, `JsonSerializable`, que `json_encode()` reconnaît. `Produit` pourrait l'implémenter et décider lui-même de sa représentation. On garde ici `versTableau()` dans le contrôleur : la forme sous laquelle un produit est transmis relève de la présentation, et une autre sortie pourrait en vouloir une autre.
 </MarginNote>
+
+
+### La requête et la réponse
+
+Plutôt que de lire `$_SERVER` ou `php://input` et d'appeler `header()` un peu partout, 
+le routeur construit deux objets et les transmet à l'action. 
+La **requête** rassemble ce que le client a envoyé ; la **réponse** offre des méthodes pour répondre, qui s'enchaînent.
+
+```php
+<?php
+
+namespace App\Core;
+
+/**
+ * Requête HTTP, dans l'esprit de l'objet req d'Express.
+ *
+ * Corrections par rapport à la version d'origine :
+ *  - path est relatif au dossier du point d'entrée : « produits/7 », et non
+ *    « erabliere/api/produits/7 » ;
+ *  - un corps JSON mal formé, ou qui n'est pas un objet, ne provoque plus
+ *    d'erreur de type : body reste vide et hasJsonBody vaut false, ce qui
+ *    permet au contrôleur de répondre 400.
+ */
+class Request
+{
+    public string $method;
+    public string $path;
+    public array $params = [];
+    public array $query = [];
+    public array $body = [];
+    public array $headers = [];
+
+    /** Vrai si le corps de la requête contenait un objet JSON lisible. */
+    public bool $hasJsonBody = false;
+
+    /**
+     * @param string|null $base dossier du point d'entrée ; déduit de
+     *                          SCRIPT_NAME s'il n'est pas fourni
+     */
+    public function __construct(?string $base = null)
+    {
+        $this->method  = $_SERVER['REQUEST_METHOD'];
+        $this->query   = $_GET;
+        $this->headers = function_exists('getallheaders') ? getallheaders() : [];
+
+        // Chemin demandé, débarrassé du dossier qui contient le point d'entrée
+        $chemin = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '';
+        $base ??= rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+
+        if ($base !== '' && str_starts_with($chemin, $base)) {
+            $chemin = substr($chemin, strlen($base));
+        }
+        $this->path = trim($chemin, '/');
+
+        // Corps : absent, objet JSON lisible, ou contenu inexploitable
+        $donnees = json_decode(file_get_contents('php://input'), true);
+
+        if (is_array($donnees)) {
+            $this->body = $donnees;
+            $this->hasJsonBody = true;
+        }
+    }
+}
+```
+
+```php
+<?php
+
+namespace App\Core;
+
+/**
+ * Réponse HTTP, dans l'esprit de l'objet res d'Express.
+ *
+ * Corrections par rapport à la version d'origine :
+ *  - header() permet de poser un en-tête, comme Location ou Allow ;
+ *  - json() précise le jeu de caractères et conserve les accents ;
+ *  - sendStatus() n'écrit plus de corps parasite : il envoie le statut seul ;
+ *  - les réponses d'erreur utilisent les clés « erreur » et « erreurs ».
+ */
+class Response
+{
+    private int $statusCode = 200;
+    private bool $sent = false;
+
+    public function status(int $code): self
+    {
+        $this->statusCode = $code;
+        http_response_code($code);
+        return $this;
+    }
+
+    public function header(string $name, string $value): self
+    {
+        header("$name: $value");
+        return $this;
+    }
+
+    public function send(string $content): void
+    {
+        if ($this->sent) return;
+        echo $content;
+        $this->sent = true;
+    }
+
+    public function json(mixed $data): void
+    {
+        if ($this->sent) return;
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+        $this->sent = true;
+    }
+
+    public function redirect(string $url, int $statusCode = 302): void
+    {
+        if ($this->sent) return;
+        header("Location: $url", true, $statusCode);
+        $this->sent = true;
+    }
+
+    /** Envoie un statut sans corps, par exemple 204 après une suppression. */
+    public function sendStatus(int $code): void
+    {
+        if ($this->sent) return;
+        $this->status($code);
+        $this->sent = true;
+    }
+
+    public function isSent(): bool
+    {
+        return $this->sent;
+    }
+
+    public function badRequest(string $message = 'Requête invalide.'): void
+    {
+        $this->status(400)->json(['erreur' => $message]);
+    }
+
+    public function unauthorized(string $message = 'Authentification requise.'): void
+    {
+        $this->status(401)->json(['erreur' => $message]);
+    }
+
+    public function forbidden(string $message = 'Accès refusé.'): void
+    {
+        $this->status(403)->json(['erreur' => $message]);
+    }
+
+    public function notFound(string $message = 'Ressource introuvable.'): void
+    {
+        $this->status(404)->json(['erreur' => $message]);
+    }
+
+    /** 405 : la ressource existe, mais pas pour cette méthode. */
+    public function methodNotAllowed(array $allowed): void
+    {
+        $this->status(405)
+            ->header('Allow', implode(', ', $allowed))
+            ->json(['erreur' => 'Méthode non prise en charge.']);
+    }
+
+    /** 422 : données lisibles, mais refusées ; anomalies indexées par champ. */
+    public function unprocessable(array $erreurs): void
+    {
+        $this->status(422)->json(['erreurs' => $erreurs]);
+    }
+
+    public function internalServerError(string $message = 'Erreur interne du serveur.'): void
+    {
+        $this->status(500)->json(['erreur' => $message]);
+    }
+
+    public function error(string $message, int $code = 400): void
+    {
+        $this->status($code)->json(['erreur' => $message]);
+    }
+}
+```
+
+<MarginNote type="rappel" titre="Des méthodes qui s'enchaînent">
+`status()` et `header()` rendent l'objet lui-même (`return $this`), ce qui permet d'écrire `$res->status(201)->header('Location', …)->json(…)` sur une seule instruction. `json()` et `sendStatus()`, qui terminent l'échange, ne rendent rien.
+</MarginNote>
+
+Qui connaît Express retrouvera chaque élément.
+
+| Express | Cette API | Rôle |
+| --- | --- | --- |
+| `req.method` | `$req->method` | la méthode HTTP |
+| `req.path` | `$req->path` | le chemin, sans le dossier de l'API |
+| `req.params.id` | `$req->params['id']` | un paramètre extrait de l'adresse |
+| `req.query` | `$req->query` | la chaîne de requête |
+| `req.body` | `$req->body` | le corps JSON décodé |
+| `res.status(201).json(obj)` | `$res->status(201)->json($obj)` | un statut, puis un corps JSON |
+| `res.set('Location', url)` | `$res->header('Location', $url)` | poser un en-tête |
+| `res.sendStatus(204)` | `$res->sendStatus(204)` | un statut seul |
+| `app.get('/produits/:id', h)` | `['GET', 'produits/{id}', $h]` | déclarer une route |
+
+<Aside type="syntaxe" title="Le rôle d'express.json()">
+En Express, `req.body` n'est rempli que si l'intergiciel `express.json()` a lu et décodé le corps. Ici, c'est le constructeur de `Request` qui s'en charge : il lit `php://input`, décode le JSON, et note dans `hasJsonBody` si le corps contenait bien un objet.
+</Aside>
+
+### Un point d'entrée unique avec .htaccess
+
+Une API REST pose un problème que les pages n'avaient pas. L'adresse `/api/produits/7` ne correspond à aucun fichier : il n'existe pas de dossier `produits` contenant un fichier `7`. La page sur les services et MVC avait volontairement évité tout routage, en faisant de chaque fichier un contrôleur. Ici, ce n'est plus possible : l'adresse désigne une ressource, pas un fichier, et il faut un code qui l'interprète.
+
+La solution consiste à confier toutes les requêtes adressées à l'API à un seul fichier, `api/index.php`, qui décompose l'adresse lui-même. C'est le serveur Apache qui s'en charge, grâce à un fichier de configuration.
+
+<Aside type="definition" title=".htaccess, réécriture d'adresse">
+Un fichier `.htaccess` contient des directives de configuration qu'Apache applique au dossier où il se trouve et à ses sous-dossiers, sans avoir à redémarrer le serveur. La **réécriture d'adresse** transforme, avant tout traitement, l'adresse demandée en une autre : le navigateur demande `/api/produits/7`, Apache exécute `index.php`.
+</Aside>
+
+```apache
+# api/.htaccess
+RewriteEngine On
+
+# Les fichiers et dossiers qui existent réellement sont servis tels quels
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Tout le reste est confié à index.php
+RewriteRule ^ index.php [L]
+```
+
+Ligne par ligne :
+
+- `RewriteEngine On` active la réécriture pour ce dossier.
+- Les deux `RewriteCond` limitent la règle aux adresses qui ne désignent ni un fichier (`!-f`) ni un dossier (`!-d`) existants.
+- `RewriteRule` capture tout ce qui suit `api/` dans `$1` et le transmet à `index.php`.
+
+<Aside type="caution" title="Vérifier XAMPP">
+Deux conditions doivent être réunies pour qu'Apache lise ce fichier. Le module de réécriture doit être chargé : dans `httpd.conf`, la ligne `LoadModule rewrite_module modules/mod_rewrite.so` ne doit pas être commentée. Et le dossier doit autoriser les `.htaccess` : `AllowOverride All` pour `htdocs`. XAMPP est généralement configuré ainsi, mais un 404 d'Apache sur `/api/produits` indique le plus souvent que l'une des deux manque. Une erreur 500 signale plutôt une faute de frappe dans le `.htaccess`.
+</Aside>
+
+<MarginNote type="rappel" titre="Propre à Apache">
+Un `.htaccess` n'est lu que par Apache. Le serveur intégré de PHP, `php -S`, l'ignore ; on lui passe plutôt le point d'entrée en argument : `php -S localhost:8000 -t . api/index.php`. Nginx utilise sa propre configuration.
+</MarginNote>
+
+#### Un autre usage : interdire un dossier
+
+Le même mécanisme protège les dossiers qui n'ont pas à être servis directement. Les classes de `src/` ou la connexion de `includes/db.php` n'ont pas à être accessibles par une adresse.
+
+```apache
+# src/.htaccess et includes/.htaccess
+Require all denied
+```
+
+Apache répond alors 403 à toute demande visant ces dossiers, tandis que PHP continue de les charger normalement par `require`.
+
+
+## Récapitulatif
+
+- Une **API** met les opérations d'un logiciel à la disposition d'autres logiciels. Elle permet plusieurs clients, des rythmes d'évolution séparés et une seule mise en œuvre des règles.
+- Elle applique à l'échelle d'un système les principes déjà vus pour les classes : encapsulation, **couplage faible**, responsabilité unique. Une API est une interface : le client dépend de ce qu'elle promet, pas de la façon dont elle le tient.
+- Une API web se conçoit en répondant à une série de questions : adresse, méthode, format, en-têtes, statuts, erreurs, authentification, **CORS**, versionnement, documentation.
+- **REST** organise l'API autour de ressources désignées par des adresses ; la méthode HTTP porte l'action, chaque requête se suffit à elle-même, et le code de statut dit le résultat.
+- `$_POST` ne reçoit que les `POST` encodés comme des formulaires. Un corps JSON se lit par `php://input`, puis `json_decode(..., true)`.
+- Un **.htaccess** confie à Apache la réécriture des adresses vers un point d'entrée unique, qui interprète la route et répond.
+- Le point d'entrée agit comme un **routeur** : il construit une requête et une réponse, à la manière d'Express, et confie chaque couple méthode et adresse à l'action d'un **contrôleur**, qui s'appuie sur le service.
+
+## Quiz
 
 <Quiz
   client:visible
-  question="Comment répondre en JSON à un programme plutôt qu'en HTML ?"
+  question="Une API reçoit un PUT avec un corps JSON. Où PHP place-t-il ce corps ?"
   options={[
-    { texte: "En envoyant json_encode($donnees) avec l'en-tête Content-Type: application/json", correct: true },
-    { texte: "En écrivant le tableau directement avec echo", correct: false },
-    { texte: "En renvoyant une page HTML contenant le tableau", correct: false },
+    { texte: "Dans $_POST, comme pour un formulaire", correct: false },
+    { texte: "Nulle part d'office : il se lit par php://input", correct: true },
+    { texte: "Dans $_GET, puisque PUT n'est pas POST", correct: false },
   ]}
-  retour="json_encode() transforme le tableau en texte JSON, et l'en-tête Content-Type annonce le format au programme qui appelle l'API."
+  retour="$_POST n'est rempli que pour un POST encodé comme un formulaire. Le corps brut, JSON compris, se lit par file_get_contents('php://input')."
 />
 
-### Recap
+<Quiz
+  client:visible
+  question="Que renvoie l'API après un POST qui a créé un produit ?"
+  options={[
+    { texte: "200, et rien d'autre", correct: false },
+    { texte: "201, le produit créé, et son adresse dans l'en-tête Location", correct: true },
+    { texte: "204, puisque la création a réussi", correct: false },
+  ]}
+  retour="201 signale une création. L'en-tête Location indique où trouver la nouvelle ressource, et le corps en donne la représentation, identifiant compris."
+/>
 
-- Une API renvoie les données seules, sans la présentation HTML, dans un format prévu pour les programmes : le JSON le plus souvent, parfois le XML ou le CSV.
-- On distingue une requête d'API par sa route et sa méthode ; un corps JSON se lit avec `php://input`, et non avec `$_POST`.
+<Quiz
+  client:visible
+  question="Quel rôle joue le fichier api/.htaccess ?"
+  options={[
+    { texte: "Il protège l'API par un mot de passe", correct: false },
+    { texte: "Il demande à Apache de confier à index.php les adresses qui ne correspondent à aucun fichier", correct: true },
+    { texte: "Il convertit automatiquement les réponses en JSON", correct: false },
+  ]}
+  retour="/api/produits/7 ne correspond à aucun fichier. La réécriture le transforme en index.php?route=produits/7, et c'est index.php qui interprète la route."
+/>
+
+<Quiz
+  client:visible
+  question="Le serveur de l'API passe de MySQL à une autre base, sans changer les adresses ni les réponses. Que doivent modifier les clients ?"
+  options={[
+    { texte: "Rien : ils ne dépendent que du contrat de l'API", correct: true },
+    { texte: "Leur façon d'interroger la base", correct: false },
+    { texte: "Les noms de colonnes qu'ils utilisent", correct: false },
+  ]}
+  retour="C'est le couplage faible : tant que le contrat est respecté, l'implémentation peut changer entièrement sans que les clients le remarquent."
+/>

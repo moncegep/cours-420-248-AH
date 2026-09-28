@@ -1,5 +1,5 @@
 ---
-title: "Des objets qui collaborent : composition, héritage et interfaces"
+title: "Notions avancées d'orientée objet : composition, héritage et interfaces"
 description: Composition, héritage, classes abstraites et interfaces, polymorphisme, injection par le constructeur, illustrés en JavaScript, en PHP et en Java.
 sidebar:
   order: 10
@@ -654,9 +654,7 @@ La version de `versTableau()` exécutée dépend de l'objet réellement fourni.
 
 </Tabs>
 
-<Highlight couleur="ambre">
-Le polymorphisme permet d'écrire du code qui dépend d'un **contrat** plutôt que d'une classe précise. On peut alors ajouter de nouvelles implémentations sans devoir modifier tout le code qui utilise ce contrat.
-</Highlight>
+<Highlight couleur="ambre">Le polymorphisme permet d'écrire du code qui dépend d'un **contrat** plutôt que d'une classe précise. On peut alors ajouter de nouvelles implémentations sans devoir modifier tout le code qui utilise ce contrat.</Highlight>
 
 Par exemple, si une nouvelle classe `Facture` implémente `Exportable`, `afficherExport()` pourra immédiatement l'utiliser :
 
@@ -1037,9 +1035,7 @@ C'est ici que polymorphisme et injection de dépendances se rejoignent :
 3. Le programme choisit l'objet à fournir à `Commande`.
 4. `Commande` utilise cet objet sans connaître sa classe concrète.
 
-<Highlight couleur="ambre">
-Une classe devrait généralement connaître **ce dont elle a besoin**, mais pas nécessairement décider **quel objet concret créer** pour répondre à ce besoin.
-</Highlight>
+<Highlight couleur="ambre">Une classe devrait généralement connaître **ce dont elle a besoin**, mais pas nécessairement décider **quel objet concret créer** pour répondre à ce besoin.</Highlight>
 
 L'injection par le constructeur rend également les dépendances visibles :
 

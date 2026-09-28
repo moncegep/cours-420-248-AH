@@ -1,0 +1,670 @@
+---
+title: "Guide : Décomposition en classes"
+description: Analyser les responsabilités mêlées dans une page PHP, appliquer le principe de responsabilité unique et en extraire une entité, un dépôt, un validateur et un gestionnaire de messages.
+sidebar:
+  order: 2
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import AnalyseResponsabilites from '../../../components/react/AnalyseResponsabilites.jsx';
+import CodeProgressif from '../../../components/CodeProgressif.astro';
+import Squelette from '../../../components/Squelette.astro';
+import EtapeCode from '../../../components/EtapeCode.astro';
+
+Ce guide applique à un cas concret les notions avancées de programmation orientée objet avec PHP : 
+composition, injection par le constructeur, espaces de noms et chargement automatique. 
+
+Nous reprenons le cas de l'Érablière tel que présenté dans le [guide sur les opérations CRUD](/guides/01-crud).
+
+<MarginNote type="rappel" titre="Prérequis">
+Le code de ce guide suppose la table `produits` créée par `init.sql`.
+</MarginNote>
+
+## Analyser une page PHP typique
+
+La page `produits.php` écrite dans le guide précédent fonctionne parfaitement et permet bien de 
+lister les produits, en ajouter, en retirer, rediriger, afficher des messages.  
+Cependant, tout cela se trouve dans un seul fichier, que tu as peut-être trouvé lourd à écrire et comprendre en un clin d'oeil.
+
+Examinons-le de plus près.
+
+<AnalyseResponsabilites client:visible />
+
+Huit couleurs ont été nécessaires ici, donc huit raisons différentes d'ouvrir ce fichier pour le modifier. 
+- Changer le texte d'un message oblige à relire le SQL qui l'entoure. 
+- Modifier la structure des données utilisées par la page oblige à retrouver les requêtes SQL dispersées dans le fichier.
+
+Rien de tout cela n'est très grave sur un fichier de soixante lignes. 
+La difficulté apparaît quand les pages se multiplient et que les mêmes requêtes y sont recopiées.
+
+<Checkpoint question="Une application mobile a besoin de la liste des produits au format JSON. Quelles lignes de produits.php pouvez-vous réutiliser telles quelles ?">
+Aucune, en pratique. La lecture de la liste est prise entre le traitement du formulaire et le HTML ; 
+pour l'obtenir ailleurs, il faudrait recopier la requête SQL et la conversion des lignes. Dès que la table change, 
+les deux copies doivent changer ensemble, et rien ne garantit qu'on pense aux deux. C'est le symptôme typique d'une responsabilité qui n'a pas de place à elle.
+</Checkpoint>
+
+## Le principe de responsabilité unique
+
+<Highlight couleur="ambre">Une classe devrait n'avoir qu'une seule raison de changer.</Highlight>
+
+Ce principe, formulé par Robert C. Martin, ne dit pas qu'une classe ne doit faire qu'une seule chose ni contenir qu'une seule méthode. Un dépôt de produits peut lister, ajouter et supprimer : ces trois opérations changent pour la même raison, une modification de la table. Le principe demande plutôt que deux préoccupations sans rapport, comme le SQL et la mise en page, n'obligent pas à ouvrir le même fichier.
+
+<Aside type="astuce" title="Découper, mais pas en miettes">
+Une classe par ligne de code serait aussi difficile à suivre qu'un fichier unique. Le bon grain se reconnaît souvent à ceci : on peut nommer la classe d'après ce qu'elle cache au reste du programme, et ce nom tient en quelques mots.
+</Aside>
+
+Appliqué à `produits.php`, le principe répartit les responsabilités ainsi.
+
+| Responsabilité | Responsable | Encapsulation |
+| --- | --- | --- |
+| Accès aux données | `ProduitRepository` | le SQL, les noms de colonnes |
+| Règles de validation | `ValidateurProduit` | le détail des contrôles de chaque champ |
+| État entre requêtes | `MessageFlash` | l'usage de `$_SESSION` |
+| Forme d'un produit | `Produit` | la représentation des données en mémoire |
+| Connexion à la base | `includes/db.php` | les identifiants |
+| Lecture de la requête, navigation, présentation | restent dans la page | traités à la page sur les services et MVC |
+
+```text
+erabliere/
+├── src/
+│   ├── autoload.php
+│   ├── Modele/
+│   │   ├── Produit.php
+│   │   ├── ProduitRepository.php
+│   │   └── ValidateurProduit.php
+│   └── Web/
+│       └── MessageFlash.php
+├── includes/          db.php, categories.php, header.php, footer.php
+├── produits.php
+└── produit-modifier.php
+```
+
+<MarginNote type="rappel" titre="validation.php disparaît">
+La fonction de contrôle de `includes/validation.php` devient une méthode de `ValidateurProduit`. Les deux fonctions d'affichage relèvent de la présentation : elles trouveront leur place parmi les vues, dans la page sur les services et MVC.
+</MarginNote>
+
+## Quatre classes extraites
+
+### Produit : une entité
+
+<Aside type="definition" title="Entité">
+Objet qui représente une chose du domaine, identifiable et durable : un produit, un client, une commande. Une entité porte ses données et les comportements qui en découlent directement, mais ne sait ni se lire ni s'enregistrer elle-même.
+</Aside>
+
+```php
+<?php
+// src/Modele/Produit.php
+namespace App\Modele;
+
+class Produit
+{
+    public function __construct(
+        private ?int $id,
+        private string $nom,
+        private string $categorie,
+        private float $prix,
+        private int $stock
+    ) {}
+
+    public function getId(): ?int          { return $this->id; }
+    public function getNom(): string       { return $this->nom; }
+    public function getCategorie(): string { return $this->categorie; }
+    public function getPrix(): float       { return $this->prix; }
+    public function getStock(): int        { return $this->stock; }
+
+    public function estDisponible(): bool
+    {
+        return $this->stock > 0;
+    }
+}
+```
+
+Le point d'interrogation de `?int` indique que l'identifiant peut valoir `null` : c'est le cas d'un produit qui vient d'être saisi et que la base n'a pas encore numéroté.
+
+<MarginNote type="astuce" titre="Une variante sans accesseurs">
+Depuis PHP 8.1, un attribut déclaré `public readonly` peut être lu de l'extérieur mais pas modifié après la construction. Il remplace alors l'accesseur, sans renoncer à la protection.
+</MarginNote>
+
+### ProduitRepository : l'accès aux données
+
+<Aside type="definition" title="Dépôt">
+Dans notre organisation, le dépôt (souvent appelé *repository*) est la classe chargée de lire et d’écrire une catégorie d’entités dans la base de données.
+</Aside>
+
+<CodeProgressif fichier="src/Modele/ProduitRepository.php" resume="Le seul endroit du programme qui connaît la table des produits.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Seul point d'accès à la table des produits.</li>
+  <li>Reçoit une connexion déjà ouverte.</li>
+  <li>Liste les produits, triés par nom.</li>
+  <li>Trouve un produit par identifiant ; signale l'absence sans erreur.</li>
+  <li>Ajoute un produit et rend l'identifiant attribué.</li>
+  <li>Modifie un produit existant.</li>
+  <li>Retire un produit et indique si une ligne a été retirée.</li>
+  <li>Reçoit et rend des objets produit, jamais des lignes brutes.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="CONSTRUCTION" libelle="recevoir la connexion à la base">
+
+```php
+public function __construct(private PDO $pdo) {}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="LECTURE" libelle="lister tous les produits, triés par nom, convertis en objets">
+
+```php
+public function tous(): array
+{
+    $lignes = $this->pdo
+        ->query('SELECT id, nom, categorie, prix, stock FROM produits ORDER BY nom')
+        ->fetchAll();
+
+    return array_map(fn(array $ligne) => $this->versProduit($ligne), $lignes);
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="trouver un produit par identifiant ; ne rien rendre s'il n'existe pas">
+
+```php
+public function trouver(int $id): ?Produit
+{
+    $requete = $this->pdo->prepare(
+        'SELECT id, nom, categorie, prix, stock FROM produits WHERE id = :id'
+    );
+    $requete->execute(['id' => $id]);
+    $ligne = $requete->fetch();
+
+    return $ligne === false ? null : $this->versProduit($ligne);
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="ÉCRITURE" libelle="ajouter un produit et rendre l'identifiant attribué">
+
+```php
+public function ajouter(Produit $produit): int
+{
+    $requete = $this->pdo->prepare(
+        'INSERT INTO produits (nom, categorie, prix, stock)
+         VALUES (:nom, :categorie, :prix, :stock)'
+    );
+    $requete->execute($this->versParametres($produit));
+
+    return (int) $this->pdo->lastInsertId();
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="modifier un produit existant, désigné par son identifiant">
+
+```php
+public function modifier(Produit $produit): void
+{
+    $requete = $this->pdo->prepare(
+        'UPDATE produits
+            SET nom = :nom, categorie = :categorie, prix = :prix, stock = :stock
+          WHERE id = :id'
+    );
+    $requete->execute($this->versParametres($produit) + ['id' => $produit->getId()]);
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="retirer un produit ; indiquer si une ligne a effectivement disparu">
+
+```php
+public function supprimer(int $id): bool
+{
+    $requete = $this->pdo->prepare('DELETE FROM produits WHERE id = :id');
+    $requete->execute(['id' => $id]);
+
+    return $requete->rowCount() === 1;
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="CONVERSION" libelle="transformer une ligne de la table en objet produit">
+
+```php
+private function versProduit(array $ligne): Produit
+{
+    return new Produit(
+        (int) $ligne['id'],
+        $ligne['nom'],
+        $ligne['categorie'],
+        (float) $ligne['prix'],
+        (int) $ligne['stock']
+    );
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="transformer un objet produit en paramètres de requête">
+
+```php
+private function versParametres(Produit $produit): array
+{
+    return [
+        'nom'       => $produit->getNom(),
+        'categorie' => $produit->getCategorie(),
+        'prix'      => $produit->getPrix(),
+        'stock'     => $produit->getStock(),
+    ];
+}
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+// src/Modele/ProduitRepository.php
+namespace App\Modele;
+
+use PDO;
+
+class ProduitRepository
+{
+    public function __construct(private PDO $pdo) {}
+
+    /** @return Produit[] */
+    public function tous(): array
+    {
+        $lignes = $this->pdo
+            ->query('SELECT id, nom, categorie, prix, stock FROM produits ORDER BY nom')
+            ->fetchAll();
+
+        return array_map(fn(array $ligne) => $this->versProduit($ligne), $lignes);
+    }
+
+    public function trouver(int $id): ?Produit
+    {
+        $requete = $this->pdo->prepare(
+            'SELECT id, nom, categorie, prix, stock FROM produits WHERE id = :id'
+        );
+        $requete->execute(['id' => $id]);
+        $ligne = $requete->fetch();
+
+        return $ligne === false ? null : $this->versProduit($ligne);
+    }
+
+    public function ajouter(Produit $produit): int
+    {
+        $requete = $this->pdo->prepare(
+            'INSERT INTO produits (nom, categorie, prix, stock)
+             VALUES (:nom, :categorie, :prix, :stock)'
+        );
+        $requete->execute($this->versParametres($produit));
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function modifier(Produit $produit): void
+    {
+        $requete = $this->pdo->prepare(
+            'UPDATE produits
+                SET nom = :nom, categorie = :categorie, prix = :prix, stock = :stock
+              WHERE id = :id'
+        );
+        $requete->execute($this->versParametres($produit) + ['id' => $produit->getId()]);
+    }
+
+    public function supprimer(int $id): bool
+    {
+        $requete = $this->pdo->prepare('DELETE FROM produits WHERE id = :id');
+        $requete->execute(['id' => $id]);
+
+        return $requete->rowCount() === 1;
+    }
+
+    private function versProduit(array $ligne): Produit
+    {
+        return new Produit(
+            (int) $ligne['id'],
+            $ligne['nom'],
+            $ligne['categorie'],
+            (float) $ligne['prix'],
+            (int) $ligne['stock']
+        );
+    }
+
+    private function versParametres(Produit $produit): array
+    {
+        return [
+            'nom'       => $produit->getNom(),
+            'categorie' => $produit->getCategorie(),
+            'prix'      => $produit->getPrix(),
+            'stock'     => $produit->getStock(),
+        ];
+    }
+}
+```
+
+  </Fragment>
+</CodeProgressif>
+
+<Aside type="syntaxe" title="use PDO dans un espace de noms">
+À l'intérieur de `namespace App\Modele`, le nom `PDO` désignerait `App\Modele\PDO`, qui n'existe pas. `use PDO;` précise qu'il s'agit de la classe fournie par PHP, rangée dans l'espace de noms global.
+</Aside>
+
+### ValidateurProduit : les règles métier
+
+<CodeProgressif fichier="src/Modele/ValidateurProduit.php" resume="Les exigences qu'un produit doit respecter, et sa construction à partir d'un formulaire.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Règles communes à l'ajout et à la correction d'un produit.</li>
+  <li>Reçoit la liste des catégories admises à la construction.</li>
+  <li>Nom : obligatoire, 100 caractères au plus.</li>
+  <li>Catégorie : doit figurer dans la liste admise.</li>
+  <li>Prix : nombre décimal positif ou nul.</li>
+  <li>Stock : nombre entier positif ou nul.</li>
+  <li>Rend les anomalies, rattachées à leur champ.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="CONSTRUCTION" libelle="recevoir la liste des catégories admises">
+
+```php
+public function __construct(private array $categories) {}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="VALIDER" libelle="partir d'une liste d'anomalies vide">
+
+```php
+$erreurs = [];
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="nom : retirer les espaces de bordure, exiger une valeur d'au plus 100 signes">
+
+```php
+$nom = trim($donnees['nom'] ?? '');
+
+if ($nom === '') {
+    $erreurs['nom'] = 'Le nom est obligatoire.';
+} elseif (mb_strlen($nom) > 100) {
+    $erreurs['nom'] = 'Le nom ne devrait pas dépasser 100 caractères.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="catégorie : exiger une clé de la liste admise">
+
+```php
+if (!array_key_exists(trim($donnees['categorie'] ?? ''), $this->categories)) {
+    $erreurs['categorie'] = 'Choisissez une catégorie de la liste.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="prix : convertir en décimal, exiger une valeur positive ou nulle">
+
+```php
+$prix = filter_var(trim($donnees['prix'] ?? ''), FILTER_VALIDATE_FLOAT);
+
+if ($prix === false || $prix < 0) {
+    $erreurs['prix'] = 'Le prix doit être un nombre positif.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="stock : convertir en entier, exiger une valeur positive ou nulle">
+
+```php
+$stock = filter_var(trim($donnees['stock'] ?? ''), FILTER_VALIDATE_INT);
+
+if ($stock === false || $stock < 0) {
+    $erreurs['stock'] = 'Le stock doit être un entier positif ou nul.';
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="rendre les anomalies">
+
+```php
+return $erreurs;
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```php
+<?php
+// src/Modele/ValidateurProduit.php
+namespace App\Modele;
+
+class ValidateurProduit
+{
+    public function __construct(private array $categories) {}
+
+    /** @return array<string, string> anomalies indexées par champ */
+    public function valider(array $donnees): array
+    {
+        $erreurs = [];
+
+        $nom = trim($donnees['nom'] ?? '');
+        if ($nom === '') {
+            $erreurs['nom'] = 'Le nom est obligatoire.';
+        } elseif (mb_strlen($nom) > 100) {
+            $erreurs['nom'] = 'Le nom ne devrait pas dépasser 100 caractères.';
+        }
+
+        if (!array_key_exists(trim($donnees['categorie'] ?? ''), $this->categories)) {
+            $erreurs['categorie'] = 'Choisissez une catégorie de la liste.';
+        }
+
+        $prix = filter_var(trim($donnees['prix'] ?? ''), FILTER_VALIDATE_FLOAT);
+        if ($prix === false || $prix < 0) {
+            $erreurs['prix'] = 'Le prix doit être un nombre positif.';
+        }
+
+        $stock = filter_var(trim($donnees['stock'] ?? ''), FILTER_VALIDATE_INT);
+        if ($stock === false || $stock < 0) {
+            $erreurs['stock'] = 'Le stock doit être un entier positif ou nul.';
+        }
+
+        return $erreurs;
+    }
+}
+```
+
+  </Fragment>
+</CodeProgressif>
+
+<Aside type="astuce" title="Valider, puis construire">
+`construire()` suppose des données déjà validées : il ne vérifie rien. L'appeler sur des données refusées produirait un produit incohérent. L'ordre d'appel, valider d'abord puis construire seulement en l'absence d'anomalie, fait partie de ce que la page appelante doit respecter.
+</Aside>
+
+### MessageFlash : l'état entre deux requêtes
+
+```php
+<?php
+// src/Web/MessageFlash.php
+namespace App\Web;
+
+class MessageFlash
+{
+    public function deposer(string $texte): void
+    {
+        $_SESSION['message'] = $texte;
+    }
+
+    public function relever(): ?string
+    {
+        $texte = $_SESSION['message'] ?? null;
+        unset($_SESSION['message']);
+
+        return $texte;
+    }
+}
+```
+
+La classe est courte, mais elle est désormais le seul endroit qui connaît la clé `'message'` et la règle « lire puis effacer ». Remplacer la session par un autre mécanisme ne toucherait qu'elle.
+
+## produits.php, réécrit
+
+```
+produits.php
+    │
+    ├── ValidateurProduit
+    │
+    ├── ProduitRepository ──> PDO
+    │          │
+    │          └──> Produit
+    │
+    └── MessageFlash ──> session
+```
+
+La page utilise maintenant ces classes au lieu de faire leur travail.
+
+```php
+<?php
+use App\Modele\ProduitRepository;
+use App\Modele\ValidateurProduit;
+use App\Web\MessageFlash;
+
+require_once __DIR__ . '/src/autoload.php';
+require_once __DIR__ . '/includes/db.php';
+session_start();
+
+$depot      = new ProduitRepository($pdo);
+$validateur = new ValidateurProduit(require __DIR__ . '/includes/categories.php');
+$flash      = new MessageFlash();
+$erreurs    = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'creer') {
+        $erreurs = $validateur->valider($_POST);
+
+        if (!$erreurs) {
+            $produit = new Produit(
+                null,
+                trim($_POST['nom']),
+                trim($_POST['categorie']),
+                (float) $_POST['prix'],
+                (int) $_POST['stock']
+            );
+
+            $depot->ajouter($produit);
+            $flash->deposer('Produit « ' . $produit->getNom() . ' » ajouté.');
+            header('Location: produits.php', true, 303);
+            exit;
+        }
+    }
+
+    if ($action === 'supprimer') {
+        $id = filter_var($_POST['id'] ?? '', FILTER_VALIDATE_INT);
+
+        if ($id !== false) {
+            $flash->deposer($depot->supprimer($id) ? 'Produit supprimé.' : "Ce produit n'existait plus.");
+        }
+
+        header('Location: produits.php', true, 303);
+        exit;
+    }
+}
+
+$produits = $depot->tous();
+$message  = $flash->relever();
+
+// La partie HTML suit, avec $produit->getNom(), $produit->getPrix(), etc.
+```
+
+Il n'y a plus une ligne de SQL ni une seule mention de `$_SESSION` dans la page. 
+Les règles de validation vivent dans une classe que `produit-modifier.php` peut réutiliser telle quelle.
+
+Un futur point d’accès API destiné à l’application mobile peut maintenant obtenir 
+les mêmes produits avec `$depot->tous()`, puis les convertir en JSON, sans recopier le SQL.
+
+La page garde pourtant trois rôles qui ne lui reviennent pas vraiment :
+
+- elle **assemble** elle-même les objets dont elle a besoin, en choisissant les paramètres de chacun ;
+- elle **connaît l'enchaînement** de chaque opération : valider, construire, enregistrer, confirmer, dans cet ordre, sans rien oublier ;
+- elle **mêle** encore ce traitement au HTML qui suit.
+
+La page sur les services et le modèle MVC confie l'enchaînement des opérations à des services, puis sépare traitement et présentation.
+
+## Récapitulatif
+
+- Une page qui mêle connexion, lecture de la requête, validation, SQL, redirection et HTML a autant de **raisons de changer** que de responsabilités, et chacune oblige à relire les autres.
+- Le **principe de responsabilité unique** demande qu'une classe n'ait qu'une seule raison de changer, ce qui n'implique pas qu'elle ne fasse qu'une seule chose.
+- Une **entité** représente une chose du domaine ; un **dépôt** est le seul à la lire et à l'écrire dans la base.
+- Le **validateur** regroupe les règles métier, réutilisables par l'ajout comme par la correction ; il vérifie, puis construit l'entité.
+- Isoler l'accès à la session dans une classe dédiée fait de celle-ci le seul endroit à modifier si le mécanisme change.
+- Après extraction, la page assemble encore les objets, enchaîne les opérations et produit le HTML : trois rôles qui relèvent des services et du modèle MVC.
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Selon le principe de responsabilité unique, une classe devrait…"
+  options={[
+    { texte: "ne contenir qu'une seule méthode publique", correct: false },
+    { texte: "n'avoir qu'une seule raison de changer", correct: true },
+    { texte: "ne manipuler qu'une seule table de la base", correct: false },
+  ]}
+  retour="Un dépôt peut lister, ajouter et supprimer : ces opérations changent toutes pour la même raison, une modification de la table."
+/>
+
+<Quiz
+  client:visible
+  question="La colonne stock est renommée quantite. Avec la nouvelle organisation, quel fichier faut-il modifier en priorité ?"
+  options={[
+    { texte: "produits.php et produit-modifier.php", correct: false },
+    { texte: "ProduitRepository.php", correct: true },
+    { texte: "Produit.php", correct: false },
+  ]}
+  retour="Le dépôt est le seul à connaître les noms de colonnes. L'entité peut garder son attribut stock : la correspondance entre la table et l'objet est justement ce que le dépôt cache."
+/>
+
+<Quiz
+  client:visible
+  question="La page appelle construire() sur des données qui n'ont pas été validées. Que se passe-t-il ?"
+  options={[
+    { texte: "construire() refuse les données et signale une anomalie", correct: false },
+    { texte: "Un produit incohérent peut être créé, car construire() ne vérifie rien", correct: true },
+    { texte: "PHP interdit l'appel tant que valider() n'a pas été exécutée", correct: false },
+  ]}
+  retour="construire() suppose des données déjà validées. Respecter l'ordre, valider puis construire, reste la responsabilité de la page appelante ; la page suivante confiera cet enchaînement à un service."
+/>
