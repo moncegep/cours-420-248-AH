@@ -1,6 +1,6 @@
 ---
 title: "Concevoir une API"
-description: Pourquoi et comment ouvrir son application à d'autres programmes, les principes de l'architecture REST, les méthodes HTTP, la lecture du corps d'une requête en PHP, la réécriture d'adresses avec .htaccess, et une API complète pour le catalogue.
+description: Pourquoi et comment ouvrir son application à d'autres programmes, les principes de l'architecture REST, les méthodes HTTP, puis une API complète pour le catalogue, écrite avec Node.js et Express.
 sidebar:
   order: 12
 ---
@@ -11,53 +11,61 @@ import Highlight from '../../../components/Highlight.astro';
 import Checkpoint from '../../../components/Checkpoint.astro';
 import Quiz from '../../../components/react/Quiz.jsx';
 import FluxSequence from '../../../components/react/FluxSequence.jsx';
+import ConsoleApi from '../../../components/react/ConsoleApi.jsx';
 import CodeProgressif from '../../../components/CodeProgressif.astro';
 import Squelette from '../../../components/Squelette.astro';
 import EtapeCode from '../../../components/EtapeCode.astro';
 
-Jusqu'à date, nous construisions des applications web complètent, mais fermés 
-sur eux même. Grâce à la puissance de PHP, un script pouvait s'occuper de traiter 
-la requête, se connecter à la base de données et formuler des requêtes, puis créer 
-le contenu HTML dynamique.
 
-Ici, nous voyons comment ouvrir son application à d'autres programmes, de façon 
+Jusqu'ici, nous avons construis des applications web complètent, mais fermés 
+sur eux même. Ici, nous voyons comment ouvrir son application à d'autres programmes, de façon 
 organisée et prévisible. Ceci permettra de centraliser la logique métier et l'accès
 aux données tout en laissant flexible l'exploitation et la présentation de ceux-ci.
+
+On change également d'outil pour construire les APIs: **l'API sera écrite en JavaScript, avec Node.js et Express**.
+
 
 ## Pourquoi des API
 
 <Aside type="definition" title="API">
-Une **API**, pour *Application Programming Interface* (interface de programmation d'application), est l'ensemble des opérations qu'un logiciel met à la disposition d'autres logiciels, avec leurs entrées, leurs sorties et leurs règles d'usage. Le logiciel qui utilise l'API s'appelle le **client**.
+Une **API**, pour *Application Programming Interface* (interface de programmation d'application), 
+est l'ensemble des opérations qu'un logiciel ou système met à la disposition d'autres logiciels.
+L'API précise leurs entrées, leurs sorties et leurs règles d'usage.  
+Le logiciel qui utilise l'API s'appelle le **client**.
 </Aside>
 
 ### Ce qui motive une API
 
-Revenons à notre exemple du catalogue de L'Érablière dorée. 
+Revenons à notre exemple du catalogue de *L'Érablière dorée*. 
 Nous avons construit un site web présentant ses produits, mais ce n'est pas nécessairement
-le seule client qui pourrait présenter ou exploiter le catalogue.  
-Une application mobile pourrait également afficher les produits, un partenaire pourrait vouloir les revendre, 
-un script d'un administrateur système pourrait voiloir mettre les stocks à jour. 
+le seule client qui pourrait présenter ou exploiter le catalogue.
+
+#### Autres clients potentiels
+
+- Une application mobile pourrait également afficher les produits
+- un partenaire pourrait vouloir les revendre, 
+- un script d'un administrateur système pourrait voiloir mettre les stocks à jour. 
 
 Sans API, chacun devrait soit accéder directement à la base de données, 
 soit extraire les données du HTML des pages, ce qui n'est pas commode. 
 De plus, le moindre changement au niveau de la base de données ou dans le
 rendu pourrait briser les clients.
 
-Une API vient répondre à quelques besoins récurrents :
+#### Une API vient répondre à quelques besoins récurrents
 
 - **plusieurs clients** pour les mêmes données et les mêmes règles ;
 - **des rythmes séparés** : le client et le serveur évoluent chacun de leur côté, parfois écrits par des équipes différentes, dans des langages différents ;
 - **une seule mise en œuvre** des règles métier, au lieu d'une copie par client ;
 - **exposer une capacité sans exposer l'implémentation** : le client n'a besoin de connaître ni la base, ni le code, ni l'organisation des fichiers.
 
-### Une API est une interface
+{/* ### Une API est une interface
 
 Dans les [notions avancées du POO](/cours/06-poo-2), on définissait une interface 
 comme un contrat au niveau des classes qui énumère des méthodes, sans se fournir
 leur implémentation (code). 
 
 Une API est exactement cela, à l'échelle d'un système : elle énumère des opérations, 
-leurs paramètres et leurs résultats, sans rien dire de la façon dont elles sont réalisées.
+leurs paramètres et leurs résultats, sans rien dire de la façon dont elles sont réalisées. */}
 
 ### Plusieurs sortes d'API
 
@@ -79,27 +87,29 @@ Aucun n'est universellement supérieur ; REST reste le plus répandu pour les AP
 ## L'architecture REST
 
 <Aside type="definition" title="REST">
-**REST**, pour *Representational State Transfer*, est un style d'architecture décrit par Roy Fielding en 2000. Ce n'est ni un protocole ni une norme, mais un ensemble de principes qui s'appuient sur HTTP.
+**REST**, pour *Representational State Transfer*, est un style d'architecture. 
+Ce n'est ni un protocole ni une norme, mais un ensemble de principes qui s'appuient 
+sur le protocole HTTP.
 </Aside>
 
-Les principes REST (Representational State Transfer) décrivent un style architectural 
+Les principes REST décrivent un style architectural 
 pour concevoir des systèmes distribués, notamment des API Web. 
 
 REST définit plusieurs contraintes architecturales. Pour concevoir notre première API, nous en retiendrons principalement trois.
 
-1. Communication client–serveur : le client gère principalement la présentation et les interactions; le serveur gère les ressources, les données et la logique associée. Cette séparation permet aux deux d'évoluer plus indépendamment.
-2. Sans état (stateless) : chaque requête contient toute l'information nécessaire pour être comprise et traitée. Le serveur ne dépend pas d'un état de conversation conservé entre deux requêtes d'un même client.
-3. Interface uniforme : les ressources sont manipulées suivant des conventions communes et prévisibles. C'est probablement la contrainte la plus importante de REST. Elle implique notamment :
+1. **Communication client–serveur** : le client gère principalement la présentation et les interactions; le serveur gère les ressources, les données et la logique associée. Cette séparation permet aux deux d'évoluer plus indépendamment.
+2. **Sans état (stateless)** :chaque requête contient toute l'information nécessaire pour être comprise et traitée. Le serveur ne dépend pas d'un état de conversation conservé entre deux requêtes d'un même client.
+3. **Interface uniforme** : les ressources sont manipulées suivant des conventions communes et prévisibles. C'est probablement la contrainte la plus importante de REST. Elle implique notamment :
     - l'identification des ressources, généralement par des URI;
     - la manipulation des ressources à travers leurs représentations (JSON, XML, etc.);
     - des messages suffisamment explicites pour être compris;
     - idéalement, des liens permettant au client de découvrir les actions ou ressources accessibles (HATEOAS).
 
-<Aside type="caution" title="REST, ou à peu près">
+{/* <Aside type="caution" title="REST, ou à peu près">
 Beaucoup d'API qui se disent REST n'en respectent qu'une partie. Ce n'est pas nécessairement un défaut : l'essentiel, pour un client, est que l'API soit cohérente et documentée. Les principes ci-dessus décrivent une cible raisonnable plutôt qu'un examen à réussir.
-</Aside>
+</Aside> */}
 
-### Application à l'Érablière
+### Application de REST à l'Érablière
 
 Si nous appliquons REST au catalogue de l'Érablière, nous obtenons les cinq points d'accès suivants.
 
@@ -128,134 +138,150 @@ Quelques conventions répandues rendent une API prévisible : des noms plutôt q
 Pour deux raisons. La première est la clarté du contrat : l'adresse désigne toujours la même ressource, et la méthode seule indique l'action, si bien qu'un client qui connaît `/api/produits/7` sait déjà comment la lire, la remplacer et la supprimer. La seconde est la sécurité, déjà rencontrée avec les formulaires : une requête GET peut être déclenchée sans intention, par un préchargement ou un robot, et ne devrait rien modifier.
 </Checkpoint>
 
-## Retour sur les superglobales
+### Préparer le projet
 
-La [page sur les formulaires](/cours/04-formulaire) présentait `$_GET`, `$_POST` et `$_SERVER`. Une API en fait un usage différent, et l'une d'elles réserve une surprise.
+Node.js s'installe depuis `nodejs.org`, en version LTS (*Long Term Support*, la version maintenue le plus longtemps). 
+XAMPP n'intervient pas ici : Node.js est lui-même le serveur.
 
-- `$_SERVER['REQUEST_METHOD']` contient la méthode, quelle qu'elle soit : `PUT` et `DELETE` compris.
-- `$_GET` contient les paramètres de la chaîne de requête, quelle que soit la méthode.
-- `$_POST` n'est rempli que pour une requête `POST` **encodée comme un formulaire**. Un corps JSON, ou n'importe quel corps envoyé avec `PUT`, n'y apparaît pas.
 
-<Highlight couleur="ambre">Pour une API qui reçoit du JSON, `$_POST` reste vide : le corps se lit ailleurs.</Highlight>
+<Aside type="definition" title="Node.js, npm, Express">
+**Node.js** est un environnement qui exécute du JavaScript en dehors du navigateur, par exemple sur un serveur. **npm** est son gestionnaire de paquets : il télécharge les bibliothèques dont un projet dépend et les range dans le dossier `node_modules`. **Express** est l'une de ces bibliothèques : un cadriciel minimal pour écrire des serveurs web et des API avec Node.js.
+</Aside>
 
-| Requête | `$_GET` | `$_POST` | `php://input` |
-| --- | --- | --- | --- |
-| `GET /api/produits?page=2` | `page` | vide | vide |
-| `POST` d'un formulaire HTML | paramètres de l'adresse | les champs | le corps brut |
-| `POST` avec un corps JSON | paramètres de l'adresse | vide | le JSON |
-| `PUT` avec un corps JSON | paramètres de l'adresse | vide | le JSON |
 
-Le corps brut d'une requête se lit par le flux `php://input`, puis se décode avec `json_decode()`.
+```bash
+mkdir erabliere-api
+cd erabliere-api
+npm init -y                  # crée package.json
+npm install express          # télécharge Express
+```
 
-```php
-<?php
-$corps   = file_get_contents('php://input');
-$donnees = json_decode($corps, true);
+<Aside type="definition" title="package.json">
+Fiche d'identité d'un projet Node.js : son nom, ses dépendances et leurs versions, et des scripts à lancer. `npm install` y inscrit chaque paquet installé. Le dossier `node_modules` se reconstruit à partir de ce fichier ; on ne le copie pas et on ne le remet pas avec un travail.
+</Aside>
 
-if (!is_array($donnees)) {
-    // corps absent, vide, ou JSON mal formé
+Deux ajouts au `package.json` créé par `npm init` :
+
+```json
+{
+  "name": "erabliere-api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/serveur.js",
+  "scripts": {
+    "dev": "node --watch src/serveur.js",
+    "start": "node src/serveur.js"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
 }
 ```
 
-<Aside type="syntaxe" title="Le second argument de json_decode">
-Avec `true`, `json_decode()` rend des tableaux associatifs ; sans lui, il rend des objets. Les tableaux s'emploient comme `$_POST`, ce qui permet de transmettre les données au service sans rien changer à celui-ci.
+- `"type": "module"` permet d'écrire `import` et `export`, la syntaxe des modules qu'on retrouvera avec Vue.js.
+- Le script `dev` lance le serveur avec `--watch` : Node.js le redémarre à chaque modification d'un fichier. On le lance par `npm run dev`.
+
+<Aside type="definition" title="Module">
+En JavaScript, un **module** est un fichier qui choisit ce qu'il rend disponible avec `export`, et qui obtient ce dont il a besoin avec `import`. Le reste de son contenu lui demeure privé. C'est l'équivalent, en plus strict, des fichiers PHP inclus avec `require`.
 </Aside>
 
-<MarginNote type="rappel" titre="Une exception">
-Pour un formulaire qui téléverse des fichiers, encodé en `multipart/form-data`, `php://input` reste vide : PHP a déjà réparti le contenu entre `$_POST` et `$_FILES`.
+<MarginNote type="rappel" titre="Deux syntaxes de modules">
+Beaucoup d'exemples en ligne utilisent encore `require()` et `module.exports`. C'est l'ancienne syntaxe de Node.js, nommée CommonJS. Elle fonctionne toujours, mais ne se mélange pas facilement avec `import`.
 </MarginNote>
 
-<Checkpoint question="Votre API reçoit un PUT avec un corps JSON correct, mais le code lit $_POST['nom'] et obtient une erreur. Pourquoi ?">
-Parce que `$_POST` n'est rempli que pour un `POST` encodé comme un formulaire. Avec `PUT`, ou avec un corps JSON quelle que soit la méthode, le contenu reste dans le corps brut de la requête. Il faut le lire par `file_get_contents('php://input')`, puis le décoder avec `json_decode(..., true)`.
+### Un premier serveur
+
+```js
+// src/serveur.js : une première version, remplacée plus bas
+import express from 'express';
+
+const app = express();
+
+app.get('/api/bonjour', (req, res) => {
+  res.json({ message: 'Bonjour du catalogue' });
+});
+
+app.listen(3000, () => {
+  console.log('Serveur prêt : http://localhost:3000/api/bonjour');
+});
+```
+
+- `express()` crée l'**application**, qui recevra toutes les requêtes.
+- `app.get(adresse, fonction)` déclare une **route** : pour une requête `GET` à cette adresse, Express appelle la fonction avec deux objets, la requête `req` et la réponse `res`.
+- `res.json()` convertit l'objet en JSON, pose l'en-tête `Content-Type: application/json` et envoie la réponse.
+- `app.listen(3000)` ouvre le port 3000 et attend les requêtes.
+
+<Aside type="caution" title="Un serveur qui reste en marche">
+En PHP, chaque requête lance l'exécution d'un script, qui se termine avec la réponse : rien ne survit d'une requête à l'autre, d'où les sessions et la base de données. Avec Node.js, c'est **un seul programme** qui démarre, puis qui reste en marche et traite toutes les requêtes. Une variable déclarée hors des routes est donc partagée par toutes les requêtes, et par tous les clients. Elle disparaît seulement quand le serveur s'arrête.
+</Aside>
+
+<Checkpoint question="Le serveur tourne. Vous modifiez le message de la route, sans utiliser --watch, puis vous rechargez la page. Pourquoi voyez-vous encore l'ancien message ?">
+Parce que le programme a lu le fichier au démarrage, et qu'il continue de s'exécuter avec cette version. En PHP, chaque requête relit le fichier, d'où l'effet immédiat d'une modification. Avec Node.js, il faut redémarrer le serveur ; l'option `--watch` le fait automatiquement à chaque enregistrement.
 </Checkpoint>
 
 ## Créer l'API du catalogue
 
-L'API réutilise tout ce qui existe déjà : le fichier d'amorçage, `CatalogueService`, le dépôt et le validateur. 
-Elle s'organise comme une petite application Express : un routeur reçoit chaque requête, et la confie à l'action 
-d'un contrôleur, qui reçoit deux objets, la requête et la réponse.
+L'API offre les cinq points d'accès définis plus haut. Elle se construit en trois étapes, chacune motivée par les limites de la précédente :
+
+1. les cinq points d'accès, dans un seul fichier ;
+2. la vérification de ce que le client envoie ;
+3. l'organisation du code avec un routeur.
+
+Pour se concentrer sur Express, l'API garde ses produits dans un tableau en mémoire, plutôt que dans la base MySQL utilisée par les pages.
+
+### Étape 1 : les cinq points d'accès
+
+Tout tient dans un seul fichier, `src/serveur.js`.
 
 ```text
-erabliere/
-├── api/
-│   ├── .htaccess                      réécriture vers index.php
-│   └── index.php                      point d'entrée unique : le routeur
-├── src/
-│   ├── Core/
-│   │   ├── Request.php                la requête, comme req en Express
-│   │   └── Response.php               la réponse, comme res en Express
-│   ├── Controleur/
-│   │   └── ProduitController.php      les actions sur les produits
-│   └── …                              modèle et service, inchangés
-└── …
+erabliere-api/
+├── package.json
+├── node_modules/        créé par npm install
+└── src/
+    └── serveur.js       les données, les cinq routes et le démarrage
 ```
 
 Voici le trajet d'une création, de la requête du client jusqu'à la réponse.
 
 <FluxSequence
   client:visible
-  titre="Créer un produit par l'API"
+  titre="Créer un produit, étape 1"
   acteurs={[
     { key: 'client', label: 'Client', icone: 'laptop' },
-    { key: 'apache', label: 'Apache', icone: 'server' },
-    { key: 'routeur', label: 'index.php' },
-    { key: 'controleur', label: 'Contrôleur' },
-    { key: 'modele', label: 'Modèle', icone: 'database' },
+    { key: 'serveur', label: 'serveur.js', icone: 'server' },
+    { key: 'donnees', label: 'Tableau en mémoire', icone: 'database' },
   ]}
   etapes={[
     { de: 0, vers: 1, texte: 'POST /api/produits', mono: true, note: 'corps JSON' },
-    { de: 1, vers: 2, texte: 'index.php', mono: true, note: 'réécrit par .htaccess' },
-    { de: 2, vers: 2, texte: 'POST + produits → creer' },
-    { de: 2, vers: 3, texte: 'creer($req, $res)', mono: true },
-    { de: 3, vers: 4, texte: 'ajouter($req->body)', mono: true },
-    { de: 4, vers: 3, texte: 'Produit numéroté' },
-    { de: 3, vers: 0, texte: 'Location: produits/7', statut: 201 },
+    { de: 1, vers: 1, texte: "app.post('/api/produits', …)", mono: true, note: 'req.body' },
+    { de: 1, vers: 2, texte: 'produits.push(produit)', mono: true },
+    { de: 1, vers: 0, texte: 'Location: /api/produits/7', statut: 201 },
   ]}
 />
 
-### Trouver les classes
+Express offre, pour la requête et la réponse, tout ce dont l'API a besoin.
 
-Le routeur utilise huit classes, réparties dans autant de fichiers. 
-C'est le chargeur automatique, présenté dans la page sur les objets qui collaborent, 
-qui permet à PHP de les trouver sans un `require_once` par fichier.
+| Express | Rôle |
+| --- | --- |
+| `app.get(adresse, fonction)`, `app.post(…)`, `app.put(…)`, `app.delete(…)` | déclarer une route pour une méthode et une adresse |
+| `req.params.id` | la partie de l'adresse désignée par `:id`, toujours sous forme de texte |
+| `req.body` | le corps JSON de la requête, déjà décodé |
+| `res.status(404)` | choisir le code de statut ; se combine avec la suite |
+| `res.json(objet)` | envoyer l'objet en JSON |
+| `res.location(adresse)` | poser l'en-tête `Location` |
+| `res.sendStatus(204)` | envoyer un statut seul, sans corps |
 
-```php
-<?php
-// src/autoload.php
+Par défaut, Express ne lit pas le corps d'une requête. La ligne `app.use(express.json())`, placée avant les routes, lui demande de lire le JSON reçu et de le ranger dans `req.body`.
 
-spl_autoload_register(function (string $classe): void {
-    $prefixe = 'App\\';
-
-    if (!str_starts_with($classe, $prefixe)) {
-        return;
-    }
-
-    $relatif = substr($classe, strlen($prefixe));
-    $fichier = __DIR__ . '/' . str_replace('\\', '/', $relatif) . '.php';
-
-    if (is_file($fichier)) {
-        require $fichier;
-    }
-});
-```
-
-La convention est la même pour toutes les classes : le nom complet reproduit le chemin du fichier, à partir de `src/`. 
-`App\Core\Request` se trouve donc dans `src/Core/Request.php`, et `App\Controleur\ProduitController` dans `src/Controleur/ProduitController.php`. 
-Ajouter une classe ne demande aucune ligne de plus dans le routeur, pourvu qu'elle respecte cette règle.
-
-### Le routeur
-
-<CodeProgressif fichier="api/index.php" resume="Reçoit toutes les requêtes et les confie à la bonne action.">
+<CodeProgressif fichier="src/serveur.js" resume="Étape 1 : les données, les cinq points d'accès et le démarrage, dans un seul fichier.">
   <Fragment slot="plan">
 
 <ul class="cspec">
-  <li>Point d'entrée unique de toutes les requêtes adressées à l'API.</li>
-  <li>Assemble le service, puis construit la requête, la réponse et le contrôleur.</li>
-  <li>Associe chaque couple méthode et motif d'adresse à une action.</li>
-  <li>Extrait de l'adresse les paramètres désignés dans le motif.</li>
-  <li>Adresse connue, méthode non prévue : 405, avec les méthodes admises.</li>
-  <li>Adresse inconnue : 404.</li>
-  <li>Aucune logique propre à une ressource.</li>
+  <li>Garde les six produits de départ en mémoire, et attribue un identifiant à chaque nouveau produit.</li>
+  <li>Collection : liste en lecture ; création, réussie avec 201 et l'adresse du nouveau produit.</li>
+  <li>Produit : lecture, remplacement, suppression ; 404 s'il n'existe pas.</li>
+  <li>Suppression réussie : 204, sans corps.</li>
+  <li>Écoute sur le port 3000.</li>
 </ul>
 
   </Fragment>
@@ -263,81 +289,99 @@ Ajouter une classe ne demande aucune ligne de plus dans le routeur, pourvu qu'el
 
 <Squelette>
 
-  <EtapeCode section="PRÉPARATION" libelle="charger les classes et la connexion, assembler le service, construire la requête, la réponse et le contrôleur">
+  <EtapeCode section="PRÉPARATION" libelle="créer l'application, lui demander de lire les corps JSON">
 
-```php
-require_once __DIR__ . '/../src/autoload.php';
-require_once __DIR__ . '/../includes/db.php';
-
-$catalogue = new CatalogueService(
-    new ProduitRepository($pdo),
-    new ValidateurProduit(require __DIR__ . '/../includes/categories.php')
-);
-
-$req      = new Request();
-$res      = new Response();
-$produits = new ProduitController($catalogue);
+```js
+const app = express();
+app.use(express.json());
 ```
 
   </EtapeCode>
 
-  <EtapeCode section="ROUTES" libelle="déclarer chaque route : méthode, motif d'adresse, action">
+  <EtapeCode libelle="garder les produits en mémoire, et le prochain identifiant">
 
-```php
-$routes = [
-    ['GET',    'produits',      [$produits, 'lister']],
-    ['POST',   'produits',      [$produits, 'creer']],
-    ['GET',    'produits/{id}', [$produits, 'afficher']],
-    ['PUT',    'produits/{id}', [$produits, 'remplacer']],
-    ['DELETE', 'produits/{id}', [$produits, 'supprimer']],
+```js
+const produits = [
+  { id: 1, nom: "Sirop d'érable doré 540 ml", categorie: 'sirop', prix: 14.5, stock: 12 },
+  // … les cinq autres produits de départ
 ];
+let prochainId = 7;
 ```
 
   </EtapeCode>
 
-  <EtapeCode section="CORRESPONDANCE" libelle="pour chaque route, transformer le motif en expression régulière et l'essayer sur l'adresse">
+  <EtapeCode section="LECTURE" libelle="GET sur la collection : rendre la liste">
 
-```php
-foreach ($routes as [$methode, $motif, $action]) {
-    $regex = '#^' . preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $motif) . '$#';
-
-    if (!preg_match($regex, $req->path, $trouve)) {
-        continue;
-    }
-
-    // suite : comparaison de la méthode
-}
+```js
+app.get('/api/produits', (req, res) => {
+  res.json(produits);
+});
 ```
 
   </EtapeCode>
 
-  <EtapeCode libelle="méthode différente : la retenir pour un éventuel 405 ; sinon extraire les paramètres et appeler l'action">
+  <EtapeCode libelle="GET sur un produit : le trouver, ou répondre 404">
 
-```php
-foreach ($routes as [$methode, $motif, $action]) {
-    // correspondance de l'adresse, ci-dessus
-
-    if ($methode !== $req->method) {
-        $permises[] = $methode;
-        continue;
-    }
-
-    $req->params = array_filter($trouve, 'is_string', ARRAY_FILTER_USE_KEY);
-    $action($req, $res);
-    exit;
-}
+```js
+app.get('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  if (!produit) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  res.json(produit);
+});
 ```
 
   </EtapeCode>
 
-  <EtapeCode section="AUCUNE ROUTE" libelle="adresse connue sous d'autres méthodes : 405 ; adresse inconnue : 404">
+  <EtapeCode section="ÉCRITURE" libelle="POST : construire le produit à partir du corps, l'ajouter, répondre 201 avec son adresse">
 
-```php
-if ($permises) {
-    $res->methodNotAllowed($permises);
-} else {
-    $res->notFound('Ressource introuvable.');
-}
+```js
+app.post('/api/produits', (req, res) => {
+  const { nom, categorie, prix, stock } = req.body;
+  const produit = { id: prochainId++, nom, categorie, prix, stock };
+  produits.push(produit);
+  res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+});
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="PUT : trouver le produit, ou répondre 404 ; remplacer ses champs">
+
+```js
+app.put('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  // 404 si absent, comme pour GET
+  const { nom, categorie, prix, stock } = req.body;
+  Object.assign(produit, { nom, categorie, prix, stock });
+  res.json(produit);
+});
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="DELETE : retirer le produit du tableau, ou répondre 404 ; répondre 204">
+
+```js
+app.delete('/api/produits/:id', (req, res) => {
+  const position = produits.findIndex((p) => p.id === Number(req.params.id));
+  if (position === -1) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  produits.splice(position, 1);
+  res.sendStatus(204);
+});
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="DÉMARRAGE" libelle="écouter sur le port 3000">
+
+```js
+app.listen(3000, () => {
+  console.log('API du catalogue : http://localhost:3000/api/produits');
+});
 ```
 
   </EtapeCode>
@@ -347,602 +391,905 @@ if ($permises) {
   </Fragment>
   <Fragment slot="complet">
 
-```php
-<?php
-// api/index.php : point d'entrée unique et routeur de l'API
-use App\Controleur\ProduitController;
-use App\Core\Request;
-use App\Core\Response;
-use App\Modele\ProduitRepository;
-use App\Modele\ValidateurProduit;
-use App\Service\CatalogueService;
+```js
+import express from 'express';
 
-require_once __DIR__ . '/../src/autoload.php';
-require_once __DIR__ . '/../includes/db.php';
+const app = express();
 
-$catalogue = new CatalogueService(
-    new ProduitRepository($pdo),
-    new ValidateurProduit(require __DIR__ . '/../includes/categories.php')
-);
+// Permet de lire un corps JSON dans req.body
+app.use(express.json());
 
-
-$req      = new Request();
-$res      = new Response();
-$produits = new ProduitController($catalogue);
-
-// Méthode, motif d'adresse, action
-$routes = [
-    ['GET',    'produits',      [$produits, 'lister']],
-    ['POST',   'produits',      [$produits, 'creer']],
-    ['GET',    'produits/{id}', [$produits, 'afficher']],
-    ['PUT',    'produits/{id}', [$produits, 'remplacer']],
-    ['DELETE', 'produits/{id}', [$produits, 'supprimer']],
+// Les produits, gardés en mémoire tant que le serveur tourne
+const produits = [
+  { id: 1, nom: "Sirop d'érable doré 540 ml",  categorie: 'sirop',      prix: 14.5,  stock: 12 },
+  { id: 2, nom: "Sirop d'érable ambré 540 ml", categorie: 'sirop',      prix: 15.25, stock: 7 },
+  { id: 3, nom: "Beurre d'érable 250 g",       categorie: 'tartinade',  prix: 9.95,  stock: 0 },
+  { id: 4, nom: "Gelée d'érable 190 ml",       categorie: 'tartinade',  prix: 11,    stock: 9 },
+  { id: 5, nom: 'Tire sur la neige',           categorie: 'confiserie', prix: 6.25,  stock: 30 },
+  { id: 6, nom: 'Coffret découverte',          categorie: 'coffret',    prix: 39,    stock: 5 },
 ];
+let prochainId = 7;
 
-$permises = [];
+// GET /api/produits : la liste
+app.get('/api/produits', (req, res) => {
+  res.json(produits);
+});
 
-foreach ($routes as [$methode, $motif, $action]) {
-    // {id} devient un groupe nommé qui n'accepte que des chiffres
-    $regex = '#^' . preg_replace('#\{(\w+)\}#', '(?P<$1>\d+)', $motif) . '$#';
+// GET /api/produits/:id : un produit
+app.get('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  if (!produit) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  res.json(produit);
+});
 
-    if (!preg_match($regex, $req->path, $trouve)) {
-        continue;
-    }
+// POST /api/produits : créer un produit
+app.post('/api/produits', (req, res) => {
+  const { nom, categorie, prix, stock } = req.body;
+  const produit = { id: prochainId++, nom, categorie, prix, stock };
+  produits.push(produit);
+  res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+});
 
-    if ($methode !== $req->method) {
-        $permises[] = $methode;
-        continue;
-    }
+// PUT /api/produits/:id : remplacer un produit
+app.put('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  if (!produit) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  const { nom, categorie, prix, stock } = req.body;
+  Object.assign(produit, { nom, categorie, prix, stock });
+  res.json(produit);
+});
 
-    $req->params = array_filter($trouve, 'is_string', ARRAY_FILTER_USE_KEY);
-    $action($req, $res);
-    exit;
-}
+// DELETE /api/produits/:id : supprimer un produit
+app.delete('/api/produits/:id', (req, res) => {
+  const position = produits.findIndex((p) => p.id === Number(req.params.id));
+  if (position === -1) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  produits.splice(position, 1);
+  res.sendStatus(204);
+});
 
-if ($permises) {
-    $res->methodNotAllowed($permises);
-} else {
-    $res->notFound('Ressource introuvable.');
-}
+app.listen(3000, () => {
+  console.log('API du catalogue : http://localhost:3000/api/produits');
+});
 ```
 
   </Fragment>
 </CodeProgressif>
 
-<Aside type="syntaxe" title="Du motif à l'expression régulière">
-`preg_replace()` remplace chaque `{nom}` du motif par un groupe nommé qui n'accepte que des chiffres : 
-`produits/{id}` devient l'expression `#^produits/(?P<id>\d+)$#`. 
-Quand elle correspond, `preg_match()` range la valeur trouvée sous la clé `id`, que le routeur recopie 
-dans `$req->params`. Une adresse comme `produits/abc` ne correspond à aucune route, d'où un 404 sans code supplémentaire.
+<Aside type="syntaxe" title="return res.status(…)">
+Envoyer une réponse ne termine pas la fonction. Sans `return`, l'exécution continuerait après le 404, et tenterait d'envoyer une seconde réponse : Express signalerait alors l'erreur « Cannot set headers after they are sent ». Le `return` placé devant `res.status(…).json(…)` envoie la réponse et quitte la fonction d'un même geste.
 </Aside>
 
-Le routeur ne sait rien des produits, et le contrôleur ne sait rien des adresses : 
-ajouter une ressource revient à écrire un contrôleur et à déclarer ses routes. 
-Ni l'un ni l'autre ne contient de règle métier ; tout cela reste dans le service, 
-que les pages HTML et l'API partagent désormais.
+<Aside type="caution" title="req.params.id est du texte">
+Dans `/api/produits/7`, `req.params.id` vaut `'7'`, une chaîne. Or `'7' === 7` est faux. D'où le `Number(req.params.id)` avant chaque comparaison. Une adresse comme `/api/produits/abc` donne `NaN`, qui n'est égal à aucun identifiant : la réponse est un 404, sans code supplémentaire.
+</Aside>
 
-{/* <Aside type="caution" title="Ouvrir l'API à une autre origine">
-Si une page servie ailleurs, par exemple le site du cours en `localhost:4321`, appelle cette API avec `fetch()`, le navigateur bloquera la réponse faute d'autorisation CORS. Une ligne en tête de `index.php` l'accorde à une origine précise : `header('Access-Control-Allow-Origin: http://localhost:4321');`. Les requêtes `PUT` et `DELETE` demandent en outre de répondre à une requête préalable de méthode `OPTIONS`, que le navigateur envoie pour vérifier l'autorisation. Autoriser toutes les origines avec `*` est tentant, mais laisse n'importe quel site utiliser l'API au nom de la personne qui le visite.
-</Aside> */}
+<Aside type="caution" title="Des données qui ne durent pas">
+Le tableau vit dans la mémoire du serveur. Les modifications sont visibles par tous les clients tant que le serveur tourne, mais elles disparaissent à chaque redémarrage, y compris ceux que provoque `--watch` à chaque enregistrement. C'est acceptable pour apprendre Express ; ce ne l'est pas pour un vrai catalogue. Une page suivante remplacera ce tableau par la base MySQL.
+</Aside>
+
+#### Mettre l'étape 1 à l'épreuve
+
+Les requêtes prévues fonctionnent. Mais une API ne choisit pas ses clients : n'importe quel programme peut lui envoyer n'importe quoi. Voici ce que répond l'étape 1 à quatre requêtes moins sages.
+
+| Requête | Réponse de l'étape 1 |
+| --- | --- |
+| `POST` avec `{"nom": "Pastilles"}` | 201 : un produit sans catégorie, sans prix ni stock, est créé |
+| `POST` avec un prix de `-3` et la catégorie `fromage` | 201 : le produit est créé tel quel |
+| `POST` sans corps | 500, et une page d'erreur HTML : `req.body` vaut `undefined`, et la route plante |
+| `POST` avec `{"nom":` | 400, mais sous forme de page HTML, illisible pour un programme |
+
+<Highlight couleur="ambre">L'étape 1 croit tout ce que le client lui envoie.</Highlight>
+
+<Checkpoint question="Les pages HTML du catalogue avaient des champs obligatoires et un champ de prix numérique. Pourquoi ces protections ne suffiraient-elles pas pour l'API ?">
+Parce qu'elles vivent dans le formulaire, donc chez le client. Une API ne reçoit pas ses requêtes d'un formulaire qu'elle a elle-même produit : elle les reçoit de `curl`, d'un script, d'une application ou d'une page écrite par d'autres. La seule vérification sur laquelle le serveur peut compter est la sienne. C'était déjà vrai pour les pages, où un formulaire modifié dans le navigateur contourne les attributs `required`.
+</Checkpoint>
+
+### Étape 2 : vérifier ce que le client envoie
+
+Les quatre requêtes de l'épreuve révèlent deux sortes de problèmes, qui appellent deux statuts différents :
+
+- **400** : le corps est absent, illisible, ou n'est pas un objet JSON. L'API ne peut même pas lire la demande.
+- **422** : le corps est un objet lisible, mais ses valeurs sont refusées : nom vide, catégorie inconnue, prix négatif. L'API répond avec les anomalies par champ, sous la clé `erreurs`.
+
+Deux fonctions s'ajoutent en tête du fichier, après les données. Les règles sont celles du guide sur la base de données.
+
+```js
+const categories = ['sirop', 'tartinade', 'confiserie', 'coffret'];
+
+// Vrai si le corps de la requête est un objet JSON (et non un tableau, ou rien)
+function estObjet(corps) {
+  return typeof corps === 'object' && corps !== null && !Array.isArray(corps);
+}
+
+// Vérifie un produit reçu ; rend les anomalies par champ, vide si tout va bien
+function valider(donnees) {
+  const erreurs = {};
+
+  if (typeof donnees.nom !== 'string' || donnees.nom.trim() === '') {
+    erreurs.nom = 'Le nom est obligatoire et doit être du texte.';
+  } else if (donnees.nom.trim().length > 100) {
+    erreurs.nom = 'Le nom ne devrait pas dépasser 100 caractères.';
+  }
+
+  if (!categories.includes(donnees.categorie)) {
+    erreurs.categorie = 'Choisissez une catégorie de la liste.';
+  }
+
+  if (typeof donnees.prix !== 'number' || !(donnees.prix > 0)) {
+    erreurs.prix = 'Le prix doit être un nombre positif.';
+  }
+
+  if (!Number.isInteger(donnees.stock) || donnees.stock < 0) {
+    erreurs.stock = 'Le stock doit être un entier positif ou nul.';
+  }
+
+  return erreurs;
+}
+```
+
+La route de création s'en sert avant d'ajouter quoi que ce soit :
+
+```js
+app.post('/api/produits', (req, res) => {
+  if (!estObjet(req.body)) {
+    return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+  }
+
+  const erreurs = valider(req.body);
+  if (Object.keys(erreurs).length > 0) {
+    return res.status(422).json({ erreurs });
+  }
+
+  const { nom, categorie, prix, stock } = req.body;
+  const produit = { id: prochainId++, nom: nom.trim(), categorie, prix, stock };
+  produits.push(produit);
+  res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+});
+```
+
+La route `PUT` reçoit les mêmes vérifications, après le 404 : on vérifie d'abord que le produit existe, puis ce que le client propose de mettre à sa place.
+
+<MarginNote type="rappel" titre="Des types vérifiés">
+`valider()` exige un prix de type nombre : `"prix": "8"` est refusé, alors que `"prix": 8` est accepté. Un formulaire HTML n'envoie que du texte, d'où les conversions du guide sur la base de données ; un client JSON, lui, peut envoyer le bon type.
+</MarginNote>
+
+{/* Reste le corps illisible, comme `{"nom":`. Ce cas n'atteint jamais la route : `express.json()` échoue avant elle, et Express cherche alors une **fonction de gestion d'erreurs**. Il la reconnaît à ses **quatre** paramètres, `err` en tête. On la déclare après toutes les routes, juste avant `app.listen()`.
+
+```js
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ erreur: "Le corps de la requête n'est pas du JSON valide." });
+  }
+  console.error(err);
+  res.status(500).json({ erreur: 'Erreur interne du serveur.' });
+});
+```
+
+Toute autre erreur imprévue aboutit au même endroit, et reçoit un 500 en JSON, sans détail technique pour le client ; le détail reste dans la console du serveur.
+
+Les quatre requêtes de l'épreuve reçoivent maintenant une réponse utile.
+
+| Requête | Réponse de l'étape 2 |
+| --- | --- |
+| `POST` avec `{"nom": "Pastilles"}` | 422, avec les anomalies sur `categorie`, `prix` et `stock` |
+| `POST` avec un prix de `-3` et la catégorie `fromage` | 422, avec les anomalies sur `categorie` et `prix` |
+| `POST` sans corps | 400, en JSON : le corps doit être un objet JSON |
+| `POST` avec `{"nom":` | 400, en JSON : le corps n'est pas du JSON valide | */}
+
+<details>
+<summary>Le fichier complet après l'étape 2</summary>
+
+```js
+import express from 'express';
+
+const app = express();
+
+// Permet de lire un corps JSON dans req.body
+app.use(express.json());
+
+// Les produits, gardés en mémoire tant que le serveur tourne
+const produits = [
+  { id: 1, nom: "Sirop d'érable doré 540 ml",  categorie: 'sirop',      prix: 14.5,  stock: 12 },
+  { id: 2, nom: "Sirop d'érable ambré 540 ml", categorie: 'sirop',      prix: 15.25, stock: 7 },
+  { id: 3, nom: "Beurre d'érable 250 g",       categorie: 'tartinade',  prix: 9.95,  stock: 0 },
+  { id: 4, nom: "Gelée d'érable 190 ml",       categorie: 'tartinade',  prix: 11,    stock: 9 },
+  { id: 5, nom: 'Tire sur la neige',           categorie: 'confiserie', prix: 6.25,  stock: 30 },
+  { id: 6, nom: 'Coffret découverte',          categorie: 'coffret',    prix: 39,    stock: 5 },
+];
+let prochainId = 7;
+
+const categories = ['sirop', 'tartinade', 'confiserie', 'coffret'];
+
+// Vrai si le corps de la requête est un objet JSON (et non un tableau, ou rien)
+function estObjet(corps) {
+  return typeof corps === 'object' && corps !== null && !Array.isArray(corps);
+}
+
+// Vérifie un produit reçu ; rend les anomalies par champ, vide si tout va bien
+function valider(donnees) {
+  const erreurs = {};
+
+  const nom = String(donnees.nom ?? '').trim();
+  if (nom === '') {
+    erreurs.nom = 'Le nom est obligatoire.';
+  } else if (nom.length > 100) {
+    erreurs.nom = 'Le nom ne devrait pas dépasser 100 caractères.';
+  }
+
+  if (!categories.includes(donnees.categorie)) {
+    erreurs.categorie = 'Choisissez une catégorie de la liste.';
+  }
+
+  if (typeof donnees.prix !== 'number' || !(donnees.prix > 0)) {
+    erreurs.prix = 'Le prix doit être un nombre positif.';
+  }
+
+  if (!Number.isInteger(donnees.stock) || donnees.stock < 0) {
+    erreurs.stock = 'Le stock doit être un entier positif ou nul.';
+  }
+
+  return erreurs;
+}
+
+// GET /api/produits : la liste
+app.get('/api/produits', (req, res) => {
+  res.json(produits);
+});
+
+// GET /api/produits/:id : un produit
+app.get('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  if (!produit) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  res.json(produit);
+});
+
+// POST /api/produits : créer un produit
+app.post('/api/produits', (req, res) => {
+  if (!estObjet(req.body)) {
+    return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+  }
+
+  const erreurs = valider(req.body);
+  if (Object.keys(erreurs).length > 0) {
+    return res.status(422).json({ erreurs });
+  }
+
+  const { nom, categorie, prix, stock } = req.body;
+  const produit = { id: prochainId++, nom: nom.trim(), categorie, prix, stock };
+  produits.push(produit);
+  res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+});
+
+// PUT /api/produits/:id : remplacer un produit
+app.put('/api/produits/:id', (req, res) => {
+  const produit = produits.find((p) => p.id === Number(req.params.id));
+  if (!produit) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  if (!estObjet(req.body)) {
+    return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+  }
+
+  const erreurs = valider(req.body);
+  if (Object.keys(erreurs).length > 0) {
+    return res.status(422).json({ erreurs });
+  }
+
+  const { nom, categorie, prix, stock } = req.body;
+  Object.assign(produit, { nom: nom.trim(), categorie, prix, stock });
+  res.json(produit);
+});
+
+// DELETE /api/produits/:id : supprimer un produit
+app.delete('/api/produits/:id', (req, res) => {
+  const position = produits.findIndex((p) => p.id === Number(req.params.id));
+  if (position === -1) {
+    return res.status(404).json({ erreur: 'Produit introuvable.' });
+  }
+  produits.splice(position, 1);
+  res.sendStatus(204);
+});
+
+app.listen(3000, () => {
+  console.log('API du catalogue : http://localhost:3000/api/produits');
+});
+```
+
+</details>
+
+### Étape 3 : organiser avec un routeur
+
+L'API fonctionne et est encore maintenable. Cependant, `serveur.js` compte déjà 125 lignes, et plusieurs signes montrent qu'il ne tiendra pas longtemps ainsi.
+
+- **Il fait quatre choses à la fois** : il garde les données, applique les règles, déclare les routes et démarre le serveur. Chacune est une raison distincte de le modifier.
+- **Les adresses se répètent** : `'/api/produits'` est écrit deux fois, `'/api/produits/:id'` trois fois. Renommer la ressource, ou la placer sous `/api/v1`, demande de modifier chaque route.
+- **La prochaine ressource s'y mêlera** : les commandes, proposées en exercice plus bas, ajouteraient leurs routes et leurs règles au même fichier.
+
+<Aside type="definition" title="Routeur">
+Un **routeur** Express est un ensemble de routes regroupées dans un module, à la manière d'une petite application. On le branche ensuite sur un **préfixe** d'adresse avec `app.use()`. Les adresses déclarées dans le routeur sont relatives à ce préfixe.
+</Aside>
+
+Le changement tient en peu de lignes :
+
+```js
+// Avant, dans serveur.js
+app.get('/api/produits/:id', (req, res) => { /* … */ });
+
+// Après, dans routes/produits.js
+const router = Router();
+router.get('/:id', (req, res) => { /* … */ });
+export default router;
+
+// Et dans app.js, une seule fois pour toutes les routes des produits
+app.use('/api/produits', router);
+```
+
+Le préfixe n'est plus écrit qu'une fois. 
+
+
+<Aside type='tip' title="Simplifier l'écriture des points d'accès">
+Un routeur offre en plus `router.route(adresse)`, qui regroupe toutes les méthodes d'une même adresse.
+```js
+router.route('/:id')
+  .get((req, res) => { /* … */ })
+  .put((req, res) => { /* … */ })
+  .delete((req, res) => { /* … */ })
+  .all((req, res) => {
+    res.set('Allow', 'GET, PUT, DELETE').status(405).json({ erreur: 'Méthode non prise en charge.' });
+  });
+```
+
+Il se termine par `.all()` pour les méthodes non prévues : c'est là que se place le 405.
+</Aside>
+
+
+Le fichier unique `server.js` se répartit alors en quatre modules, chacun avec une seule raison de changer.
+
+```text
+erabliere-api/
+├── package.json
+└── src/
+    ├── serveur.js             démarre l'écoute
+    ├── app.js                 crée l'application, branche le routeur, traite les cas restants
+    ├── routes/
+    │   └── produits.js        les points d'accès sur les produits, et leurs vérifications
+    └── donnees/
+        └── produits.js        les produits, gardés en mémoire
+```
+
+<FluxSequence
+  client:visible
+  titre="Créer un produit, étape 3"
+  acteurs={[
+    { key: 'client', label: 'Client', icone: 'laptop' },
+    { key: 'app', label: 'app.js', icone: 'server' },
+    { key: 'routeur', label: 'routes/produits.js' },
+    { key: 'donnees', label: 'donnees/produits.js', icone: 'database' },
+  ]}
+  etapes={[
+    { de: 0, vers: 1, texte: 'POST /api/produits', mono: true, note: 'corps JSON' },
+    { de: 1, vers: 1, texte: 'express.json()', mono: true, note: 'req.body' },
+    { de: 1, vers: 2, texte: '/api/produits → routeur', mono: true },
+    { de: 2, vers: 2, texte: 'POST / → valider(req.body)', mono: true },
+    { de: 2, vers: 3, texte: 'produits.push(produit)', mono: true },
+    { de: 2, vers: 0, texte: 'Location: /api/produits/7', statut: 201 },
+  ]}
+/>
+
+#### Les données
+
+Le tableau passe dans son propre module. Il exporte les produits, la liste des catégories permises, et une fonction qui attribue les identifiants ; le compteur `prochainId`, lui, reste privé au module.
+
+```js
+// Les produits du catalogue, gardés en mémoire.
+// Ils sont partagés par toutes les requêtes, et reviennent à cet état
+// à chaque redémarrage du serveur.
+
+export const categories = ['sirop', 'tartinade', 'confiserie', 'coffret'];
+
+export const produits = [
+  { id: 1, nom: "Sirop d'érable doré 540 ml",  categorie: 'sirop',      prix: 14.5,  stock: 12 },
+  { id: 2, nom: "Sirop d'érable ambré 540 ml", categorie: 'sirop',      prix: 15.25, stock: 7 },
+  { id: 3, nom: "Beurre d'érable 250 g",       categorie: 'tartinade',  prix: 9.95,  stock: 0 },
+  { id: 4, nom: "Gelée d'érable 190 ml",       categorie: 'tartinade',  prix: 11,    stock: 9 },
+  { id: 5, nom: 'Tire sur la neige',           categorie: 'confiserie', prix: 6.25,  stock: 30 },
+  { id: 6, nom: 'Coffret découverte',          categorie: 'coffret',    prix: 39,    stock: 5 },
+];
+
+let prochainId = 7;
+
+/** Attribue un identifiant à un nouveau produit. */
+export function nouvelId() {
+  return prochainId++;
+}
+```
+
+#### Le routeur des produits
+
+Les routes de l'étape 2 y passent presque telles quelles : les adresses perdent leur préfixe, et les recherches répétées deviennent une fonction `trouver()`.
+
+<CodeProgressif fichier="src/routes/produits.js" resume="Les cinq points d'accès de l'API sur les produits.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Traite les opérations de l'API sur la collection des produits et sur chaque produit.</li>
+  <li>Collection : liste en lecture ; création, réussie avec 201 et l'adresse du nouveau produit.</li>
+  <li>Produit : lecture, remplacement, suppression ; 404 s'il n'existe pas.</li>
+  <li>Création et remplacement : un objet JSON est exigé, sinon 400 ; données refusées : 422, avec les anomalies par champ.</li>
+  <li>Règles : nom obligatoire d'au plus 100 caractères, catégorie de la liste, prix positif, stock entier positif ou nul.</li>
+  <li>Suppression réussie : 204, sans corps.</li>
+  <li>Méthode non prévue pour une adresse connue : 405, avec les méthodes admises.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="OUTILS" libelle="valider un produit reçu : rendre les anomalies par champ">
+
+```js
+function valider(donnees) {
+  const erreurs = {};
+  // nom, categorie, prix, stock : une règle par champ
+  return erreurs;
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="vérifier que le corps est un objet ; retrouver le produit désigné par l'adresse ; préparer la réponse 405">
+
+```js
+function estObjet(corps) {
+  return typeof corps === 'object' && corps !== null && !Array.isArray(corps);
+}
+
+function trouver(id) {
+  return produits.find((p) => p.id === Number(id));
+}
+
+function nonPermise(methodes) {
+  return (req, res) => {
+    res.set('Allow', methodes).status(405).json({ erreur: 'Méthode non prise en charge.' });
+  };
+}
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="COLLECTION" libelle="GET : rendre la liste">
+
+```js
+router.route('/')
+  .get((req, res) => {
+    res.json(produits);
+  })
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="POST : exiger un objet JSON, valider, ajouter, répondre 201 avec l'adresse">
+
+```js
+  .post((req, res) => {
+    if (!estObjet(req.body)) {
+      return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+    }
+    const erreurs = valider(req.body);
+    if (Object.keys(erreurs).length > 0) {
+      return res.status(422).json({ erreurs });
+    }
+    const { nom, categorie, prix, stock } = req.body;
+    const produit = { id: nouvelId(), nom: nom.trim(), categorie, prix, stock };
+    produits.push(produit);
+    res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+  })
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="PRODUIT" libelle="GET : trouver le produit, ou répondre 404">
+
+```js
+router.route('/:id')
+  .get((req, res) => {
+    const produit = trouver(req.params.id);
+    if (!produit) {
+      return res.status(404).json({ erreur: 'Produit introuvable.' });
+    }
+    res.json(produit);
+  })
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="PUT : vérifier l'existence, exiger un objet JSON, valider, remplacer les champs">
+
+```js
+  .put((req, res) => {
+    const produit = trouver(req.params.id);
+    // 404, 400, 422 : mêmes vérifications que plus haut
+    const { nom, categorie, prix, stock } = req.body;
+    Object.assign(produit, { nom: nom.trim(), categorie, prix, stock });
+    res.json(produit);
+  })
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="DELETE : retirer le produit du tableau, répondre 204">
+
+```js
+  .delete((req, res) => {
+    const position = produits.findIndex((p) => p.id === Number(req.params.id));
+    if (position === -1) {
+      return res.status(404).json({ erreur: 'Produit introuvable.' });
+    }
+    produits.splice(position, 1);
+    res.sendStatus(204);
+  })
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="AUTRES MÉTHODES" libelle="toute autre méthode sur ces adresses : 405, avec les méthodes admises">
+
+```js
+router.route('/')
+  // .get(…) et .post(…), ci-dessus
+  .all(nonPermise('GET, POST'));
+
+router.route('/:id')
+  // .get(…), .put(…) et .delete(…), ci-dessus
+  .all(nonPermise('GET, PUT, DELETE'));
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```js
+import { Router } from 'express';
+import { categories, produits, nouvelId } from '../donnees/produits.js';
+
+const router = Router();
+
+// Vérifie un produit reçu ; rend les anomalies par champ, vide si tout va bien.
+function valider(donnees) {
+  const erreurs = {};
+
+  const nom = String(donnees.nom ?? '').trim();
+  if (nom === '') {
+    erreurs.nom = 'Le nom est obligatoire.';
+  } else if (nom.length > 100) {
+    erreurs.nom = 'Le nom ne devrait pas dépasser 100 caractères.';
+  }
+
+  if (!categories.includes(donnees.categorie)) {
+    erreurs.categorie = 'Choisissez une catégorie de la liste.';
+  }
+
+  if (typeof donnees.prix !== 'number' || !(donnees.prix > 0)) {
+    erreurs.prix = 'Le prix doit être un nombre positif.';
+  }
+
+  if (!Number.isInteger(donnees.stock) || donnees.stock < 0) {
+    erreurs.stock = 'Le stock doit être un entier positif ou nul.';
+  }
+
+  return erreurs;
+}
+
+// Vrai si le corps de la requête est un objet JSON (et non un tableau, ou rien).
+function estObjet(corps) {
+  return typeof corps === 'object' && corps !== null && !Array.isArray(corps);
+}
+
+// Retrouve le produit désigné par :id, ou undefined.
+function trouver(id) {
+  return produits.find((p) => p.id === Number(id));
+}
+
+// Réponse commune aux méthodes non prévues pour une adresse connue.
+function nonPermise(methodes) {
+  return (req, res) => {
+    res.set('Allow', methodes).status(405).json({ erreur: 'Méthode non prise en charge.' });
+  };
+}
+
+router.route('/')
+  // GET /api/produits : la liste
+  .get((req, res) => {
+    res.json(produits);
+  })
+
+  // POST /api/produits : créer un produit
+  .post((req, res) => {
+    if (!estObjet(req.body)) {
+      return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+    }
+
+    const erreurs = valider(req.body);
+    if (Object.keys(erreurs).length > 0) {
+      return res.status(422).json({ erreurs });
+    }
+
+    const { nom, categorie, prix, stock } = req.body;
+    const produit = { id: nouvelId(), nom: nom.trim(), categorie, prix, stock };
+    produits.push(produit);
+
+    res.status(201).location(`/api/produits/${produit.id}`).json(produit);
+  })
+
+  .all(nonPermise('GET, POST'));
+
+router.route('/:id')
+  // GET /api/produits/:id : un produit
+  .get((req, res) => {
+    const produit = trouver(req.params.id);
+    if (!produit) {
+      return res.status(404).json({ erreur: 'Produit introuvable.' });
+    }
+    res.json(produit);
+  })
+
+  // PUT /api/produits/:id : remplacer un produit
+  .put((req, res) => {
+    const produit = trouver(req.params.id);
+    if (!produit) {
+      return res.status(404).json({ erreur: 'Produit introuvable.' });
+    }
+    if (!estObjet(req.body)) {
+      return res.status(400).json({ erreur: 'Le corps de la requête doit être un objet JSON.' });
+    }
+
+    const erreurs = valider(req.body);
+    if (Object.keys(erreurs).length > 0) {
+      return res.status(422).json({ erreurs });
+    }
+
+    const { nom, categorie, prix, stock } = req.body;
+    Object.assign(produit, { nom: nom.trim(), categorie, prix, stock });
+
+    res.json(produit);
+  })
+
+  // DELETE /api/produits/:id : supprimer un produit
+  .delete((req, res) => {
+    const position = produits.findIndex((p) => p.id === Number(req.params.id));
+    if (position === -1) {
+      return res.status(404).json({ erreur: 'Produit introuvable.' });
+    }
+    produits.splice(position, 1);
+    res.sendStatus(204);
+  })
+
+  .all(nonPermise('GET, PUT, DELETE'));
+
+export default router;
+```
+
+  </Fragment>
+</CodeProgressif>
+
+#### L'application
+
+<CodeProgressif fichier="src/app.js" resume="Crée l'application, branche le routeur des produits, traite les cas restants.">
+  <Fragment slot="plan">
+
+<ul class="cspec">
+  <li>Crée l'application Express et l'exporte, sans la démarrer.</li>
+  <li>Lit les corps JSON de toutes les requêtes.</li>
+  <li>Confie les adresses qui commencent par /api/produits au routeur des produits.</li>
+  <li>Adresse qu'aucune route ne traite : 404, en JSON.</li>
+  <li>Corps JSON illisible : 400 ; toute autre erreur : 500, sans détail technique pour le client.</li>
+</ul>
+
+  </Fragment>
+  <Fragment slot="squelette">
+
+<Squelette>
+
+  <EtapeCode section="CRÉATION" libelle="créer l'application, lui demander de lire les corps JSON">
+
+```js
+const app = express();
+app.use(express.json());
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="ROUTES" libelle="brancher le routeur des produits sur son préfixe">
+
+```js
+app.use('/api/produits', produits);
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="CAS RESTANTS" libelle="aucune route n'a répondu : 404">
+
+```js
+app.use((req, res) => {
+  res.status(404).json({ erreur: 'Ressource introuvable.' });
+});
+```
+
+  </EtapeCode>
+
+  <EtapeCode libelle="une erreur est survenue : 400 si le JSON est illisible, 500 sinon">
+
+```js
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ erreur: "Le corps de la requête n'est pas du JSON valide." });
+  }
+  res.status(500).json({ erreur: 'Erreur interne du serveur.' });
+});
+```
+
+  </EtapeCode>
+
+  <EtapeCode section="EXPORT" libelle="rendre l'application disponible, sans la démarrer">
+
+```js
+export default app;
+```
+
+  </EtapeCode>
+
+</Squelette>
+
+  </Fragment>
+  <Fragment slot="complet">
+
+```js
+import express from 'express';
+import produits from './routes/produits.js';
+
+const app = express();
+
+// Permet de lire un corps JSON dans req.body
+app.use(express.json());
+
+// Toutes les adresses qui commencent par /api/produits vont au routeur des produits
+app.use('/api/produits', produits);
+
+// Aucune route n'a répondu : 404 en JSON
+app.use((req, res) => {
+  res.status(404).json({ erreur: 'Ressource introuvable.' });
+});
+
+// Corps JSON illisible (400) ou erreur imprévue (500)
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ erreur: "Le corps de la requête n'est pas du JSON valide." });
+  }
+  console.error(err);
+  res.status(500).json({ erreur: 'Erreur interne du serveur.' });
+});
+
+export default app;
+```
+
+  </Fragment>
+</CodeProgressif>
+
+<Aside type='caution' title="L'ordre de déclaration est important">
+Express examine les `app.use()` et les routes dans l'ordre où ils sont déclarés.
+
+L'ordre a donc un sens :
+
+- `express.json()` vient avant le routeur, sans quoi `req.body` serait vide au moment où les routes le lisent.
+- Le 404 vient après le routeur : il n'est atteint que si aucune route n'a répondu.
+- La fonction de gestion d'erreurs vient en dernier, comme à l'étape 2.
+</Aside>
+
+#### Le démarrage
+
+```js
+import app from './app.js';
+
+const PORT = 3000;
+
+app.listen(PORT, () => {
+  console.log(`API du catalogue : http://localhost:${PORT}/api/produits`);
+});
+```
+
+`app.js` crée l'application, `serveur.js` la démarre. Cette séparation peut sembler excessive pour quelques lignes. Elle permettra plus tard de tester l'application sans ouvrir de port, en important `app.js` seulement.
+
+
+{/* <Checkpoint question="Vous créez un produit avec POST, puis vous modifiez une ligne de routes/produits.js et vous l'enregistrez. Le nouveau produit a disparu de la liste. Pourquoi ?">
+`--watch` a redémarré le serveur après l'enregistrement. Le tableau des produits a été recréé à partir du module `donnees/produits.js`, avec ses six produits de départ. C'est la limite d'un stockage en mémoire, que la base de données lèvera.
+</Checkpoint> */}
+
+{/* ## Essayer l'API
+
+La console ci-dessous reproduit l'API dans le navigateur : mêmes adresses, mêmes règles de validation, mêmes statuts. Elle affiche la requête et la réponse HTTP telles qu'elles circulent, et la commande `curl` qui permet de refaire l'essai sur la vraie API, une fois le serveur lancé.
+
+<ConsoleApi client:visible />
 
 <Aside type="definition" title="curl">
 Outil en ligne de commande qui envoie des requêtes HTTP et affiche la réponse. L'option `-i` montre les en-têtes, `-X` choisit la méthode, `-H` ajoute un en-tête et `-d` fournit le corps. Il est installé d'office sous macOS, sous la plupart des distributions Linux et sous les versions récentes de Windows.
 </Aside>
 
-### Le contrôleur
+```bash
+curl -i http://localhost:3000/api/produits/3
 
-<CodeProgressif fichier="src/Controleur/ProduitController.php" resume="Les cinq actions de l'API sur les produits.">
-  <Fragment slot="plan">
+curl -i -X POST http://localhost:3000/api/produits \
+  -H "Content-Type: application/json" \
+  -d '{"nom": "Sucre granulé 200 g", "categorie": "confiserie", "prix": 8.4, "stock": 15}'
 
-<ul class="cspec">
-  <li>Traite les opérations de l'API sur la ressource des produits.</li>
-  <li>Reçoit le service du catalogue à la construction.</li>
-  <li>Chaque action reçoit la requête et la réponse, et envoie une seule réponse.</li>
-  <li>Produit absent, en consultation, remplacement ou suppression : 404.</li>
-  <li>Création et remplacement : un objet JSON est exigé, sinon 400 ; données refusées : 422, avec les anomalies par champ.</li>
-  <li>Création réussie : 201, avec l'adresse du nouveau produit.</li>
-  <li>Suppression réussie : 204, sans corps.</li>
-  <li>Aucune règle métier propre : toute opération passe par le service.</li>
-</ul>
-
-  </Fragment>
-  <Fragment slot="squelette">
-
-<Squelette>
-
-  <EtapeCode section="CONSTRUCTION" libelle="recevoir le service du catalogue">
-
-```php
-public function __construct(private CatalogueService $catalogue) {}
+curl -i -X DELETE http://localhost:3000/api/produits/7
 ```
 
-  </EtapeCode>
-
-  <EtapeCode section="CONSULTATION" libelle="lister : rendre la représentation de chaque produit">
-
-```php
-public function lister(Request $req, Response $res): void
-{
-    $res->json(array_map(fn(Produit $p) => $this->versTableau($p), $this->catalogue->lister()));
-}
-```
-
-  </EtapeCode>
-
-  <EtapeCode libelle="afficher : trouver le produit désigné par l'adresse, ou répondre 404">
-
-```php
-public function afficher(Request $req, Response $res): void
-{
-    $produit = $this->catalogue->trouver((int) $req->params['id']);
-
-    if ($produit === null) {
-        $res->notFound('Produit introuvable.');
-        return;
-    }
-
-    $res->json($this->versTableau($produit));
-}
-```
-
-  </EtapeCode>
-
-  <EtapeCode section="ÉCRITURE" libelle="créer : exiger un objet JSON, confier l'ajout au service, répondre 201 avec l'adresse">
-
-```php
-public function creer(Request $req, Response $res): void
-{
-    if (!$req->hasJsonBody) {
-        $res->badRequest('Le corps de la requête doit être un objet JSON.');
-        return;
-    }
-
-    try {
-        $produit = $this->catalogue->ajouter($req->body);
-    } catch (DonneesInvalides $e) {
-        $res->unprocessable($e->getErreurs());
-        return;
-    }
-
-    $res->status(201)
-        ->header('Location', 'produits/' . $produit->getId())
-        ->json($this->versTableau($produit));
-}
-```
-
-  </EtapeCode>
-
-  <EtapeCode libelle="remplacer : vérifier l'existence, exiger un objet JSON, confier la modification au service">
-
-```php
-public function remplacer(Request $req, Response $res): void
-{
-    $id = (int) $req->params['id'];
-
-    if ($this->catalogue->trouver($id) === null) {
-        $res->notFound('Produit introuvable.');
-        return;
-    }
-
-    if (!$req->hasJsonBody) {
-        $res->badRequest('Le corps de la requête doit être un objet JSON.');
-        return;
-    }
-
-    try {
-        $this->catalogue->modifier($id, $req->body);
-    } catch (DonneesInvalides $e) {
-        $res->unprocessable($e->getErreurs());
-        return;
-    }
-
-    $res->json($this->versTableau($this->catalogue->trouver($id)));
-}
-```
-
-  </EtapeCode>
-
-  <EtapeCode libelle="supprimer : répondre 204 si un produit a disparu, 404 sinon">
-
-```php
-public function supprimer(Request $req, Response $res): void
-{
-    if (!$this->catalogue->retirer((int) $req->params['id'])) {
-        $res->notFound('Produit introuvable.');
-        return;
-    }
-
-    $res->sendStatus(204);
-}
-```
-
-  </EtapeCode>
-
-  <EtapeCode section="REPRÉSENTATION" libelle="transformer un produit en tableau pour le JSON">
-
-```php
-private function versTableau(Produit $produit): array
-{
-    return [
-        'id'        => $produit->getId(),
-        'nom'       => $produit->getNom(),
-        'categorie' => $produit->getCategorie(),
-        'prix'      => $produit->getPrix(),
-        'stock'     => $produit->getStock(),
-    ];
-}
-```
-
-  </EtapeCode>
-
-</Squelette>
-
-  </Fragment>
-  <Fragment slot="complet">
-
-```php
-<?php
-
-namespace App\Controleur;
-
-use App\Core\Request;
-use App\Core\Response;
-use App\Modele\Produit;
-use App\Service\CatalogueService;
-use App\Service\DonneesInvalides;
-
-/**
- * Actions de l'API sur la ressource « produits ».
- * Chaque action reçoit la requête et la réponse, comme un gestionnaire Express.
- */
-class ProduitController
-{
-    public function __construct(private CatalogueService $catalogue) {}
-
-    /** GET /produits */
-    public function lister(Request $req, Response $res): void
-    {
-        $res->json(array_map(fn(Produit $p) => $this->versTableau($p), $this->catalogue->lister()));
-    }
-
-    /** GET /produits/{id} */
-    public function afficher(Request $req, Response $res): void
-    {
-        $produit = $this->catalogue->trouver((int) $req->params['id']);
-
-        if ($produit === null) {
-            $res->notFound('Produit introuvable.');
-            return;
-        }
-
-        $res->json($this->versTableau($produit));
-    }
-
-    /** POST /produits */
-    public function creer(Request $req, Response $res): void
-    {
-        if (!$req->hasJsonBody) {
-            $res->badRequest('Le corps de la requête doit être un objet JSON.');
-            return;
-        }
-
-        try {
-            $produit = $this->catalogue->ajouter($req->body);
-        } catch (DonneesInvalides $e) {
-            $res->unprocessable($e->getErreurs());
-            return;
-        }
-
-        $res->status(201)
-            ->header('Location', 'produits/' . $produit->getId())
-            ->json($this->versTableau($produit));
-    }
-
-    /** PUT /produits/{id} */
-    public function remplacer(Request $req, Response $res): void
-    {
-        $id = (int) $req->params['id'];
-
-        if ($this->catalogue->trouver($id) === null) {
-            $res->notFound('Produit introuvable.');
-            return;
-        }
-
-        if (!$req->hasJsonBody) {
-            $res->badRequest('Le corps de la requête doit être un objet JSON.');
-            return;
-        }
-
-        try {
-            $this->catalogue->modifier($id, $req->body);
-        } catch (DonneesInvalides $e) {
-            $res->unprocessable($e->getErreurs());
-            return;
-        }
-
-        $res->json($this->versTableau($this->catalogue->trouver($id)));
-    }
-
-    /** DELETE /produits/{id} */
-    public function supprimer(Request $req, Response $res): void
-    {
-        if (!$this->catalogue->retirer((int) $req->params['id'])) {
-            $res->notFound('Produit introuvable.');
-            return;
-        }
-
-        $res->sendStatus(204);
-    }
-
-    /** Représentation d'un produit, telle que l'API la transmet. */
-    private function versTableau(Produit $produit): array
-    {
-        return [
-            'id'        => $produit->getId(),
-            'nom'       => $produit->getNom(),
-            'categorie' => $produit->getCategorie(),
-            'prix'      => $produit->getPrix(),
-            'stock'     => $produit->getStock(),
-        ];
-    }
-}
-```
-
-  </Fragment>
-</CodeProgressif>
-
-Chaque action se termine par un `return` dès qu'une réponse est envoyée. C'est ce qui garantit qu'elle n'en envoie qu'une : `Response` ignore d'ailleurs tout second envoi, mais compter sur ce garde-fou masquerait une erreur de logique.
-
-<MarginNote type="astuce" titre="Une variante par interface">
-PHP fournit une interface, `JsonSerializable`, que `json_encode()` reconnaît. `Produit` pourrait l'implémenter et décider lui-même de sa représentation. On garde ici `versTableau()` dans le contrôleur : la forme sous laquelle un produit est transmis relève de la présentation, et une autre sortie pourrait en vouloir une autre.
+<MarginNote type="astuce" titre="Sans l'en-tête Content-Type">
+`express.json()` ne décode que les corps annoncés comme JSON. Sans `-H "Content-Type: application/json"`, `req.body` reste `undefined`, et l'API répond 400.
 </MarginNote>
 
+## Et ensuite
 
-### La requête et la réponse
+Les données ont quitté le routeur, mais celui-ci porte encore deux responsabilités : traduire HTTP (statuts, en-têtes, corps) et appliquer les règles du catalogue (`valider()`, la construction d'un produit). Chaque besoin à venir alourdira le même fichier.
 
-Plutôt que de lire `$_SERVER` ou `php://input` et d'appeler `header()` un peu partout, 
-le routeur construit deux objets et les transmet à l'action. 
-La **requête** rassemble ce que le client a envoyé ; la **réponse** offre des méthodes pour répondre, qui s'enchaînent.
+- **Base de données.** Remplacer le tableau par MySQL ajoutera des requêtes SQL, et des fonctions `async`, dans chaque route.
+- **Règles métier.** Un stock qui ne descend pas sous zéro, un prix promotionnel, une catégorie qu'on ne peut pas supprimer : autant de règles qui ne relèvent pas de HTTP.
+- **Plusieurs clients du même code.** Un script d'importation voudrait ajouter des produits avec les mêmes règles, sans passer par HTTP.
 
-```php
-<?php
+L'amélioration naturelle reprend le découpage de la page sur les services : un `CatalogueService` qui porte les règles et ne sait rien de HTTP, appelé par des routes réduites à la traduction entre HTTP et le service. Les routes y gagneraient en concision, et le service pourrait être testé seul. Ce découpage fera l'objet d'une page suivante. */}
 
-namespace App\Core;
+## Exercice : la ressource des commandes
 
-/**
- * Requête HTTP, dans l'esprit de l'objet req d'Express.
- *
- * Corrections par rapport à la version d'origine :
- *  - path est relatif au dossier du point d'entrée : « produits/7 », et non
- *    « erabliere/api/produits/7 » ;
- *  - un corps JSON mal formé, ou qui n'est pas un objet, ne provoque plus
- *    d'erreur de type : body reste vide et hasJsonBody vaut false, ce qui
- *    permet au contrôleur de répondre 400.
- */
-class Request
+Ajoutez à l'API une seconde ressource, les commandes, en suivant l'organisation des produits : un module de données `src/donnees/commandes.js`, un routeur `src/routes/commandes.js`, branché dans `app.js` sur `/api/commandes`.
+
+Une commande a la forme suivante :
+
+```json
 {
-    public string $method;
-    public string $path;
-    public array $params = [];
-    public array $query = [];
-    public array $body = [];
-    public array $headers = [];
-
-    /** Vrai si le corps de la requête contenait un objet JSON lisible. */
-    public bool $hasJsonBody = false;
-
-    /**
-     * @param string|null $base dossier du point d'entrée ; déduit de
-     *                          SCRIPT_NAME s'il n'est pas fourni
-     */
-    public function __construct(?string $base = null)
-    {
-        $this->method  = $_SERVER['REQUEST_METHOD'];
-        $this->query   = $_GET;
-        $this->headers = function_exists('getallheaders') ? getallheaders() : [];
-
-        // Chemin demandé, débarrassé du dossier qui contient le point d'entrée
-        $chemin = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '';
-        $base ??= rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-
-        if ($base !== '' && str_starts_with($chemin, $base)) {
-            $chemin = substr($chemin, strlen($base));
-        }
-        $this->path = trim($chemin, '/');
-
-        // Corps : absent, objet JSON lisible, ou contenu inexploitable
-        $donnees = json_decode(file_get_contents('php://input'), true);
-
-        if (is_array($donnees)) {
-            $this->body = $donnees;
-            $this->hasJsonBody = true;
-        }
-    }
+  "id": 1,
+  "client": "Ana Tremblay",
+  "lignes": [
+    { "produitId": 2, "quantite": 3 },
+    { "produitId": 5, "quantite": 1 }
+  ],
+  "total": 52
 }
 ```
 
-```php
-<?php
+| Méthode | Adresse | Réponse en cas de succès | Erreurs |
+| --- | --- | --- | --- |
+| `GET` | `/api/commandes` | 200, la liste | |
+| `GET` | `/api/commandes/:id` | 200, la commande | 404 |
+| `POST` | `/api/commandes` | 201, la commande et son adresse dans `Location` | 400, 422 |
+| `DELETE` | `/api/commandes/:id` | 204 | 404 |
 
-namespace App\Core;
+#### Règles à respecter :
 
-/**
- * Réponse HTTP, dans l'esprit de l'objet res d'Express.
- *
- * Corrections par rapport à la version d'origine :
- *  - header() permet de poser un en-tête, comme Location ou Allow ;
- *  - json() précise le jeu de caractères et conserve les accents ;
- *  - sendStatus() n'écrit plus de corps parasite : il envoie le statut seul ;
- *  - les réponses d'erreur utilisent les clés « erreur » et « erreurs ».
- */
-class Response
-{
-    private int $statusCode = 200;
-    private bool $sent = false;
+1. Le client envoie seulement `client` et `lignes`. Le serveur attribue l'identifiant et **calcule le total** à partir des prix des produits.
+2. `client` est obligatoire. `lignes` est un tableau non vide ; chaque ligne désigne un produit existant, avec une quantité entière d'au moins 1. Toute anomalie produit un 422, avec les clés `client` ou `lignes` dans `erreurs`.
+3. Toute autre méthode répond 405, avec l'en-tête `Allow`.
 
-    public function status(int $code): self
-    {
-        $this->statusCode = $code;
-        http_response_code($code);
-        return $this;
-    }
+{/* **Pour aller plus loin** : refusez une commande dont une quantité dépasse le stock du produit (422), et diminuez le stock des produits commandés quand la commande est acceptée.
 
-    public function header(string $name, string $value): self
-    {
-        header("$name: $value");
-        return $this;
-    }
+<Checkpoint question="Pourquoi le serveur calcule-t-il le total, plutôt que de faire confiance au total envoyé par le client ?">
+Parce que tout ce qui vient du client peut être modifié par lui. Un client qui enverrait `"total": 1` pour une commande de 52 $ fixerait son propre prix. Le serveur ne fait confiance qu'à ses propres données : il retrouve chaque produit, multiplie son prix par la quantité, et additionne.
+</Checkpoint>
 
-    public function send(string $content): void
-    {
-        if ($this->sent) return;
-        echo $content;
-        $this->sent = true;
-    }
-
-    public function json(mixed $data): void
-    {
-        if ($this->sent) return;
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE);
-        $this->sent = true;
-    }
-
-    public function redirect(string $url, int $statusCode = 302): void
-    {
-        if ($this->sent) return;
-        header("Location: $url", true, $statusCode);
-        $this->sent = true;
-    }
-
-    /** Envoie un statut sans corps, par exemple 204 après une suppression. */
-    public function sendStatus(int $code): void
-    {
-        if ($this->sent) return;
-        $this->status($code);
-        $this->sent = true;
-    }
-
-    public function isSent(): bool
-    {
-        return $this->sent;
-    }
-
-    public function badRequest(string $message = 'Requête invalide.'): void
-    {
-        $this->status(400)->json(['erreur' => $message]);
-    }
-
-    public function unauthorized(string $message = 'Authentification requise.'): void
-    {
-        $this->status(401)->json(['erreur' => $message]);
-    }
-
-    public function forbidden(string $message = 'Accès refusé.'): void
-    {
-        $this->status(403)->json(['erreur' => $message]);
-    }
-
-    public function notFound(string $message = 'Ressource introuvable.'): void
-    {
-        $this->status(404)->json(['erreur' => $message]);
-    }
-
-    /** 405 : la ressource existe, mais pas pour cette méthode. */
-    public function methodNotAllowed(array $allowed): void
-    {
-        $this->status(405)
-            ->header('Allow', implode(', ', $allowed))
-            ->json(['erreur' => 'Méthode non prise en charge.']);
-    }
-
-    /** 422 : données lisibles, mais refusées ; anomalies indexées par champ. */
-    public function unprocessable(array $erreurs): void
-    {
-        $this->status(422)->json(['erreurs' => $erreurs]);
-    }
-
-    public function internalServerError(string $message = 'Erreur interne du serveur.'): void
-    {
-        $this->status(500)->json(['erreur' => $message]);
-    }
-
-    public function error(string $message, int $code = 400): void
-    {
-        $this->status($code)->json(['erreur' => $message]);
-    }
-}
-```
-
-<MarginNote type="rappel" titre="Des méthodes qui s'enchaînent">
-`status()` et `header()` rendent l'objet lui-même (`return $this`), ce qui permet d'écrire `$res->status(201)->header('Location', …)->json(…)` sur une seule instruction. `json()` et `sendStatus()`, qui terminent l'échange, ne rendent rien.
-</MarginNote>
-
-Qui connaît Express retrouvera chaque élément.
-
-| Express | Cette API | Rôle |
-| --- | --- | --- |
-| `req.method` | `$req->method` | la méthode HTTP |
-| `req.path` | `$req->path` | le chemin, sans le dossier de l'API |
-| `req.params.id` | `$req->params['id']` | un paramètre extrait de l'adresse |
-| `req.query` | `$req->query` | la chaîne de requête |
-| `req.body` | `$req->body` | le corps JSON décodé |
-| `res.status(201).json(obj)` | `$res->status(201)->json($obj)` | un statut, puis un corps JSON |
-| `res.set('Location', url)` | `$res->header('Location', $url)` | poser un en-tête |
-| `res.sendStatus(204)` | `$res->sendStatus(204)` | un statut seul |
-| `app.get('/produits/:id', h)` | `['GET', 'produits/{id}', $h]` | déclarer une route |
-
-<Aside type="syntaxe" title="Le rôle d'express.json()">
-En Express, `req.body` n'est rempli que si l'intergiciel `express.json()` a lu et décodé le corps. Ici, c'est le constructeur de `Request` qui s'en charge : il lit `php://input`, décode le JSON, et note dans `hasJsonBody` si le corps contenait bien un objet.
-</Aside>
-
-### Un point d'entrée unique avec .htaccess
-
-Une API REST pose un problème que les pages n'avaient pas. L'adresse `/api/produits/7` ne correspond à aucun fichier : il n'existe pas de dossier `produits` contenant un fichier `7`. La page sur les services et MVC avait volontairement évité tout routage, en faisant de chaque fichier un contrôleur. Ici, ce n'est plus possible : l'adresse désigne une ressource, pas un fichier, et il faut un code qui l'interprète.
-
-La solution consiste à confier toutes les requêtes adressées à l'API à un seul fichier, `api/index.php`, qui décompose l'adresse lui-même. C'est le serveur Apache qui s'en charge, grâce à un fichier de configuration.
-
-<Aside type="definition" title=".htaccess, réécriture d'adresse">
-Un fichier `.htaccess` contient des directives de configuration qu'Apache applique au dossier où il se trouve et à ses sous-dossiers, sans avoir à redémarrer le serveur. La **réécriture d'adresse** transforme, avant tout traitement, l'adresse demandée en une autre : le navigateur demande `/api/produits/7`, Apache exécute `index.php`.
-</Aside>
-
-```apache
-# api/.htaccess
-RewriteEngine On
-
-# Les fichiers et dossiers qui existent réellement sont servis tels quels
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-
-# Tout le reste est confié à index.php
-RewriteRule ^ index.php [L]
-```
-
-Ligne par ligne :
-
-- `RewriteEngine On` active la réécriture pour ce dossier.
-- Les deux `RewriteCond` limitent la règle aux adresses qui ne désignent ni un fichier (`!-f`) ni un dossier (`!-d`) existants.
-- `RewriteRule` capture tout ce qui suit `api/` dans `$1` et le transmet à `index.php`.
-
-<Aside type="caution" title="Vérifier XAMPP">
-Deux conditions doivent être réunies pour qu'Apache lise ce fichier. Le module de réécriture doit être chargé : dans `httpd.conf`, la ligne `LoadModule rewrite_module modules/mod_rewrite.so` ne doit pas être commentée. Et le dossier doit autoriser les `.htaccess` : `AllowOverride All` pour `htdocs`. XAMPP est généralement configuré ainsi, mais un 404 d'Apache sur `/api/produits` indique le plus souvent que l'une des deux manque. Une erreur 500 signale plutôt une faute de frappe dans le `.htaccess`.
-</Aside>
-
-<MarginNote type="rappel" titre="Propre à Apache">
-Un `.htaccess` n'est lu que par Apache. Le serveur intégré de PHP, `php -S`, l'ignore ; on lui passe plutôt le point d'entrée en argument : `php -S localhost:8000 -t . api/index.php`. Nginx utilise sa propre configuration.
-</MarginNote>
-
-#### Un autre usage : interdire un dossier
-
-Le même mécanisme protège les dossiers qui n'ont pas à être servis directement. Les classes de `src/` ou la connexion de `includes/db.php` n'ont pas à être accessibles par une adresse.
-
-```apache
-# src/.htaccess et includes/.htaccess
-Require all denied
-```
-
-Apache répond alors 403 à toute demande visant ces dossiers, tandis que PHP continue de les charger normalement par `require`.
-
+<Checkpoint question="Le tableau ci-dessus ne prévoit aucun PUT sur une commande. Qu'est-ce qui pourrait le justifier ?">
+Une commande passée est un engagement : la remplacer entièrement après coup brouillerait l'historique, et le total pourrait ne plus correspondre aux prix du moment. On préfère souvent l'annuler et en passer une nouvelle. Une API réelle offrirait plutôt des opérations ciblées, comme changer le statut d'une commande. C'est un choix de conception, pas une contrainte de REST.
+</Checkpoint> */}
 
 ## Récapitulatif
 
@@ -950,21 +1297,45 @@ Apache répond alors 403 à toute demande visant ces dossiers, tandis que PHP co
 - Elle applique à l'échelle d'un système les principes déjà vus pour les classes : encapsulation, **couplage faible**, responsabilité unique. Une API est une interface : le client dépend de ce qu'elle promet, pas de la façon dont elle le tient.
 - Une API web se conçoit en répondant à une série de questions : adresse, méthode, format, en-têtes, statuts, erreurs, authentification, **CORS**, versionnement, documentation.
 - **REST** organise l'API autour de ressources désignées par des adresses ; la méthode HTTP porte l'action, chaque requête se suffit à elle-même, et le code de statut dit le résultat.
-- `$_POST` ne reçoit que les `POST` encodés comme des formulaires. Un corps JSON se lit par `php://input`, puis `json_decode(..., true)`.
-- Un **.htaccess** confie à Apache la réécriture des adresses vers un point d'entrée unique, qui interprète la route et répond.
-- Le point d'entrée agit comme un **routeur** : il construit une requête et une réponse, à la manière d'Express, et confie chaque couple méthode et adresse à l'action d'un **contrôleur**, qui s'appuie sur le service.
+- **Node.js** exécute du JavaScript sur le serveur ; un seul programme reste en marche et traite toutes les requêtes. **Express** fournit le routage et les objets `req` et `res`.
+- `express.json()` décode le corps JSON dans `req.body` ; `req.params` contient les parties variables de l'adresse, sous forme de texte.
+- Une API ne choisit pas ses clients : elle vérifie elle-même ce qu'elle reçoit. Un corps illisible ou absent mérite un **400** ; des valeurs refusées, un **422**, avec les anomalies par champ.
+- Un **routeur** regroupe les routes d'une ressource ; `app.js` le branche sur un préfixe, puis traite les cas restants : 404, puis les erreurs. `router.route()` regroupe les méthodes d'une adresse, et `.all()` répond 405 aux autres.
+{/* - Des données gardées en mémoire sont partagées par tous les clients, mais disparaissent au redémarrage du serveur. */}
 
-## Quiz
+{/* ## Quiz
 
 <Quiz
   client:visible
-  question="Une API reçoit un PUT avec un corps JSON. Où PHP place-t-il ce corps ?"
+  question="Une route lit req.body et obtient undefined, alors que le client a bien envoyé du JSON. Quelle est la cause la plus probable ?"
   options={[
-    { texte: "Dans $_POST, comme pour un formulaire", correct: false },
-    { texte: "Nulle part d'office : il se lit par php://input", correct: true },
-    { texte: "Dans $_GET, puisque PUT n'est pas POST", correct: false },
+    { texte: "express.json() n'est pas déclaré, ou l'est après le routeur", correct: true },
+    { texte: "Le JSON doit d'abord être lu par php://input", correct: false },
+    { texte: "req.body n'existe que pour les requêtes GET", correct: false },
   ]}
-  retour="$_POST n'est rempli que pour un POST encodé comme un formulaire. Le corps brut, JSON compris, se lit par file_get_contents('php://input')."
+  retour="req.body n'est rempli que si express.json() a décodé le corps avant que la route ne s'exécute. app.use(express.json()) doit donc être déclaré avant les routes. Le client doit aussi envoyer l'en-tête Content-Type: application/json."
+/>
+
+<Quiz
+  client:visible
+  question="Quelle méthode est idempotente sans être sûre ?"
+  options={[
+    { texte: "GET", correct: false },
+    { texte: "POST", correct: false },
+    { texte: "PUT", correct: true },
+  ]}
+  retour="PUT modifie le serveur, donc n'est pas sûre ; mais l'envoyer deux fois laisse le même état qu'un seul envoi. GET est à la fois sûre et idempotente, POST n'est ni l'une ni l'autre."
+/>
+
+<Quiz
+  client:visible
+  question="Le client envoie un objet JSON lisible, mais avec un prix négatif. Quel statut l'API répond-elle ?"
+  options={[
+    { texte: "400 : la requête est mauvaise", correct: false },
+    { texte: "422 : la requête est lisible, mais ses valeurs sont refusées", correct: true },
+    { texte: "500 : le serveur ne peut pas traiter ce prix", correct: false },
+  ]}
+  retour="400 signale un corps que l'API ne peut même pas lire : absent, mal formé, ou qui n'est pas un objet. Ici, le corps est lisible ; ce sont ses valeurs qui sont refusées, d'où 422 et les anomalies par champ."
 />
 
 <Quiz
@@ -980,22 +1351,22 @@ Apache répond alors 403 à toute demande visant ces dossiers, tandis que PHP co
 
 <Quiz
   client:visible
-  question="Quel rôle joue le fichier api/.htaccess ?"
+  question="Deux personnes utilisent l'API en même temps. L'une crée un produit. L'autre le voit-elle dans la liste ?"
   options={[
-    { texte: "Il protège l'API par un mot de passe", correct: false },
-    { texte: "Il demande à Apache de confier à index.php les adresses qui ne correspondent à aucun fichier", correct: true },
-    { texte: "Il convertit automatiquement les réponses en JSON", correct: false },
+    { texte: "Oui : le tableau vit dans le serveur, qui est le même pour tous les clients", correct: true },
+    { texte: "Non : chaque client a sa propre copie du tableau", correct: false },
+    { texte: "Non : rien ne survit d'une requête à l'autre", correct: false },
   ]}
-  retour="/api/produits/7 ne correspond à aucun fichier. La réécriture le transforme en index.php?route=produits/7, et c'est index.php qui interprète la route."
+  retour="Avec Node.js, un seul programme traite toutes les requêtes ; le tableau est donc partagé. Il disparaît seulement au redémarrage du serveur. C'est en PHP que chaque requête repart de zéro."
 />
 
 <Quiz
   client:visible
-  question="Le serveur de l'API passe de MySQL à une autre base, sans changer les adresses ni les réponses. Que doivent modifier les clients ?"
+  question="Le serveur de l'API passe d'un tableau en mémoire à MySQL, sans changer les adresses ni les réponses. Que doivent modifier les clients ?"
   options={[
     { texte: "Rien : ils ne dépendent que du contrat de l'API", correct: true },
     { texte: "Leur façon d'interroger la base", correct: false },
     { texte: "Les noms de colonnes qu'ils utilisent", correct: false },
   ]}
   retour="C'est le couplage faible : tant que le contrat est respecté, l'implémentation peut changer entièrement sans que les clients le remarquent."
-/>
+/> */}

@@ -1,0 +1,517 @@
+---
+title: "Révision : questions pour l'examen"
+description: Questions de révision sur l'ensemble du cours, de la page dynamique à l'API, réparties en six thèmes et mêlant choix multiples, lecture de code et réponses courtes.
+sidebar:
+  order: 13
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+
+Cette page rassemble des questions sur l'ensemble du cours, de la construction d'une page dynamique jusqu'à la conception d'une API. Elles sont regroupées en six thèmes, qui suivent l'ordre du cours.
+
+Trois formes de questions alternent :
+
+- des **choix multiples**, pour vérifier une notion ;
+- de la **lecture de code** : un extrait, puis ce qu'il produit ou ce qu'il faut y changer ;
+- des **réponses courtes**, qui demandent d'expliquer un « pourquoi ». La réponse proposée se déplie, une fois la vôtre formulée.
+
+<Aside type="astuce" title="Comment s'en servir">
+Une réponse trouvée par élimination ne garantit pas que la notion soit comprise. Pour les réponses courtes en particulier, formulez la vôtre avant d'ouvrir le corrigé, puis comparez le raisonnement plutôt que les mots. Chaque explication indique la page où revoir la notion.
+</Aside>
+
+## 1. Rendu et cycle de vie d'une page
+
+<Quiz
+  client:visible
+  question="En affichant le code source d'une page PHP dans le navigateur, vous voyez la ligne <?php echo $titre; ?>. Que peut-on en conclure ?"
+  options={[
+    { texte: "Le code PHP s'est exécuté, mais n'a rien affiché", correct: false },
+    { texte: "Le fichier n'a pas été exécuté par PHP avant d'être envoyé", correct: true },
+    { texte: "Le navigateur n'a pas su interpréter le PHP reçu", correct: false },
+  ]}
+  retour="Le navigateur ne reçoit normalement que le HTML produit. S'il voit du PHP, le fichier a été envoyé tel quel : page ouverte en file://, mauvaise extension, ou serveur mal configuré. À revoir : « Construire une page dynamique », mode de rendu."
+/>
+
+<Quiz
+  client:visible
+  question="Dans un rendu côté client, que contient le plus souvent la réponse HTTP initiale ?"
+  options={[
+    { texte: "Une page déjà complète, construite par le serveur", correct: false },
+    { texte: "Une page presque vide et le JavaScript chargé de construire le contenu", correct: true },
+    { texte: "Uniquement des données JSON, sans HTML", correct: false },
+  ]}
+  retour="Le contenu apparaît après le téléchargement et l'exécution du JavaScript, souvent accompagné d'une seconde requête pour les données. À revoir : « Construire une page dynamique », côté serveur, côté client."
+/>
+
+Ce fichier est rafraîchi trois fois de suite dans le navigateur.
+
+```php
+<?php
+$compteur = ($compteur ?? 0) + 1;
+echo "Visites : $compteur";
+```
+
+<Quiz
+  client:visible
+  question="Qu'affiche la troisième requête ?"
+  options={[
+    { texte: "Visites : 1", correct: true },
+    { texte: "Visites : 3", correct: false },
+    { texte: "Une erreur, puisque $compteur n'existe pas au départ", correct: false },
+  ]}
+  retour="Chaque requête exécute un script neuf, dont toutes les variables disparaissent à la fin. Conserver une valeur d'une requête à l'autre demande une session ou une base de données. À revoir : « Construire une page dynamique », cycle de vie."
+/>
+
+<Checkpoint question="Pourquoi place-t-on le filtrage et le tri des produits avant le premier caractère de HTML, plutôt qu'au milieu de la boucle d'affichage ?">
+Pour séparer la préparation des données de leur présentation. Une fois les données prêtes, la partie HTML ne fait plus que parcourir et afficher : elle reste lisible, et une règle de filtrage se modifie à un seul endroit, sans fouiller le balisage. À revoir : « Construire une page dynamique », construction d'une page.
+</Checkpoint>
+
+```php
+<?php
+require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/fonctions.php';
+
+include __DIR__ . '/partials/carte.php';
+include __DIR__ . '/partials/carte.php';
+```
+
+<Quiz
+  client:visible
+  question="Combien de fois chacun des deux fichiers inclus est-il exécuté ?"
+  options={[
+    { texte: "fonctions.php une fois, carte.php deux fois", correct: true },
+    { texte: "Les deux fichiers deux fois", correct: false },
+    { texte: "Les deux fichiers une seule fois", correct: false },
+  ]}
+  retour="La variante _once ignore un fichier déjà chargé, ce qui évite de redéclarer des fonctions. include sans _once répète le fragment, ce qui convient à une carte affichée plusieurs fois. À revoir : « Construire une page dynamique », include et require."
+/>
+
+<Quiz
+  client:visible
+  question="Lequel de ces deux chemins est interprété par le navigateur : href='produits.php' ou __DIR__ . '/includes/header.php' ?"
+  options={[
+    { texte: "Le premier : c'est un chemin d'URL", correct: true },
+    { texte: "Le second : c'est un chemin de fichier", correct: false },
+    { texte: "Les deux, de la même manière", correct: false },
+  ]}
+  retour="Le href désigne une adresse web, que le navigateur résout. Le chemin d'un include désigne un fichier sur le disque du serveur, que PHP ouvre. À revoir : « Construire une page dynamique », deux sortes de chemins."
+/>
+
+## 2. Formulaires et données reçues
+
+Ce formulaire est envoyé sans cocher la case.
+
+```html
+<form method="get" action="recherche.php">
+  <input type="text" name="q" value="sirop">
+  <input type="checkbox" name="stock" value="1">
+  <input type="hidden" name="page" value="2">
+  <button type="submit">Chercher</button>
+</form>
+```
+
+<Quiz
+  client:visible
+  question="Quelle adresse le navigateur demande-t-il ?"
+  options={[
+    { texte: "recherche.php?q=sirop&page=2", correct: true },
+    { texte: "recherche.php?q=sirop&stock=&page=2", correct: false },
+    { texte: "recherche.php, les champs voyageant dans le corps", correct: false },
+  ]}
+  retour="En GET, les champs forment la chaîne de requête. Une case décochée n'est pas transmise du tout ; un champ caché l'est comme les autres. À revoir : « Formulaires et données reçues », écrire le formulaire."
+/>
+
+<Quiz
+  client:visible
+  question="Quelle méthode convient le mieux à un formulaire qui supprime un produit ?"
+  options={[
+    { texte: "GET, puisque l'identifiant tient dans l'adresse", correct: false },
+    { texte: "POST, puisque rejouer la requête ne devrait pas répéter l'action", correct: true },
+    { texte: "Les deux conviennent également", correct: false },
+  ]}
+  retour="Une requête GET peut être rejouée ou suivie sans intention, par un rafraîchissement, un préchargement ou un robot. Une action qui modifie les données gagne à passer par POST. À revoir : « Formulaires et données reçues », GET ou POST."
+/>
+
+<Checkpoint question="Les champs portent déjà required et min='1'. Pourquoi revalider les données côté serveur ?">
+Parce que ces attributs décrivent le comportement du navigateur avant l'envoi. Une requête peut être construite autrement, par un outil en ligne de commande, un script ou une copie modifiée du formulaire, et le serveur ne peut pas distinguer ces cas. Les contraintes HTML restent utiles pour guider la personne qui remplit ; les règles du serveur, elles, s'appliquent à toutes les requêtes. À revoir : « Formulaires et données reçues », valider côté serveur.
+</Checkpoint>
+
+```php
+<?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($erreurs)) {
+    enregistrer($_POST);
+    header('Location: merci.php', true, 303);
+}
+
+echo '<p>Formulaire de contact</p>';
+```
+
+<Quiz
+  client:visible
+  question="Quel est le défaut de ce code ?"
+  options={[
+    { texte: "Le code 303 n'est pas accepté par les navigateurs", correct: false },
+    { texte: "Il manque exit après header() : le script continue après la redirection", correct: true },
+    { texte: "header() doit être appelée après le echo", correct: false },
+  ]}
+  retour="header() prépare un en-tête mais n'arrête rien. Sans exit, la suite du script s'exécute, avec ses éventuels effets, et produit un contenu que le navigateur ne lira pas. À revoir : « Formulaires et données reçues », rediriger après traitement."
+/>
+
+<Quiz
+  client:visible
+  question="Une valeur a passé toutes les validations. À quel moment htmlspecialchars() reste-t-elle nécessaire ?"
+  options={[
+    { texte: "Jamais : une valeur validée est sûre", correct: false },
+    { texte: "Au moment de l'afficher dans la page", correct: true },
+    { texte: "Avant de la valider", correct: false },
+  ]}
+  retour="Valider répond à « cette valeur est-elle acceptable ? », échapper à « comment l'écrire sans qu'elle soit interprétée ? ». Un nom valide peut contenir un chevron ou une apostrophe. À revoir : « Formulaires et données reçues », valider n'est pas échapper."
+/>
+
+<Checkpoint question="Quand un envoi échoue à la validation, pourquoi réaffiche-t-on le formulaire au lieu de rediriger, comme on le fait après un succès ?">
+Une redirection déclenche une nouvelle requête, qui repart d'un script neuf : les messages d'erreur et les valeurs saisies seraient perdus. Réafficher directement permet de les présenter dans la même réponse. Les transporter malgré une redirection demanderait une session. À revoir : « Formulaires et données reçues », rediriger après traitement.
+</Checkpoint>
+
+## 3. Persistance : session, base de données, CRUD
+
+<Quiz
+  client:visible
+  question="Où sont conservées les valeurs rangées dans $_SESSION ?"
+  options={[
+    { texte: "Dans un cookie, sur le poste de la personne", correct: false },
+    { texte: "Sur le serveur ; le navigateur ne conserve qu'un identifiant de session", correct: true },
+    { texte: "Dans la chaîne de requête de chaque page", correct: false },
+  ]}
+  retour="Le navigateur renvoie un identifiant à chaque requête, et PHP retrouve grâce à lui les données de la session, stockées côté serveur. À revoir : « Préserver les données », la session."
+/>
+
+```php
+<?php
+$id = $_GET['id'];
+$produit = $pdo->query("SELECT * FROM produits WHERE id = $id")->fetch();
+```
+
+<Checkpoint question="Ce code fonctionne avec l'adresse produits.php?id=7. Quel risque présente-t-il, et comment le corriger ?">
+La valeur reçue est insérée telle quelle dans la requête SQL : une adresse construite avec un fragment de SQL à la place du nombre modifierait la requête elle-même. C'est une injection SQL. La correction consiste à utiliser une requête préparée, `prepare('... WHERE id = :id')` puis `execute(['id' => $id])`, qui transporte la valeur à part du texte de la requête. Valider que l'identifiant est un entier ajoute une précaution, sans remplacer la requête préparée. À revoir : « Préserver les données », requêtes préparées.
+</Checkpoint>
+
+<Quiz
+  client:visible
+  question="Dans quel cas query() convient-elle, plutôt que prepare() suivi de execute() ?"
+  options={[
+    { texte: "Quand la requête ne contient aucune valeur venue du client", correct: true },
+    { texte: "Quand la requête est une lecture", correct: false },
+    { texte: "Quand la requête ne rend qu'une seule ligne", correct: false },
+  ]}
+  retour="C'est l'origine des valeurs qui décide. Une lecture filtrée par un paramètre reçu passe elle aussi par une requête préparée. À revoir : guide « Mettre en place une base et écrire un CRUD »."
+/>
+
+<Quiz
+  client:visible
+  question="Une page lit $_SESSION['message'] pour afficher une confirmation. Pourquoi l'effacer juste après ?"
+  options={[
+    { texte: "Pour qu'il ne réapparaisse pas sur chaque page consultée ensuite", correct: true },
+    { texte: "Parce qu'une valeur de session ne se lit qu'une fois", correct: false },
+    { texte: "Pour libérer de la mémoire sur le serveur", correct: false },
+  ]}
+  retour="La session dure toute la visite. Un message déposé pour être lu une seule fois, puis retiré, s'appelle un message éphémère. À revoir : guide « Mettre en place une base et écrire un CRUD », le message après la redirection."
+/>
+
+```html
+<a href="supprimer.php?id=7">Supprimer</a>
+```
+
+<Quiz
+  client:visible
+  question="Ce lien supprime correctement le produit quand on clique dessus. Quel est le risque ?"
+  options={[
+    { texte: "L'identifiant est visible dans l'adresse", correct: false },
+    { texte: "Un préchargement, un robot ou un aperçu peut suivre le lien sans que personne n'ait cliqué", correct: true },
+    { texte: "Aucun, tant que la page vérifie que l'identifiant est un entier", correct: false },
+  ]}
+  retour="Un lien annonce une ressource à consulter, et plusieurs mécanismes le suivent automatiquement. Une suppression passe plutôt par un petit formulaire en POST. À revoir : guide « Mettre en place une base et écrire un CRUD », la suppression."
+/>
+
+<Quiz
+  client:visible
+  question="Le fichier init.sql commence par DROP TABLE IF EXISTS produits. Que se passe-t-il si on l'exécute une seconde fois ?"
+  options={[
+    { texte: "Une erreur, puisque la table existe déjà", correct: false },
+    { texte: "La base revient au même état de départ, et les produits ajoutés entre-temps disparaissent", correct: true },
+    { texte: "Les produits de départ sont insérés en double", correct: false },
+  ]}
+  retour="Le script est idempotent : relancé, il produit le même résultat. C'est commode pour repartir d'une base saine, mais destructeur pour les données ajoutées. À revoir : guide « Mettre en place une base et écrire un CRUD », créer et peupler la table."
+/>
+
+## 4. Programmation orientée objet
+
+<Quiz
+  client:visible
+  question="Pourquoi déclarer l'attribut prix d'un produit private et passer par une méthode pour le modifier ?"
+  options={[
+    { texte: "Pour que la méthode puisse refuser une valeur incohérente, comme un prix négatif", correct: true },
+    { texte: "Parce que PHP interdit les attributs publics", correct: false },
+    { texte: "Pour que le programme s'exécute plus vite", correct: false },
+  ]}
+  retour="L'encapsulation laisse l'objet garder la maîtrise de son état : toute modification passe par du code qui peut vérifier la valeur. À revoir : page sur la programmation orientée objet, encapsulation."
+/>
+
+<Quiz
+  client:visible
+  question="Une commande conserve une liste de lignes, et chaque ligne désigne un produit. De quelle relation s'agit-il entre la commande et ses lignes ?"
+  options={[
+    { texte: "La composition", correct: true },
+    { texte: "L'héritage", correct: false },
+    { texte: "L'encapsulation", correct: false },
+  ]}
+  retour="La commande a des lignes et s'appuie sur leurs méthodes. Une commande n'est pas une ligne : l'héritage ne conviendrait pas. À revoir : « Des objets qui collaborent », la composition."
+/>
+
+```php
+<?php
+class Produit
+{
+    private float $prix;
+
+    public function __construct(float $prix)
+    {
+        $this->prix = $prix;
+    }
+}
+
+class ProduitPerissable extends Produit
+{
+    public function prixSolde(): float
+    {
+        return $this->prix * 0.8;
+    }
+}
+```
+
+<Checkpoint question="La méthode prixSolde() ne rend pas le prix attendu. Pourquoi, et quelles sont deux façons de corriger ?">
+Un attribut `private` de la classe parente n'est pas accessible depuis la classe enfant, même si celle-ci en hérite : `$this->prix` ne désigne pas, dans `ProduitPerissable`, l'attribut de `Produit`. On peut déclarer l'attribut `protected`, ce qui le garde caché de l'extérieur mais le rend visible des sous-classes, ou passer par un accesseur public, `getPrix()`, défini dans `Produit`. À revoir : « Des objets qui collaborent », l'héritage.
+</Checkpoint>
+
+<Quiz
+  client:visible
+  question="Une remise en pourcentage et une remise d'un montant fixe partagent une méthode decrire(), mais chacune calcule différemment le prix réduit. Que choisir pour la classe Remise ?"
+  options={[
+    { texte: "Une classe abstraite, avec decrire() complète et appliquer() abstraite", correct: true },
+    { texte: "Une interface, puisque les deux remises calculent différemment", correct: false },
+    { texte: "Une classe ordinaire, instanciable telle quelle", correct: false },
+  ]}
+  retour="Il y a du code à mettre en commun, decrire(), et une méthode que chaque sous-classe doit fournir : c'est le rôle d'une classe abstraite. Une interface ne porte pas de code. À revoir : « Des objets qui collaborent », classe abstraite et interface."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi transmettre le calculateur de taxes au constructeur de Commande plutôt que de le créer à l'intérieur ?"
+  options={[
+    { texte: "Pour pouvoir changer de calculateur sans modifier la classe Commande", correct: true },
+    { texte: "Parce qu'un constructeur ne peut pas créer d'objet", correct: false },
+    { texte: "Pour rendre le calculateur accessible depuis l'extérieur de la commande", correct: false },
+  ]}
+  retour="Une classe qui reçoit ses dépendances ignore comment elles ont été configurées. Changer de province, ou utiliser un calculateur sans taxe, se fait alors à l'extérieur. À revoir : « Des objets qui collaborent », l'injection par le constructeur."
+/>
+
+<Quiz
+  client:visible
+  question="Avec le chargeur automatique du cours, dans quel fichier PHP cherche-t-il la classe App\Service\CatalogueService ?"
+  options={[
+    { texte: "src/Service/CatalogueService.php", correct: true },
+    { texte: "src/App/Service/CatalogueService.php", correct: false },
+    { texte: "Service/CatalogueService.php, à la racine du projet", correct: false },
+  ]}
+  retour="Le chargeur retire le préfixe App, remplace les séparateurs d'espace de noms par des barres obliques, et cherche à partir de src. À revoir : « Des objets qui collaborent », trouver les autres classes."
+/>
+
+```php
+<?php
+class Commande
+{
+    private CalculateurTaxes $taxes;
+
+    public function __construct()
+    {
+        $this->taxes = new CalculateurTaxes(0.14975);
+    }
+}
+```
+
+<Checkpoint question="Ce constructeur fonctionne. Quel problème pose-t-il pour la suite du projet ?">
+Le taux de taxe est enfoui dans `Commande`. Vendre dans une autre province, ou tester un total sans taxe, oblige à modifier une classe dont la notion n'a pourtant pas changé. Recevoir le calculateur en paramètre du constructeur règle le problème : le choix du taux se fait à l'extérieur. À revoir : « Des objets qui collaborent », l'injection par le constructeur.
+</Checkpoint>
+
+## 5. Organisation du code : responsabilités, services, MVC
+
+<Quiz
+  client:visible
+  question="Selon le principe de responsabilité unique, une classe devrait…"
+  options={[
+    { texte: "n'avoir qu'une seule raison de changer", correct: true },
+    { texte: "ne contenir qu'une seule méthode publique", correct: false },
+    { texte: "ne manipuler qu'une seule table", correct: false },
+  ]}
+  retour="Un dépôt peut lister, ajouter et supprimer : ces opérations changent toutes pour la même raison, une modification de la table. À revoir : guide « Découper une page PHP en classes »."
+/>
+
+<Quiz
+  client:visible
+  question="Une nouvelle règle exige qu'un nom de produit compte au moins trois caractères. Quel fichier faut-il modifier ?"
+  options={[
+    { texte: "ValidateurProduit.php", correct: true },
+    { texte: "ProduitRepository.php", correct: false },
+    { texte: "produits.php et produit-modifier.php", correct: false },
+  ]}
+  retour="Les règles métier sont rassemblées dans le validateur, que la création et la modification utilisent tous deux. La règle ne s'écrit qu'une fois. À revoir : guide « Découper une page PHP en classes », le validateur."
+/>
+
+<Quiz
+  client:visible
+  question="En MVC, que désigne le modèle ?"
+  options={[
+    { texte: "Toute la couche métier : entités, dépôts, validateurs et services", correct: true },
+    { texte: "La classe Produit uniquement", correct: false },
+    { texte: "La structure de la table dans la base", correct: false },
+  ]}
+  retour="L'entité n'est qu'une partie du modèle. Le réduire à elle conduit souvent à placer les règles métier dans le contrôleur, faute d'endroit prévu pour elles. À revoir : « Services et MVC », le modèle MVC."
+/>
+
+Cet extrait se trouve dans un fichier de vue.
+
+```php
+<p>
+  En rupture : <?= $pdo->query('SELECT COUNT(*) FROM produits WHERE stock = 0')->fetchColumn() ?>
+</p>
+```
+
+<Checkpoint question="Le nombre s'affiche correctement. Qu'est-ce qui pose problème, et où ce calcul devrait-il se faire ?">
+La vue prend une décision qui revient au modèle : elle connaît la table, ses colonnes et la définition d'une rupture. Si cette définition change, par exemple pour tenir compte d'un seuil minimal, il faudra la retrouver dans une vue. Le comptage gagne à devenir une méthode du service, appelée par le contrôleur, qui transmet le nombre à la vue. À revoir : « Services et MVC », qui fait quoi.
+</Checkpoint>
+
+<Quiz
+  client:visible
+  question="Pourquoi le contrôleur appelle-t-il rendre('produits/liste', [...]) plutôt que de faire directement require de la vue ?"
+  options={[
+    { texte: "Pour que la vue ne voie que les données transmises, et pas le service ni la connexion", correct: true },
+    { texte: "Parce que require ne fonctionne pas avec les fichiers de vue", correct: false },
+    { texte: "Pour que la vue s'affiche plus rapidement", correct: false },
+  ]}
+  retour="Une fonction a sa propre portée : seules les clés du tableau transmis deviennent des variables dans la vue. À revoir : « Services et MVC », des vues qui ne voient que ce qu'on leur donne."
+/>
+
+<Quiz
+  client:visible
+  question="Après un ajout de produit accepté, le contrôleur n'affiche aucune vue. Pourquoi ?"
+  options={[
+    { texte: "Parce qu'il redirige, et que la liste sera affichée par la requête GET suivante", correct: true },
+    { texte: "Parce que le service affiche lui-même le résultat", correct: false },
+    { texte: "Parce qu'une vue ne peut pas afficher un produit qui vient d'être créé", correct: false },
+  ]}
+  retour="C'est le patron POST-Redirect-GET : l'ajout répond par une redirection, et la page affichée résulte d'une lecture, rejouable sans effet. À revoir : « Services et MVC », le modèle MVC."
+/>
+
+<Checkpoint question="Le service CatalogueService reçoit un tableau de données au lieu de lire lui-même $_POST. Qu'est-ce que cela permet ?">
+Le service ignore tout du protocole Web : il ne sait pas s'il est appelé par une page, une API ou un script. Il devient donc réutilisable tel quel par chacun d'eux. Une page lui passe `$_POST`, l'API lui passe le corps JSON décodé, et les règles métier restent écrites une seule fois. À revoir : « Services et MVC », un service pour les cas d'usage.
+</Checkpoint>
+
+## 6. Concevoir une API
+
+Une API reçoit cette requête :
+
+```http
+PUT /api/produits/3 HTTP/1.1
+Content-Type: application/json
+
+{"nom": "Beurre d'érable 250 g", "categorie": "tartinade", "prix": 9.95, "stock": 20}
+```
+
+<Quiz
+  client:visible
+  question="Le code lit $_POST['nom'] et n'obtient rien. Pourquoi ?"
+  options={[
+    { texte: "$_POST n'est rempli que pour un POST encodé comme un formulaire ; le JSON se lit par php://input", correct: true },
+    { texte: "Le corps est arrivé dans $_GET, puisque la méthode n'est pas POST", correct: false },
+    { texte: "PHP ignore le corps des requêtes PUT", correct: false },
+  ]}
+  retour="Un corps JSON, quelle que soit la méthode, reste dans le corps brut de la requête. On le lit avec file_get_contents('php://input'), puis json_decode(..., true). À revoir : « Concevoir une API », retour sur les superglobales."
+/>
+
+<Quiz
+  client:visible
+  question="Quelle méthode est idempotente sans être sûre ?"
+  options={[
+    { texte: "GET", correct: false },
+    { texte: "POST", correct: false },
+    { texte: "PUT", correct: true },
+  ]}
+  retour="PUT modifie le serveur, donc n'est pas sûre ; mais l'envoyer deux fois laisse le même état qu'un seul envoi. DELETE partage cette propriété. À revoir : « Concevoir une API », GET, POST, PUT, DELETE."
+/>
+
+<Quiz
+  client:visible
+  question="Que renvoie l'API après un POST qui a créé un produit ?"
+  options={[
+    { texte: "201, le produit créé, et son adresse dans l'en-tête Location", correct: true },
+    { texte: "200, et rien d'autre", correct: false },
+    { texte: "204, puisque la création a réussi", correct: false },
+  ]}
+  retour="201 signale une création ; Location indique où trouver la nouvelle ressource. À revoir : « Concevoir une API », l'architecture REST."
+/>
+
+Voici la table des routes de l'API.
+
+```php
+<?php
+$routes = [
+    ['GET',    'produits',      [$produits, 'lister']],
+    ['POST',   'produits',      [$produits, 'creer']],
+    ['GET',    'produits/{id}', [$produits, 'afficher']],
+    ['PUT',    'produits/{id}', [$produits, 'remplacer']],
+    ['DELETE', 'produits/{id}', [$produits, 'supprimer']],
+];
+```
+
+<Quiz
+  client:visible
+  question="Que répond le routeur à DELETE /api/produits, sans identifiant ?"
+  options={[
+    { texte: "404, car aucune route ne correspond", correct: false },
+    { texte: "405, avec l'en-tête Allow: GET, POST", correct: true },
+    { texte: "204, tous les produits sont supprimés", correct: false },
+  ]}
+  retour="L'adresse produits existe, mais seulement pour GET et POST. Le routeur retient ces méthodes et répond 405 en les énumérant dans Allow. À revoir : « Concevoir une API », le routeur."
+/>
+
+<Quiz
+  client:visible
+  question="Quel rôle joue le fichier api/.htaccess ?"
+  options={[
+    { texte: "Il demande à Apache de confier à index.php les adresses qui ne correspondent à aucun fichier", correct: true },
+    { texte: "Il protège l'API par un mot de passe", correct: false },
+    { texte: "Il convertit les réponses en JSON", correct: false },
+  ]}
+  retour="/api/produits/7 ne correspond à aucun fichier. La réécriture le confie à index.php, qui lit l'adresse demandée et la compare à ses routes. À revoir : « Concevoir une API », le serveur reçoit la requête."
+/>
+
+<Checkpoint question="Le service lève DonneesInvalides quand les données sont refusées. Pourquoi est-ce le contrôleur, et non le service, qui répond 422 ?">
+Parce que le service ne connaît pas HTTP : il signale un refus, sans savoir qui l'appelle. C'est au contrôleur de traduire ce refus selon le canal. La page HTML le traduit en formulaire réaffiché, l'API en réponse 422 avec les anomalies. Le service décide ; le contrôleur traduit sa décision. À revoir : « Concevoir une API », le contrôleur.
+</Checkpoint>
+
+<Quiz
+  client:visible
+  question="Un appel à l'API fonctionne avec curl, mais échoue depuis une page servie en localhost:4321. Quelle est la cause la plus probable ?"
+  options={[
+    { texte: "Le navigateur bloque la réponse faute d'autorisation CORS", correct: true },
+    { texte: "curl n'envoie pas les mêmes en-têtes qu'un navigateur", correct: false },
+    { texte: "Le fichier .htaccess refuse les requêtes venant d'un navigateur", correct: false },
+  ]}
+  retour="La page et l'API ont des origines différentes. Le navigateur applique la restriction, et le serveur doit autoriser l'origine par un en-tête. curl n'y est pas soumis. À revoir : « Concevoir une API », le client envoie sa requête."
+/>
+
+<MarginNote type="rappel" titre="Et ensuite ?">
+La console d'API de la page « Concevoir une API » permet de vérifier soi-même plusieurs réponses de ce thème : supprimer deux fois le même produit, envoyer une méthode non prévue, ou un JSON mal formé.
+</MarginNote>

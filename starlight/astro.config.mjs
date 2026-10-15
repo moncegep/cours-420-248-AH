@@ -37,6 +37,7 @@ export default defineConfig({
 							{ label: 'Programmation orienté objet en PHP ', slug: 'cours/06-poo-1' },
 							{ label: 'POO avancée en PHP ', slug: 'cours/06-poo-2' },
 							{ label: "Conception d'API", slug: 'cours/07-api' },
+							// { label: "Révision", slug: 'cours/09-revision' },
 							// { label: 'MVC', slug: 'cours/10-mvc' },
 							// { label: 'MVC', slug: 'cours/10-mvc' },
 						] },
