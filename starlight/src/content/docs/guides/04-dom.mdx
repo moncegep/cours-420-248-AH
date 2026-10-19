@@ -194,7 +194,9 @@ Un élément créé est détaché : il faut l'attacher à un parent déjà prés
 
 ---
 
-## Réagir aux événements
+## Gestion des événements
+
+### Réagir aux événements
 
 Le DOM ne sert pas qu'à modifier la page : il permet aussi de **réagir** à ce que fait l'utilisateur, 
 qu'il s'agisse d'un clic, d'une frappe au clavier, d'un survol ou de la soumission d'un formulaire. 
@@ -237,7 +239,7 @@ annule ce comportement, ce qui permet d'exécuter du JavaScript à la place (par
 Sans cet appel, le navigateur suivrait le lien et quitterait la page avant l'exécution du reste du code.
 </Checkpoint>
 
-## Le cycle d'un événement
+### Le cycle d'un événement
 
 Lorsqu'un utilisateur clique sur un élément, le navigateur ne transmet pas simplement l'événement à cet élément isolé. 
 Comme les éléments HTML sont imbriqués dans l'arbre du DOM, l'événement est aussi 
@@ -281,7 +283,7 @@ mais annule l'action que le navigateur ferait par défaut. Ce sont deux choses d
 **carte** (l'élément dont l'écouteur s'exécute). C'est précisément cette distinction qui rend la délégation possible.
 </Checkpoint>
 
-## La délégation d'événements
+### La délégation d'événements
 
 Comme l'événement remonte par bouillonnement, on peut placer **un seul** écouteur 
 sur un parent plutôt qu'un par enfant. Le parent inspecte `event.target` pour savoir d'où vient le clic. 
@@ -308,6 +310,41 @@ liste.addEventListener("click", (e) => {
 **ajoutés plus tard**, sans avoir à les ré-abonner un par un.</Highlight>
 
 ---
+
+## Les templates
+
+Lorsqu'une même structure HTML doit être répétée plusieurs fois, par exemple pour afficher une liste de cartes, 
+il peut être tentant de construire une longue chaîne de caractères HTML. 
+Cette approche est fragile : une erreur de syntaxe est difficile à repérer, et l'insertion de contenu utilisateur 
+avec `innerHTML` peut introduire des risques de sécurité.
+
+L'élément `<template>` permet de conserver la structure HTML dans le document, puis de la cloner en JavaScript lorsque nécessaire.
+Il est **analysé mais n'est pas rendu** : ses images et scripts ne se chargent pas, tant qu'on ne le clone pas. 
+C'est l'outil idéal pour répéter une structure.
+
+```html
+<template id="tpl-livre">
+  <li class="livre">
+    <span class="titre"></span>
+    <span class="auteur"></span>
+  </li>
+</template>
+```
+
+```js
+const tpl = document.querySelector("#tpl-livre");
+const liste = document.querySelector("#livres");
+
+for (const livre of livres) {
+  const noeud = tpl.content.cloneNode(true); // copie profonde du contenu
+  noeud.querySelector(".titre").textContent = livre.titre;
+  noeud.querySelector(".auteur").textContent = livre.auteur;
+  liste.append(noeud);
+}
+```
+
+<Highlight>On remplit le clone avec `textContent`, jamais en concaténant du HTML : le contenu reste du **texte**, ce qui évite l'injection. Comparé à `innerHTML`, le template garde la structure au même endroit et ne force pas le navigateur à ré-analyser une chaîne à chaque insertion.</Highlight>
+
 
 <MarginNote type="plusloin">
 La référence complète des méthodes du DOM est disponible sur [MDN](https://developer.mozilla.org/fr/docs/Web/API/Document_Object_Model). Pour expérimenter, on peut ouvrir la console du navigateur (`F12`) sur n'importe quelle page et y saisir `document.querySelector("h1")` : le résultat est un véritable nœud du DOM.

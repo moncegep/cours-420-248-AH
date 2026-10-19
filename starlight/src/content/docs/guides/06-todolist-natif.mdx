@@ -12,7 +12,7 @@ import TodoInspector from "../../../components/react/TodoInspector.jsx";
 ## 1. La TodoList
 
 <MarginNote type="prerequis">
-Ce guide met en pratique [Le DOM avancé](/guides/tuto-dom-2) (templates, délégation d'événements, formulaires) et la méthodologie de [Concevoir une interface réactive](/notes/interface-reactive).  
+Ce guide met en pratique les [notions de DOM](/guides/04-dom) (templates, délégation d'événements, etc.).  
 **Tout est fait en éléments natifs, sans librairie ou framework.**
 </MarginNote>
 
@@ -169,7 +169,10 @@ const today = () => new Date().toLocaleDateString("en-CA");
 ```
 
 <MarginNote type="attention" titre="La date du jour">
-`new Date().toISOString().slice(0, 10)` semble donner la date du jour, mais en temps universel : à Montréal, après 20 h ou 19 h selon la saison, elle donne déjà celle du lendemain. `toLocaleDateString("en-CA")` donne la date locale, dans le même format que la valeur d'un `<input type="date">`, ce qui permet de comparer les deux chaînes directement.
+`new Date().toISOString().slice(0, 10)` semble donner la date du jour, mais en temps universel : 
+à Montréal, après 20 h ou 19 h selon la saison, elle donne déjà celle du lendemain. 
+`toLocaleDateString("en-CA")` donne la date locale, dans le même format que la valeur d'un `<input type="date">`, 
+ce qui permet de comparer les deux chaînes directement.
 </MarginNote>
 
 #### Fonctionnement de l'ajout (via `FormData`)
@@ -195,6 +198,7 @@ form.addEventListener("submit", (event) => {
   tasks.push(task);
  
   form.reset();
+
   render();
 });
 ```
@@ -229,29 +233,37 @@ const handlers = {
  
 function actionHandler(action, task) {
   if (!Object.hasOwn(handlers, action)) return;
+
   handlers[action](task);
 }
  
 // Un seul écouteur de clic, délégué sur la liste.
 list.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
+
   if (!button) return;
 
   const item = button.closest(".todo-item");
   const task = item && findTask(item.dataset.id);
+
   if (!task) return;
 
   actionHandler(button.dataset.action, task);
+
   render();
 });
 ```
 
 <MarginNote type="lien" titre="Délégation d'événements">
-Un seul écouteur sur le parent traite tous les enfants, présents ou à venir. C'est essentiel ici : les tâches sont créées et supprimées en continu, et la délégation évite d'attacher puis de retirer des écouteurs à chaque fois. Le détail est dans [Le DOM avancé](/notes/dom-avance).
+Un seul écouteur sur le parent traite tous les enfants, présents ou à venir. 
+C'est essentiel ici : les tâches sont créées et supprimées en continu, et la délégation 
+évite d'attacher puis de retirer des écouteurs à chaque fois. Le détail est dans [le guide sur le DOM](/guides/04-dom).
 </MarginNote>
 
 <MarginNote type="astuce" titre="Pourquoi remonter jusqu'au bouton">
-`event.target` est l'élément exact sous le pointeur. Si un bouton contient une icône, par exemple un `<svg>` ou un `<span>`, c'est elle qui est la cible, et elle n'a pas de `data-action`. Remonter jusqu'au premier ancêtre qui en porte un rend l'écouteur robuste à tout contenu du bouton.
+`event.target` est l'élément exact sous le pointeur. Si un bouton contient une icône, 
+par exemple un `<svg>` ou un `<span>`, c'est elle qui est la cible, et elle n'a pas de `data-action`. 
+Remonter jusqu'au premier ancêtre qui en porte un rend l'écouteur robuste à tout contenu du bouton.
 </MarginNote>
 
 Les changements (case complétée, statut) suivent le même schéma, avec l'événement `change` délégué sur la liste :
@@ -260,10 +272,17 @@ Les changements (case complétée, statut) suivent le même schéma, avec l'év�
 list.addEventListener("change", (event) => {
   const item = event.target.closest(".todo-item");
   const task = item && findTask(item.dataset.id);
+
   if (!task) return;
 
-  if (event.target.matches(".todo-item__check")) task.completed = event.target.checked;
-  if (event.target.matches(".todo-item__status")) task.status = event.target.value;
+  if (event.target.matches(".todo-item__check")) {
+    task.completed = event.target.checked;
+  }
+  
+  if (event.target.matches(".todo-item__status")) {
+    task.status = event.target.value;
+  }
+
   render();
 });
 ```
@@ -273,7 +292,9 @@ L'édition du titre combine trois événements : `dblclick` rend le titre édita
 ```js
 list.addEventListener("dblclick", (event) => {
   const title = event.target.closest(".todo-item__title");
+
   if (!title) return;
+  
   title.contentEditable = "true";
   title.focus();
 });
@@ -289,17 +310,24 @@ list.addEventListener("keydown", (event) => {
 // blur ne bouillonne pas : pour déléguer, on écoute focusout, qui bouillonne
 list.addEventListener("focusout", (event) => {
   const title = event.target.closest(".todo-item__title");
+
   if (!title || !title.isContentEditable) return;
 
   const task = findTask(title.closest(".todo-item").dataset.id);
   const value = title.textContent.trim();
-  if (task && !isEmpty(value)) task.title = value; // précondition : titre non vide
+
+  if (task && !isEmpty(value)) { // précondition : titre non vide
+    task.title = value;
+  }
+
   render();
 });
 ```
 
 <MarginNote type="attention" titre="blur ne bouillonne pas">
-Quelques événements ne remontent pas vers les ancêtres : c'est le cas de `blur` et de `focus`. Un écouteur `blur` posé sur la liste ne serait donc jamais appelé quand un titre perd le focus. Leurs équivalents `focusout` et `focusin` bouillonnent, et permettent la délégation.
+Quelques événements ne remontent pas vers les ancêtres : c'est le cas de `blur` et de `focus`. 
+Un écouteur `blur` posé sur la liste ne serait donc jamais appelé quand un titre perd le focus. 
+Leurs équivalents `focusout` et `focusin` bouillonnent, et permettent la délégation.
 </MarginNote>
 
 ## 6. Assembler le tout
@@ -359,12 +387,17 @@ function render() {
 }
 ```
 
-Chaque action suit la même boucle : elle modifie l'état, puis appelle `render`. Le style « complétée » n'est qu'une classe posée pendant le rendu (`classList.toggle("is-done", task.completed)`), le CSS s'occupe du barré et de l'atténuation. Le statut se traduit en `data-status` sur l'élément, ce qui permet au CSS de colorer la tâche selon son état.
+Chaque action suit la même boucle : elle modifie l'état, puis appelle `render`. 
+Le style « complétée » n'est qu'une classe posée pendant le rendu (`classList.toggle("is-done", task.completed)`), 
+le CSS s'occupe du barré et de l'atténuation. Le statut se traduit en `data-status` sur l'élément, 
+ce qui permet au CSS de colorer la tâche selon son état.
 
 <Highlight couleur="ambre">Une seule règle tient tout l'ensemble : l'état décide, la vue suit. Aucune action ne modifie le DOM d'une autre tâche directement ; tout passe par l'état, puis par un nouveau rendu.</Highlight>
 
 <Checkpoint question="Quand on coche une tâche, pourquoi mettre à jour l'état puis re-rendre, plutôt que d'ajouter directement la classe is-done à l'élément ?">
-Parce que l'élément du DOM n'est qu'un reflet de l'état. Si on modifiait seulement le DOM, l'état (`completed`) et l'affichage divergeraient : au prochain rendu, ou après une autre action, la coche reviendrait en arrière. En passant par l'état, la tâche reste complétée de façon durable, et toute la vue reste cohérente.
+Parce que l'élément du DOM n'est qu'un reflet de l'état. Si on modifiait seulement le DOM, l'état (`completed`) 
+et l'affichage divergeraient : au prochain rendu, ou après une autre action, la coche reviendrait en arrière. 
+En passant par l'état, la tâche reste complétée de façon durable, et toute la vue reste cohérente.
 </Checkpoint>
 
 ## 7. Pistes d'extension
@@ -378,12 +411,12 @@ L'application reste volontairement simple. Plusieurs directions permettent de l'
 - **Authentification.** Associer les tâches à un utilisateur connecté, ce qui suppose une identité et un contrôle d'accès.
 - **Partage.** Permettre à plusieurs personnes de voir ou de modifier une même liste, ce qui pose la question de la synchronisation et des conflits.
 
-<MarginNote type="plusloin" titre="La même application avec Vue.js">
+{/* <MarginNote type="plusloin" titre="La même application avec Vue.js">
 Le guide [Construire une TodoList avec Vue.js](/guides/tuto-todolist-vue) reprend la même spécification et la même démarche, avec un cadriciel : la plupart des mécanismes écrits ici à la main y sont pris en charge par Vue.
-</MarginNote>
+</MarginNote> */}
 
-<MarginNote type="plusloin" titre="La suite">
+{/* <MarginNote type="plusloin" titre="La suite">
 Pour l'instant, l'état vit en mémoire et disparaît au rechargement. Dans un prochain guide, 
 on ajoutera une couche de communication avec un serveur Express pour persister les tâches 
 dans une base de données, et on verra comment relier les actions de l'interface aux requêtes HTTP.
-</MarginNote>
+</MarginNote> */}
