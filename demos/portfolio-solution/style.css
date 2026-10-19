@@ -1,0 +1,46 @@
+/* Thème clair par défaut ; la classe .sombre sur le conteneur principal inverse les couleurs */
+.site {
+  --fond: #faf8f6; --surface: #ffffff; --encre: #1f2430; --gris: #5d6575; --bord: #e2e5ec;
+  --accent: #2f6f5e; --accent-doux: #e6f2ee;
+  min-height: 100vh; background: var(--fond); color: var(--encre);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.6;
+  transition: background .2s, color .2s;
+}
+.site.sombre {
+  --fond: #14171f; --surface: #1d212b; --encre: #eef0f4; --gris: #a6adbb; --bord: #2c3240;
+  --accent: #7fd1b9; --accent-doux: #213a34;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.conteneur { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+.entete { padding-top: 56px; padding-bottom: 32px; }
+.entete .haut { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 28px; }
+.marque { font-weight: 700; color: var(--accent); }
+.entete h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0 0 6px; line-height: 1.15; }
+.entete .titre { font-size: 1.15rem; color: var(--gris); margin: 0 0 18px; }
+.dispo { display: inline-block; background: var(--accent-doux); color: var(--accent); font-weight: 600; font-size: .9rem; padding: 4px 12px; border-radius: 999px; }
+
+section { padding: 28px 0; border-top: 1px solid var(--bord); }
+h2 { font-size: 1.35rem; margin: 0 0 14px; }
+
+.puces { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.puces li { background: var(--surface); border: 1px solid var(--bord); border-radius: 999px; padding: 4px 12px; font-size: .9rem; }
+
+button { font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 6px 12px;
+  border: 1px solid var(--bord); background: var(--surface); color: var(--encre); }
+button.actif { background: var(--accent); border-color: var(--accent); color: var(--fond); }
+.filtres { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.projet { background: var(--surface); border: 1px solid var(--bord); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.projet h3 { margin: 0; font-size: 1.05rem; }
+.projet p { margin: 0; }
+.technos { display: flex; flex-wrap: wrap; gap: 6px; }
+.technos span { font-size: .78rem; font-weight: 600; color: var(--accent); background: var(--accent-doux); padding: 2px 8px; border-radius: 6px; }
+.projet button { align-self: flex-start; margin-top: auto; }
+.appris { font-size: .9rem; color: var(--gris); border-left: 3px solid var(--accent); padding-left: 10px; }
+.vide { color: var(--gris); }
+
+.contact a { color: var(--accent); }
+.pied { padding-top: 28px; padding-bottom: 40px; color: var(--gris); font-size: .85rem; border-top: 1px solid var(--bord); }

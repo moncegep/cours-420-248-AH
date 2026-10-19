@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Todos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<section class="todo">
+  <header class="todo__head">
+    <h3>Todos</h3>
+    <form class="todo__add" id="todo-add">
+      <input name="title" type="text" placeholder="Nouvelle tâche" required />
+      <input name="tags" type="text" placeholder="tags, séparés, par virgules" />
+      <input name="dueDate" type="date" />
+      <button type="submit">Ajouter</button>
+    </form>
+  </header>
+
+  <ul class="todo__list" id="todo-list"></ul>
+  <p class="todo__empty" id="todo-empty" hidden>Aucune tâche.</p>
+</section>
+
+<template id="todo-item-template">
+  <li class="todo-item">
+    <input class="todo-item__check" type="checkbox" />
+    <div class="todo-item__body">
+      <span class="todo-item__title"></span>
+      <div class="todo-item__meta">
+        <select class="todo-item__status">
+          <option value="todo">à faire</option>
+          <option value="in-progress">en cours</option>
+          <option value="done">terminé</option>
+        </select>
+        <span class="todo-item__due"></span>
+        <span class="todo-item__tags"></span>
+      </div>
+    </div>
+    <div class="todo-item__actions">
+      <button data-action="duplicate" aria-label="Dupliquer">&#x29C9;</button>
+      <button data-action="delete" aria-label="Supprimer">&times;</button>
+    </div>
+  </li>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

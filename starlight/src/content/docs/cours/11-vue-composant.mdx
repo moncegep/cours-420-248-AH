@@ -1,0 +1,851 @@
+---
+title: "Composants et API"
+description: Structurer une application Vue en composants qui communiquent par props et événements, charger des données depuis une API, et entrevoir le routage, à travers une liste de cafés alimentée par l'API de Café sans-fil.
+sidebar:
+  order: 15
+---
+
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import DemoChargement from '../../../components/vue/DemoChargement.vue';
+import DemoProps from '../../../components/vue/DemoProps.vue';
+import DemoVModel from '../../../components/vue/DemoVModel.vue';
+import DemoEmits from '../../../components/vue/DemoEmits.vue';
+import ListeCafes from '../../../components/vue/cafes/ListeCafes.vue';
+
+La page précédente rendait interactive une page HTML existante, en y montant Vue. Cette page construit une application de toutes pièces, avec Vite. Deux questions s'y ajoutent : comment découper l'interface en composants qui collaborent, et comment l'alimenter avec des données venues d'une API.
+
+## D'une page à une application
+
+Une fois terminée, l'application de cette page affiche les cafés étudiants de l'Université de Montréal, avec des filtres rapides et des favoris. Tout écrire dans un seul fichier serait possible, comme pour le portfolio. Mais une application grossit, et un fichier unique finit par mêler l'état de toute l'application et le détail de chaque élément affiché.
+
+On la découpe donc en composants, chacun avec une responsabilité :
+
+```text
+App.vue                    l'état de l'application : les cafés, les filtres, les favoris
+│                          le chargement des données depuis l'API
+│                          les champs de filtre, liés aux données
+└── CarteCafe.vue          l'affichage d'un café, et son bouton favori
+                           (répété pour chaque café affiché)
+```
+
+Trois principes guident ce découpage, et la suite de la page les met en œuvre :
+
+1. **Un composant, une responsabilité.** `CarteCafe` sait afficher un café ; il ne sait ni d'où viennent les cafés, ni comment on les filtre.
+2. **L'état vit dans le composant le plus haut qui en a besoin.** La liste des favoris sert à filtrer la liste entière : elle appartient donc à `App.vue`, et non à chaque carte.
+3. **Les données descendent, les événements remontent.** Le parent transmet à l'enfant ce qu'il doit afficher ; l'enfant signale au parent ce qui s'est passé, et le parent décide.
+
+C'est le même souci que pour les classes et les services côté serveur : séparer les responsabilités pour que chaque partie reste lisible et modifiable sans toucher aux autres.
+
+## Créer le projet
+
+<Aside type="definition" title="Vite">
+**Vite** est un outil de développement web. Pendant le développement, il sert l'application et met la page à jour à chaque enregistrement, sans la recharger entièrement. Pour la mise en ligne, il **construit** l'application : il traduit les fichiers `.vue` en JavaScript ordinaire, les regroupe et les allège, dans un dossier `dist/`.
+</Aside>
+
+Il faut Node.js en version 22.18 ou plus récente. Dans un terminal :
+
+```bash
+npm create vue@latest
+```
+
+L'assistant pose quelques questions :
+
+- **nom du projet** : `cafes-udem` ;
+- **fonctionnalités** (TypeScript, Router, Pinia, tests…) : aucune, on valide sans rien cocher ;
+- **code d'exemple** : on choisit de commencer avec un projet vide.
+
+```bash
+cd cafes-udem
+npm install
+npm run dev        # ouvre http://localhost:5173
+```
+
+```text
+cafes-udem/
+├── index.html              la seule page HTML : elle contient <div id="app">
+├── package.json
+├── vite.config.js          la configuration de Vite
+├── public/                 fichiers copiés tels quels (images, données)
+└── src/
+    ├── main.js             crée l'application et la monte sur #app
+    ├── style.css           styles communs, à ajouter
+    ├── App.vue             le composant principal
+    └── components/
+        └── CarteCafe.vue   à ajouter
+```
+
+On ajoute une petite feuille de style commune, que `main.js` importe :
+
+```css
+/* src/style.css */
+:root { --encre: #1f2430; --gris: #667085; --bord: #e2e5ec; --accent: #7a2e3b; --fond: #faf8f6; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--encre); background: var(--fond); line-height: 1.5; }
+```
+
+```js
+// src/main.js
+import { createApp } from 'vue'
+import App from './App.vue'
+import './style.css'
+
+createApp(App).mount('#app')
+```
+
+Dans les Vue DevTools, qu'ouvre le petit bouton flottant en bas de la page, l'onglet des composants montrera l'arbre `App` puis `CarteCafe`, et la valeur de chaque donnée.
+
+## Anatomie d'un composant
+
+<Aside type="definition" title="Composant">
+Un **composant** est un morceau d'interface réutilisable, qui réunit sa structure, son comportement et son apparence. Dans un projet Vite, chaque composant est un fichier `.vue`, qu'on appelle un **SFC**, pour *Single-File Component* (composant monofichier).
+</Aside>
+
+```vue
+<script setup>
+// 1. Le comportement : données, calculs, fonctions, composants utilisés
+import { ref } from 'vue'
+import CarteCafe from './components/CarteCafe.vue'
+
+const message = ref('Bonjour de Vue')
+</script>
+
+<template>
+  <!-- 2. La structure : du HTML enrichi par la syntaxe de Vue -->
+  <p>{{ message }}</p>
+  <CarteCafe />
+</template>
+
+<style scoped>
+/* 3. L'apparence : avec scoped, ces règles ne touchent que ce composant */
+p { font-weight: 600; }
+</style>
+```
+
+- Avec `<script setup>`, tout ce qui est déclaré dans le script, données, fonctions et composants importés, est utilisable directement dans le gabarit (`<template>`).
+- Un composant importé s'utilise comme une balise. Par convention, son nom s'écrit en *PascalCase* (une majuscule à chaque mot) et compte au moins deux mots, pour ne jamais se confondre avec une balise HTML.
+- Grâce à `scoped`, une règle comme `p { … }` ne touche que les paragraphes de ce composant, et non ceux de toute l'application.
+
+<MarginNote type="rappel" titre="Les démonstrations de cette page">
+Chaque concept est illustré par une petite démonstration, que l'on peut manipuler. Leur style est omis de l'affichage.
+</MarginNote>
+
+## Le cas : explorer les cafés du campus
+
+Les cafés étudiants de l'Université de Montréal sont recensés par **Café sans-fil**, un projet étudiant qui offre une API publique. On construit une page qui les affiche, avec des filtres rapides : cafés ouverts, pavillon, carte acceptée, recherche par mot-clé, et favoris.
+
+| Élément | Valeur |
+| --- | --- |
+| Adresse | `GET https://api.cafesansfil.ca/v1/cafes?size=100` |
+| Documentation | `https://api.cafesansfil.ca/docs` |
+| Réponse | un objet paginé : `items` (les cafés), `total`, `page`, `size`, `pages` |
+| Champs utilisés | `name`, `slug`, `description`, `banner_url`, `is_open`, `status_message`, `location.pavillon`, `location.local`, `payment_details[].method` |
+
+`payment_details` est un tableau de moyens de paiement : `CASH` (comptant), `DEBIT` ou `CREDIT`. Le `slug` est un identifiant lisible, formé à partir du nom : `cafe-beagel`.
+
+### Étape 1 : charger les données
+
+Les cafés viennent de l'API, une seule fois, quand le composant apparaît à l'écran. Le chargement prend du temps et peut échouer : la page doit pouvoir afficher ces deux états.
+
+<DemoChargement client:visible />
+
+```vue
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const cafes = ref([])
+const chargement = ref(true)
+const erreur = ref('')
+const simulerErreur = ref(false)
+
+// Simule un appel réseau d'une seconde, réussi ou non
+function fausseRequete() {
+  return new Promise((resoudre, rejeter) => {
+    setTimeout(() => {
+      if (simulerErreur.value) rejeter(new Error('réseau indisponible'))
+      else resoudre(['Café Beagel', 'La Planck', 'Café-In'])
+    }, 1000)
+  })
+}
+
+async function charger() {
+  chargement.value = true
+  erreur.value = ''
+  try {
+    cafes.value = await fausseRequete()
+  } catch (e) {
+    erreur.value = `Échec du chargement : ${e.message}`
+  } finally {
+    chargement.value = false
+  }
+}
+
+onMounted(charger)
+</script>
+
+<template>
+  <div class="demo">
+    <p v-if="chargement" class="note">Chargement…</p>
+    <p v-else-if="erreur" class="erreur">{{ erreur }}</p>
+    <ul v-else>
+      <li v-for="cafe in cafes" :key="cafe">{{ cafe }}</li>
+    </ul>
+
+    <div class="ligne">
+      <label><input type="checkbox" v-model="simulerErreur" /> Simuler une erreur</label>
+      <button @click="charger" :disabled="chargement">Recharger</button>
+    </div>
+  </div>
+</template>
+```
+
+<Aside type="definition" title="Cycle de vie, onMounted">
+Un composant traverse plusieurs moments : il est créé, inséré dans la page (**monté**), mis à jour, puis retiré. C'est son **cycle de vie**. `onMounted(fonction)` exécute la fonction une fois le composant monté : c'est le moment habituel pour lancer un premier chargement de données.
+</Aside>
+
+`App.vue` suit le même schéma, avec un vrai `fetch` :
+
+```vue
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import CarteCafe from './components/CarteCafe.vue'
+
+// L'API de Café sans-fil. Plan B : '/cafes.json', un instantané placé dans public/
+const SOURCE = 'https://api.cafesansfil.ca/v1/cafes?size=100'
+
+// Données et état du chargement
+const cafes = ref([])
+const chargement = ref(true)
+const erreur = ref('')
+
+onMounted(async () => {
+  try {
+    const reponse = await fetch(SOURCE)
+    if (!reponse.ok) {
+      throw new Error(`statut ${reponse.status}`)
+    }
+    const page = await reponse.json()
+    cafes.value = page.items
+  } catch (e) {
+    erreur.value = `Impossible de charger les cafés (${e.message}).`
+  } finally {
+    chargement.value = false
+  }
+})
+</script>
+```
+
+```html
+<p v-if="chargement" class="message">Chargement des cafés…</p>
+<p v-else-if="erreur" class="message erreur">{{ erreur }}</p>
+<template v-else>
+  <!-- la liste des cafés, à l'étape suivante -->
+</template>
+```
+
+<MarginNote type="rappel" titre="fetch ne rejette pas un 404">
+`fetch` n'échoue que si le serveur est injoignable. Une réponse 404 ou 500 est une réponse comme une autre : d'où la vérification de `reponse.ok`, qui vaut `true` seulement pour un statut de 200 à 299.
+</MarginNote>
+
+<MarginNote type="astuce" titre="L'élément template">
+Un `<template>` regroupe plusieurs éléments sous une même directive, sans ajouter d'élément à la page.
+</MarginNote>
+
+<Aside type="caution" title="Plan B : un instantané des données">
+Une API externe peut être indisponible, ou refuser les appels d'une autre origine, le jour où l'on en a besoin. Le dossier fourni contient `public/cafes.json`, un instantané de démonstration de la réponse de l'API. Pour l'utiliser, il suffit de remplacer `SOURCE` par `'/cafes.json'` : Vite sert les fichiers de `public/` à la racine du site. Les données de l'instantané ne sont pas tenues à jour.
+</Aside>
+
+### Étape 2 : un composant par café
+
+Chaque café s'affiche dans une carte. Plutôt que d'écrire tout ce HTML dans `App.vue`, on en fait un composant, `CarteCafe`, qui reçoit le café à afficher par une **prop**.
+
+<DemoProps client:visible />
+
+```vue
+<script setup>
+defineProps({
+  nom: { type: String, required: true },
+  ouvert: { type: Boolean, default: false },
+})
+</script>
+
+<template>
+  <span class="badge" :class="ouvert ? 'ouvert' : 'ferme'">
+    {{ nom }} : {{ ouvert ? 'ouvert' : 'fermé' }}
+  </span>
+</template>
+```
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import BadgeStatut from './BadgeStatut.vue'
+
+const nom = ref('Café Beagel')
+const ouvert = ref(true)
+</script>
+
+<template>
+  <div class="demo">
+    <div class="ligne">
+      <input type="text" v-model="nom" />
+      <label><input type="checkbox" v-model="ouvert" /> Ouvert</label>
+    </div>
+    <div class="ligne">
+      <BadgeStatut :nom="nom" :ouvert="ouvert" />
+      <BadgeStatut nom="La Planck" />
+    </div>
+  </div>
+</template>
+```
+
+<Aside type="definition" title="Prop">
+Une **prop** est une valeur que le composant parent transmet à un composant enfant, comme un attribut HTML. L'enfant les déclare avec `defineProps()`, en précisant leur type. Avec `:`, la prop reçoit la valeur d'une expression, tenue à jour ; sans `:`, elle reçoit le texte tel quel. L'enfant ne modifie pas ses props : elles appartiennent au parent.
+</Aside>
+
+`CarteCafe` déclare deux props : le café, et s'il fait partie des favoris, qui serviront à l'étape 5. Une propriété calculée traduit les codes de paiement en mots.
+
+```vue
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  cafe: { type: Object, required: true },
+  favori: { type: Boolean, default: false },
+})
+
+const NOMS_PAIEMENT = { CASH: 'Comptant', DEBIT: 'Débit', CREDIT: 'Crédit' }
+
+const paiements = computed(() =>
+  props.cafe.payment_details.map((p) => NOMS_PAIEMENT[p.method] ?? p.method).join(', '),
+)
+</script>
+```
+
+Dans le gabarit, les props s'utilisent directement par leur nom ; dans le script, on passe par l'objet que rend `defineProps()`, ici `props`. `App.vue` répète la carte pour chaque café, avec le `slug` comme clé :
+
+```html
+<div class="grille">
+  <CarteCafe v-for="cafe in cafes" :key="cafe.slug" :cafe="cafe" />
+</div>
+```
+
+### Étape 3 : des filtres rapides
+
+Les filtres sont des champs de formulaire, liés à des données par `v-model`.
+
+<DemoVModel client:visible />
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const nom = ref('')
+const sujet = ref('Stage')
+const urgent = ref(false)
+</script>
+
+<template>
+  <div class="demo">
+    <div class="ligne">
+      <input type="text" v-model="nom" placeholder="Votre nom" />
+      <select v-model="sujet">
+        <option>Stage</option>
+        <option>Projet</option>
+        <option>Question</option>
+      </select>
+      <label><input type="checkbox" v-model="urgent" /> Urgent</label>
+    </div>
+    <p>
+      Aperçu : <strong>[{{ sujet }}]</strong>
+      message de {{ nom || 'personne' }}<span v-if="urgent">, à traiter en priorité</span>
+    </p>
+  </div>
+</template>
+```
+
+<Aside type="definition" title="v-model">
+`v-model` lie un champ de formulaire à une donnée **dans les deux sens** : ce que la personne saisit modifie la donnée, et une modification de la donnée met le champ à jour. Selon le champ, la donnée est un texte (`input`, `select`) ou un booléen (case à cocher).
+</Aside>
+
+Dans `App.vue`, chaque filtre est une donnée, et la liste affichée devient une propriété calculée qui les combine. La liste des pavillons du menu déroulant se déduit elle aussi des données.
+
+```js
+// Filtres rapides
+const recherche = ref('')
+const ouvertsSeulement = ref(false)
+const pavillon = ref('')
+const carteAcceptee = ref(false)
+
+// Les pavillons présents dans les données, sans doublon, en ordre alphabétique
+const pavillons = computed(() =>
+  [...new Set(cafes.value.map((c) => c.location.pavillon))].sort((a, b) => a.localeCompare(b, 'fr')),
+)
+
+const cafesFiltres = computed(() => {
+  const texte = recherche.value.trim().toLowerCase()
+
+  return cafes.value.filter((cafe) => {
+    if (ouvertsSeulement.value && !cafe.is_open) return false
+    if (pavillon.value && cafe.location.pavillon !== pavillon.value) return false
+    if (carteAcceptee.value && !cafe.payment_details.some((p) => p.method !== 'CASH')) return false
+    if (texte && !`${cafe.name} ${cafe.description}`.toLowerCase().includes(texte)) return false
+    return true
+  })
+})
+```
+
+```html
+<section class="filtres" aria-label="Filtres rapides">
+  <input v-model="recherche" type="search" placeholder="Rechercher un café, un plat…" />
+
+  <select v-model="pavillon">
+    <option value="">Tous les pavillons</option>
+    <option v-for="p in pavillons" :key="p" :value="p">{{ p }}</option>
+  </select>
+
+  <label><input v-model="ouvertsSeulement" type="checkbox" /> Ouverts</label>
+  <label><input v-model="carteAcceptee" type="checkbox" /> Carte acceptée</label>
+</section>
+
+<p class="message">{{ cafesFiltres.length }} café(s) sur {{ cafes.length }}</p>
+```
+
+La grille parcourt désormais `cafesFiltres` plutôt que `cafes`.
+
+<Checkpoint question="La personne coche « Ouverts », puis choisit un pavillon. Combien de fois le code de cafesFiltres s'exécute-t-il, et pourquoi ?">
+Deux fois, une par changement : Vue a noté que `cafesFiltres` dépend de `ouvertsSeulement`, de `pavillon`, de `recherche`, de `carteAcceptee` et de `cafes`. À chaque modification de l'une de ces données, il recalcule la liste. Tant qu'aucune ne change, il réutilise le dernier résultat, même si le gabarit l'affiche à plusieurs endroits.
+</Checkpoint>
+
+### Étape 4 : des favoris
+
+Le bouton étoile se trouve dans la carte, mais la liste des favoris appartient à `App.vue`, qui s'en sert pour filtrer. L'enfant ne peut pas la modifier lui-même : il **émet un événement**, et le parent décide quoi en faire.
+
+<DemoEmits client:visible />
+
+```vue
+<script setup>
+defineProps({
+  actif: { type: Boolean, default: false },
+})
+const emit = defineEmits(['basculer'])
+</script>
+
+<template>
+  <button class="favori" :aria-pressed="actif" @click="emit('basculer')">
+    {{ actif ? '★' : '☆' }}
+  </button>
+</template>
+```
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import BoutonFavori from './BoutonFavori.vue'
+
+const cafes = ['Café Beagel', 'La Planck', 'Café-In']
+const favoris = ref([])
+
+function basculer(cafe) {
+  if (favoris.value.includes(cafe)) {
+    favoris.value = favoris.value.filter((f) => f !== cafe)
+  } else {
+    favoris.value.push(cafe)
+  }
+}
+</script>
+
+<template>
+  <div class="demo">
+    <ul>
+      <li v-for="cafe in cafes" :key="cafe">
+        {{ cafe }}
+        <BoutonFavori :actif="favoris.includes(cafe)" @basculer="basculer(cafe)" />
+      </li>
+    </ul>
+    <p class="note">Favoris : {{ favoris.length ? favoris.join(', ') : 'aucun' }}</p>
+  </div>
+</template>
+```
+
+<Aside type="definition" title="Événement émis (emit)">
+Un composant enfant **émet** un événement pour signaler qu'il s'est passé quelque chose, sans savoir ce que le parent en fera. Il le déclare avec `defineEmits()`, puis l'émet avec `emit('nom')`, accompagné au besoin d'une valeur. Le parent l'écoute comme un événement du navigateur, avec `@nom`.
+</Aside>
+
+<Highlight couleur="ambre">Les données descendent du parent vers l'enfant par les props ; les événements remontent de l'enfant vers le parent par les emits.</Highlight>
+
+`CarteCafe` émet `basculer-favori`, avec le `slug` du café :
+
+```js
+const emit = defineEmits(['basculer-favori'])
+```
+
+```html
+<button
+  class="favori"
+  :aria-pressed="favori"
+  :aria-label="favori ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+  @click="emit('basculer-favori', cafe.slug)"
+>
+  {{ favori ? '★' : '☆' }}
+</button>
+```
+
+`App.vue` garde la liste des favoris, reçoit l'événement, et ajoute un dernier filtre :
+
+```js
+const favorisSeulement = ref(false)
+const favoris = ref([])
+
+function basculerFavori(slug) {
+  if (favoris.value.includes(slug)) {
+    favoris.value = favoris.value.filter((s) => s !== slug)
+  } else {
+    favoris.value.push(slug)
+  }
+}
+```
+
+```html
+<label><input v-model="favorisSeulement" type="checkbox" /> Mes favoris ({{ favoris.length }})</label>
+
+<CarteCafe
+  v-for="cafe in cafesFiltres"
+  :key="cafe.slug"
+  :cafe="cafe"
+  :favori="favoris.includes(cafe.slug)"
+  @basculer-favori="basculerFavori"
+/>
+```
+
+Dans `cafesFiltres`, une ligne de plus : `if (favorisSeulement.value && !favoris.value.includes(cafe.slug)) return false`. Avec `@basculer-favori="basculerFavori"`, Vue appelle la fonction en lui passant la valeur émise, ici le `slug`.
+
+### Le résultat
+
+La démonstration ci-dessous utilise l'instantané des données ; le projet, lui, interroge l'API.
+
+<ListeCafes client:visible source="/demos/cafes.json" />
+
+<details>
+<summary>Le fichier src/App.vue complet</summary>
+
+```vue
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import CarteCafe from './components/CarteCafe.vue'
+
+// L'API de Café sans-fil. Plan B : '/cafes.json', un instantané placé dans public/
+const SOURCE = 'https://api.cafesansfil.ca/v1/cafes?size=100'
+
+// Données et état du chargement
+const cafes = ref([])
+const chargement = ref(true)
+const erreur = ref('')
+
+// Filtres rapides
+const recherche = ref('')
+const ouvertsSeulement = ref(false)
+const pavillon = ref('')
+const carteAcceptee = ref(false)
+const favorisSeulement = ref(false)
+const favoris = ref([])
+
+onMounted(async () => {
+  try {
+    const reponse = await fetch(SOURCE)
+    if (!reponse.ok) {
+      throw new Error(`statut ${reponse.status}`)
+    }
+    const page = await reponse.json()
+    cafes.value = page.items
+  } catch (e) {
+    erreur.value = `Impossible de charger les cafés (${e.message}).`
+  } finally {
+    chargement.value = false
+  }
+})
+
+// Les pavillons présents dans les données, sans doublon, en ordre alphabétique
+const pavillons = computed(() =>
+  [...new Set(cafes.value.map((c) => c.location.pavillon))].sort((a, b) => a.localeCompare(b, 'fr')),
+)
+
+const cafesFiltres = computed(() => {
+  const texte = recherche.value.trim().toLowerCase()
+
+  return cafes.value.filter((cafe) => {
+    if (ouvertsSeulement.value && !cafe.is_open) return false
+    if (pavillon.value && cafe.location.pavillon !== pavillon.value) return false
+    if (carteAcceptee.value && !cafe.payment_details.some((p) => p.method !== 'CASH')) return false
+    if (favorisSeulement.value && !favoris.value.includes(cafe.slug)) return false
+    if (texte && !`${cafe.name} ${cafe.description}`.toLowerCase().includes(texte)) return false
+    return true
+  })
+})
+
+function basculerFavori(slug) {
+  if (favoris.value.includes(slug)) {
+    favoris.value = favoris.value.filter((s) => s !== slug)
+  } else {
+    favoris.value.push(slug)
+  }
+}
+
+function reinitialiser() {
+  recherche.value = ''
+  ouvertsSeulement.value = false
+  pavillon.value = ''
+  carteAcceptee.value = false
+  favorisSeulement.value = false
+}
+</script>
+
+<template>
+  <main>
+    <h1>Cafés étudiants de l'UdeM</h1>
+
+    <section class="filtres" aria-label="Filtres rapides">
+      <input v-model="recherche" type="search" placeholder="Rechercher un café, un plat…" />
+
+      <select v-model="pavillon">
+        <option value="">Tous les pavillons</option>
+        <option v-for="p in pavillons" :key="p" :value="p">{{ p }}</option>
+      </select>
+
+      <label><input v-model="ouvertsSeulement" type="checkbox" /> Ouverts</label>
+      <label><input v-model="carteAcceptee" type="checkbox" /> Carte acceptée</label>
+      <label><input v-model="favorisSeulement" type="checkbox" /> Mes favoris ({{ favoris.length }})</label>
+
+      <button type="button" @click="reinitialiser">Réinitialiser</button>
+    </section>
+
+    <p v-if="chargement" class="message">Chargement des cafés…</p>
+    <p v-else-if="erreur" class="message erreur">{{ erreur }}</p>
+
+    <template v-else>
+      <p class="message">{{ cafesFiltres.length }} café(s) sur {{ cafes.length }}</p>
+
+      <p v-if="cafesFiltres.length === 0" class="message">Aucun café ne correspond à ces filtres.</p>
+
+      <div class="grille">
+        <CarteCafe
+          v-for="cafe in cafesFiltres"
+          :key="cafe.slug"
+          :cafe="cafe"
+          :favori="favoris.includes(cafe.slug)"
+          @basculer-favori="basculerFavori"
+        />
+      </div>
+    </template>
+  </main>
+</template>
+
+<style scoped>
+main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
+h1 { margin: 0 0 16px; }
+.filtres { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; background: #fff; border: 1px solid var(--bord);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.filtres input[type='search'] { flex: 1 1 220px; }
+input[type='search'], select, button { font: inherit; padding: 6px 10px; border: 1px solid #cfd4de; border-radius: 8px; background: #fff; }
+button { cursor: pointer; }
+label { display: inline-flex; gap: 6px; align-items: center; }
+.message { color: var(--gris); margin: 0 0 12px; }
+.erreur { color: #b42318; }
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+</style>
+```
+
+</details>
+
+<details>
+<summary>Le fichier src/components/CarteCafe.vue complet</summary>
+
+```vue
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  cafe: { type: Object, required: true },
+  favori: { type: Boolean, default: false },
+})
+const emit = defineEmits(['basculer-favori'])
+
+const NOMS_PAIEMENT = { CASH: 'Comptant', DEBIT: 'Débit', CREDIT: 'Crédit' }
+
+const paiements = computed(() =>
+  props.cafe.payment_details.map((p) => NOMS_PAIEMENT[p.method] ?? p.method).join(', '),
+)
+</script>
+
+<template>
+  <article class="carte">
+    <img v-if="cafe.banner_url" :src="cafe.banner_url" :alt="`Photo du café ${cafe.name}`" loading="lazy" />
+
+    <div class="contenu">
+      <header>
+        <h2>{{ cafe.name }}</h2>
+        <button
+          class="favori"
+          :aria-pressed="favori"
+          :aria-label="favori ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+          @click="emit('basculer-favori', cafe.slug)"
+        >
+          {{ favori ? '★' : '☆' }}
+        </button>
+      </header>
+
+      <p class="statut" :class="cafe.is_open ? 'ouvert' : 'ferme'">
+        {{ cafe.is_open ? 'Ouvert' : 'Fermé' }}
+        <span v-if="cafe.status_message"> · {{ cafe.status_message }}</span>
+      </p>
+
+      <p class="description">{{ cafe.description }}</p>
+
+      <p class="infos">
+        {{ cafe.location.pavillon }}, {{ cafe.location.local }}<br />
+        Paiement : {{ paiements }}
+      </p>
+    </div>
+  </article>
+</template>
+
+<style scoped>
+.carte { background: #fff; border: 1px solid var(--bord); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+img { width: 100%; height: 140px; object-fit: cover; background: var(--bord); }
+.contenu { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+header { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+h2 { margin: 0; font-size: 1.1rem; }
+p { margin: 0; }
+.favori { border: 0; background: none; font-size: 1.3rem; line-height: 1; color: #b54708; cursor: pointer; padding: 0; }
+.statut { font-size: .85rem; font-weight: 600; }
+.ouvert { color: #067647; }
+.ferme { color: #b42318; }
+.description { font-size: .92rem; }
+.infos { font-size: .85rem; color: var(--gris); }
+</style>
+```
+
+</details>
+
+<Aside type="astuce" title="Pour aller plus loin">
+Conserver les favoris d'une visite à l'autre, dans `localStorage`. Ajouter un filtre « Ouvert maintenant », qui compare l'heure actuelle aux plages de `opening_hours`.
+</Aside>
+
+## Vers plusieurs pages : le routage
+
+Une suite naturelle consiste à afficher la fiche détaillée d'un café, avec son menu, que l'API fournit à l'adresse `GET /v1/cafes/{slug}`. On pourrait garder le café choisi dans une donnée de `App.vue`, et basculer entre la liste et la fiche avec `v-if`. Mais l'adresse affichée par le navigateur ne changerait jamais :
+
+- impossible de partager le lien vers la fiche d'un café, ou de l'ajouter aux favoris du navigateur ;
+- le bouton **Précédent** ferait quitter l'application, au lieu de revenir à la liste ;
+- recharger la page ramènerait toujours à la liste.
+
+<Aside type="definition" title="Routage côté client">
+Le **routage côté client** associe chaque adresse de l'application à un composant à afficher. Le navigateur ne charge qu'une seule page HTML ; quand l'adresse change, le routeur remplace le composant affiché, sans nouvelle requête au serveur pour la page. C'est le fonctionnement d'une **application monopage**, ou SPA (*Single Page Application*). Avec Vue, ce rôle revient à la bibliothèque officielle **Vue Router**.
+</Aside>
+
+L'idée est familière : l'API Express associait déjà une méthode et une adresse à un traitement, avec la même syntaxe pour les parties variables. Voici, en aperçu, ce que deviendrait l'application :
+
+```js
+// src/router.js
+import { createRouter, createWebHistory } from 'vue-router'
+import ListeCafes from './components/ListeCafes.vue'
+import FicheCafe from './components/FicheCafe.vue'
+
+export default createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', component: ListeCafes },
+    { path: '/cafes/:slug', component: FicheCafe },
+  ],
+})
+```
+
+```js
+// src/main.js
+createApp(App).use(router).mount('#app')
+```
+
+- `App.vue` ne contient plus que `<RouterView />`, l'emplacement où le routeur affiche le composant de l'adresse courante. La liste et ses filtres déménagent dans `ListeCafes.vue`.
+- Dans `CarteCafe`, un lien ``<RouterLink :to="`/cafes/${cafe.slug}`">`` remplace la balise `<a>` : il change l'adresse sans recharger la page.
+- `FicheCafe` lit le `slug` dans l'adresse avec `useRoute().params.slug`, comme `req.params.slug` en Express, puis charge le café dans `onMounted`.
+
+<Aside type="caution" title="Une adresse que le serveur ne connaît pas">
+Avec `createWebHistory()`, les adresses ont l'air de vraies pages : `/cafes/cafe-beagel`. Si l'on recharge la fiche, le navigateur demande cette adresse au serveur, qui doit alors renvoyer `index.html` pour que le routeur prenne le relais. Le serveur de développement de Vite le fait déjà ; un serveur de production doit souvent être configuré pour cela.
+</Aside>
+
+Le routage fera l'objet de la page suivante : routes et paramètres, liens, navigation par le code, et page « introuvable ».
+
+## Récapitulatif
+
+| Concept | Syntaxe | Rôle |
+| --- | --- | --- |
+| Composant | fichier `.vue` : `<script setup>`, `<template>`, `<style scoped>` | un morceau d'interface réutilisable, avec une responsabilité |
+| Prop | `defineProps()`, `:prop="…"` | transmettre une valeur du parent à l'enfant |
+| Événement émis | `defineEmits()`, `emit('nom', valeur)`, `@nom` | signaler au parent ce qui s'est passé dans l'enfant |
+| Cycle de vie | `onMounted(…)` | agir une fois le composant dans la page, par exemple charger des données |
+| Appel d'API | `fetch`, `reponse.ok`, `await reponse.json()` | obtenir des données, en prévoyant le chargement et l'erreur |
+| Liaison de formulaire | `v-model` | lier un champ à une donnée, dans les deux sens |
+| Routage (aperçu) | `createRouter`, `<RouterView />`, `<RouterLink>` | associer une adresse à un composant |
+
+- L'état vit dans le composant le plus haut qui en a besoin ; les données descendent par les props, les événements remontent par les emits.
+- Un chargement de données a trois états à prévoir : en cours, réussi, échoué.
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Le composant CarteCafe veut signaler qu'on a cliqué sur son étoile. Que fait-il ?"
+  options={[
+    { texte: "Il modifie sa prop favori", correct: false },
+    { texte: "Il émet un événement, que le parent écoute", correct: true },
+    { texte: "Il modifie directement la liste des favoris du parent", correct: false },
+  ]}
+  retour="Les props appartiennent au parent : l'enfant ne les modifie pas. Il émet un événement, avec emit('basculer-favori', slug), et c'est le parent, qui possède la liste des favoris, qui la met à jour."
+/>
+
+<Quiz
+  client:visible
+  question="Où placer la liste des favoris, qui sert à la fois aux étoiles des cartes et au filtre « Mes favoris » ?"
+  options={[
+    { texte: "Dans chaque CarteCafe, une donnée par carte", correct: false },
+    { texte: "Dans App.vue, le composant le plus haut qui en a besoin", correct: true },
+    { texte: "Dans le fichier main.js", correct: false },
+  ]}
+  retour="Le filtre de App.vue doit connaître tous les favoris : la liste lui appartient. Chaque carte reçoit seulement, par une prop, si son café en fait partie."
+/>
+
+<Quiz
+  client:visible
+  question="Une requête fetch reçoit une réponse 404. Que se passe-t-il ?"
+  options={[
+    { texte: "fetch lève une erreur, et le bloc catch s'exécute", correct: false },
+    { texte: "fetch réussit ; c'est au code de vérifier reponse.ok", correct: true },
+    { texte: "Le navigateur affiche une page d'erreur", correct: false },
+  ]}
+  retour="fetch n'échoue que si le serveur est injoignable. Un 404 ou un 500 reste une réponse : reponse.ok vaut alors false, et c'est au code de la traiter comme une erreur."
+/>
+
+<Quiz
+  client:visible
+  question="À quoi sert onMounted dans la liste des cafés ?"
+  options={[
+    { texte: "À lancer le chargement des cafés une fois le composant dans la page", correct: true },
+    { texte: "À recharger les cafés à chaque changement de filtre", correct: false },
+    { texte: "À déclarer les props du composant", correct: false },
+  ]}
+  retour="onMounted exécute sa fonction une seule fois, quand le composant vient d'être inséré dans la page. Les filtres, eux, n'ont pas besoin de nouvel appel : la propriété calculée cafesFiltres travaille sur les cafés déjà chargés."
+/>
+
+<Quiz
+  client:visible
+  question="Pourquoi un routeur plutôt qu'un simple v-if pour passer de la liste à la fiche d'un café ?"
+  options={[
+    { texte: "Parce que v-if ne peut pas afficher de composants", correct: false },
+    { texte: "Pour que chaque fiche ait sa propre adresse : partageable, compatible avec Précédent et le rechargement", correct: true },
+    { texte: "Pour que la fiche soit produite par le serveur", correct: false },
+  ]}
+  retour="Avec v-if, l'adresse ne change jamais. Le routeur associe une adresse à chaque vue : on peut partager le lien d'une fiche, revenir en arrière, ou recharger sans perdre sa place."
+/>

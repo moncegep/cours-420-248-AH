@@ -1,20 +1,17 @@
 {
-  "name": "demo-node-api",
+  "name": "demo-express",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node --watch serveur.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "react": "^19.3.1"
-  },
-  "devDependencies": {
-    "vitest": "^5.0.4"
+    "express": "^5.3.0"
   }
 }

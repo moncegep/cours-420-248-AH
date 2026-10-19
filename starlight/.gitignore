@@ -1,3 +1,5 @@
+# temp folder
+temp/
 # build output
 dist/
 # generated types

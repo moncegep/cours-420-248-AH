@@ -1,0 +1,358 @@
+---
+title: "Les outils du développement web moderne"
+description: "Une page qui situe les outils du développement web moderne : un rappel du serveur (PHP, Node.js, Express) et de la base de données (MySQL), puis l'accent sur le côté client avec Vue.js, Vite et npm, et un aperçu des alternatives (React, Angular, Webpack, Nuxt, Next.js, Astro)."
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import MarginNote from "../../../components/MarginNote.astro";
+import Highlight from "../../../components/Highlight.astro";
+import Checkpoint from "../../../components/Checkpoint.astro";
+import SimpleLayerDiagram from "../../../components/SimpleLayerDiagram.astro";
+
+Une application web moderne s'appuie sur des outils répartis en trois couches : le client, dans le navigateur ; le serveur, qui produit des pages ou répond par une API ; et la base de données. Jusqu'ici, le cours a surtout porté sur les deux dernières, pour construire le serveur et conserver les données à long terme.
+
+Cette page les rappelle brièvement, puis se concentre sur le côté client, où **Vue.js**, **Vite** et **npm**, déjà rencontré, prennent le relais.
+
+## 1. Vue d'ensemble
+
+<SimpleLayerDiagram
+  ariaLabel="Les trois couches d'une application web moderne : le client, le serveur et la base de données. Le client communique avec le serveur par HTTP, et le serveur communique avec la base de données par un pilote."
+  caption="Les trois couches d'une application web. Le client échange en HTTP avec le serveur, qui parle à la base de données par un pilote. Cette page se concentre sur la couche client."
+  layers={[
+    { icon: "laptop", iconSize: "24", iconColor: "var(--accent)", title: "Client (navigateur)", lines: ["HTML · CSS · JavaScript", "DOM · événements"], accent: true, focus: { label: "Vue.js · Vite · npm", note: "le sujet de cette page" } },
+    { icon: "server", iconColor: "#777", title: "Serveur", lines: ["PHP : pages produites par le serveur", "Node.js · Express : API REST", "sessions · authentification"] },
+    { icon: "database", iconColor: "#777", title: "Base de données", lines: ["MySQL", "PDO (PHP)"] },
+  ]}
+  connectors={[
+    { label: "HTTP", accent: true },
+    { label: "pilote" },
+  ]}
+/>
+
+## 2. Le côté client
+
+Développer côté client, c'est faire appel à des outils spécialisés, chacun répondant à un enjeu précis :
+
+| Tâche | Enjeu | Outils |
+|---|---|---|
+| Structurer l'interface | éviter la duplication, isoler les responsabilités | les composants (Vue, React, Angular) |
+| Garder l'affichage à jour | synchroniser l'affichage avec un état qui change | la réactivité déclarative : l'interface est une fonction de l'état |
+| Partager l'état de l'application | une source de vérité cohérente, partagée entre composants | les composables, Pinia, `localStorage` |
+| Réagir aux interactions | traiter les événements et les saisies | les événements du DOM, et ceux qu'émettent les composants |
+| Naviguer entre les vues | plusieurs écrans, sans recharger la page | un routeur (Vue Router, React Router) |
+| Échanger avec un serveur ou un service externe | prévoir les états de chargement, de succès et d'erreur | `fetch`, axios, TanStack Query |
+| Optimiser les ressources | réduire la taille des fichiers, ne charger que le nécessaire | l'élimination du code inutile, le découpage du code, le chargement différé |
+| Itérer rapidement | voir chaque modification sans tout reconstruire | un serveur de développement à rechargement instantané (Vite) |
+| Livrer en production | produire un livrable optimisé, prêt à déployer | la construction et le regroupement des fichiers (Vite, Webpack) |
+| Gérer les dépendances | installer les bibliothèques et en fixer les versions | npm, pnpm, yarn |
+
+Le **flux de développement** suit en général les mêmes étapes :
+
+1. créer le projet (`npm create vue@latest`) ;
+2. lancer le serveur de développement à rechargement instantané (`npm run dev`) ;
+3. composer l'interface en composants ;
+4. ajouter des dépendances avec npm, et, au besoin, typer le code avec TypeScript ;
+5. construire le livrable optimisé pour la production (`npm run build`).
+
+## 3. Vue.js
+
+**Vue.js** est un **cadriciel JavaScript open source** pour construire des interfaces utilisateur à partir de composants réutilisables et réactifs. Créé par Evan You en 2014, il est maintenu par une équipe indépendante et par sa communauté.
+
+<MarginNote type="attention" titre="Un cadriciel « progressif »">
+Vue se présente comme un cadriciel **progressif** : on peut l'adopter par degrés. Il peut d'abord rendre interactive une seule page existante, chargé par une simple ligne `import` ; puis porter une application complète, avec ses outils officiels pour le routage (Vue Router) et l'état partagé (Pinia).
+</MarginNote>
+
+Dans le [sondage Stack Overflow 2025](https://survey.stackoverflow.co/2025/technology#most-popular-technologies-webframe-prof), React est la bibliothèque d'interface la plus utilisée par les développeurs professionnels (46,9 %), devant Angular (19,8 %) et Vue.js (18,4 %). Ces proportions varient selon les régions et les secteurs, mais les trois reposent sur les mêmes idées : des composants, un état, et une interface qui se met à jour quand l'état change.
+
+### Pourquoi Vue dans ce cours
+
+- **La continuité avec le HTML.** Les gabarits de Vue sont du HTML enrichi de quelques attributs : `v-if` et `v-for` jouent le rôle des `if` et des `foreach` qu'on écrivait dans les pages PHP.
+- **Une réactivité automatique.** Quand une donnée change, Vue met à jour ce qui en dépend, sans qu'on ait à le lui demander.
+- **Des outils officiels.** Le routeur, la gestion d'état et les outils de développement sont maintenus par la même équipe, ce qui évite d'avoir à choisir parmi des bibliothèques concurrentes.
+
+React reste plus répandu sur le marché de l'emploi. Les concepts vus avec Vue s'y transposent en grande partie, et la section sur les alternatives, plus bas, montre un même composant dans les trois cadriciels.
+
+### La syntaxe des gabarits
+
+Un composant Vue tient dans un fichier `.vue`, qui réunit son comportement (`<script setup>`), sa structure (`<template>`) et son apparence (`<style scoped>`).
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const prenom = 'Maude'
+const age = ref(22)
+</script>
+
+<template>
+  <h1>Bienvenue, {{ prenom }} !</h1>
+  <p>Vous avez {{ age }} ans. L'an prochain, vous aurez {{ age + 1 }} ans.</p>
+  <button @click="age++">Un an de plus</button>
+</template>
+```
+
+Le gabarit insère des **expressions JavaScript** entre doubles accolades (`{{ }}`), et ajoute au HTML des **directives**, des attributs spéciaux qui commencent par `v-` :
+
+| Directive | Raccourci | Rôle |
+|---|---|---|
+| `v-bind:attribut` | `:attribut` | donner à un attribut la valeur d'une expression |
+| `v-on:evenement` | `@evenement` | réagir à un événement |
+| `v-if`, `v-else-if`, `v-else` | | afficher un élément sous condition |
+| `v-for` | | répéter un élément pour chaque valeur d'une liste |
+| `v-model` | | lier un champ de formulaire à une donnée, dans les deux sens |
+
+Trois règles distinguent un gabarit Vue du HTML ordinaire :
+
+1. **Des expressions, pas des instructions.** Entre `{{ }}` et dans une directive, on écrit une expression qui produit une valeur, comme `age + 1` ou `actif ? 'oui' : 'non'`. Une instruction comme `if (…) { … }` n'y a pas sa place.
+2. **Les attributs restent ceux du HTML.** On écrit `class`, et non `className` comme en JSX. Une valeur dynamique passe par `:class`.
+3. **Plusieurs éléments racines sont permis.** Contrairement à JSX, un gabarit Vue peut contenir plusieurs éléments côte à côte, comme le `h1`, le `p` et le `button` ci-dessus.
+
+<MarginNote type="plusloin">
+La page sur la prise en main de Vue.js présente chaque directive avec une démonstration à manipuler. La documentation officielle propose aussi un guide de la [syntaxe des gabarits](https://fr.vuejs.org/guide/essentials/template-syntax).
+</MarginNote>
+
+### Écosystème
+
+L'écosystème complète Vue pour couvrir les autres aspects d'une application. La plupart de ces outils sont officiels.
+
+| Besoin | Outils |
+|---|---|
+| Logique réutilisable entre composants | les composables, de simples fonctions qui utilisent `ref` et `computed` |
+| État partagé (moyennes et grandes applications) | Pinia |
+| Routage et navigation | Vue Router |
+| Données asynchrones d'API | `fetch` dans `onMounted`, ou TanStack Query (états de chargement, de succès et d'erreur) |
+| Rendu serveur et génération statique | Nuxt |
+| Tests | Vitest, Vue Test Utils |
+| Mobile | Ionic Vue, avec Capacitor, qui emballe l'application web dans une application installable |
+
+### Alternatives : React et Angular
+
+Vue n'est pas la seule option pour concevoir des applications web réactives.
+
+**React**, créé chez Facebook, aujourd'hui Meta, est officiellement une **bibliothèque** : il ne gère que la couche interface, et s'appuie sur un vaste écosystème (React Router, TanStack Query, Next.js) pour le reste. Il décrit l'interface en **JSX**, une syntaxe qui place le balisage directement dans le JavaScript.
+
+**Angular**, développé et maintenu par Google, est un cadriciel tout-en-un, écrit en TypeScript, qui fournit d'emblée le routage, les formulaires et l'accès HTTP. Plus exigeant à prendre en main, il convient bien aux applications complexes, aux grandes équipes et aux projets qui demandent une architecture fortement encadrée.
+
+Voici le même composant, un compteur de mentions « J'aime », dans les trois :
+
+<Tabs>
+  <TabItem label="Vue">
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const mentions = ref(0)
+</script>
+
+<template>
+  <p>{{ mentions }} mention(s)</p>
+  <button @click="mentions++">J'aime</button>
+</template>
+```
+
+  </TabItem>
+  <TabItem label="React">
+
+```jsx
+import { useState } from 'react'
+
+export default function Compteur() {
+  const [mentions, setMentions] = useState(0)
+
+  return (
+    <>
+      <p>{mentions} mention(s)</p>
+      <button onClick={() => setMentions(mentions + 1)}>J'aime</button>
+    </>
+  )
+}
+```
+
+  </TabItem>
+  <TabItem label="Angular">
+
+```ts
+import { Component, signal } from '@angular/core'
+
+@Component({
+  selector: 'app-compteur',
+  template: `
+    <p>{{ mentions() }} mention(s)</p>
+    <button (click)="aimer()">J'aime</button>
+  `,
+})
+export class Compteur {
+  mentions = signal(0)
+
+  aimer() {
+    this.mentions.update((n) => n + 1)
+  }
+}
+```
+
+  </TabItem>
+</Tabs>
+
+Les trois expriment la même idée : une donnée d'état, affichée dans le balisage, et modifiée par un événement. Ce qui change, c'est la façon de l'écrire :
+
+- Vue sépare le gabarit du script, et modifie l'état directement (`mentions++`).
+- React écrit le balisage en JSX, dans une fonction ; l'état ne se modifie que par la fonction que fournit `useState` (`setMentions`). Le JSX impose aussi ses règles : un seul élément racine, ou un fragment `<>…</>` ; toutes les balises fermées ; `className` au lieu de `class`.
+- Angular réunit gabarit et logique dans une classe TypeScript, décorée par `@Component` ; l'état est un **signal**, lu en l'appelant (`mentions()`).
+
+<Checkpoint question="Le JSX impose className au lieu de class, alors que Vue et Angular gardent class. D'où vient cette différence ?">
+En JSX, le balisage est du JavaScript : chaque attribut devient une propriété d'objet, et `class` est un mot réservé du langage. D'où `className`, le nom de la propriété correspondante du DOM. Les gabarits de Vue et d'Angular, eux, restent du HTML, analysé par le cadriciel : ils peuvent garder les attributs habituels.
+</Checkpoint>
+
+## 4. Vite et les outils de construction
+
+Une application moderne compte des dizaines, voire des centaines de fichiers et de dépendances. Avant de la livrer au navigateur, des **outils de construction** (*build tools*) la préparent :
+
+- **le regroupement** (*bundling*) rassemble les modules, liés par `import` et `export`, en quelques fichiers seulement ;
+- **l'élimination du code inutile** (*tree-shaking*) retire ce qu'aucun module n'importe ;
+- **la minification** raccourcit le code, sans changer ce qu'il fait ;
+- **la traduction** convertit ce que le navigateur ne lit pas directement, comme les fichiers `.vue` ou TypeScript, en JavaScript ordinaire.
+
+[Vite](https://vite.dev/) est un outil de construction moderne, créé lui aussi par Evan You, mais utilisable avec la plupart des cadriciels : Vue, React, Svelte, ou aucun. Il distingue deux moments :
+
+- **En développement**, il sert les fichiers comme des modules ES, que le navigateur charge lui-même, plutôt que de tout regrouper au démarrage. Le serveur démarre presque instantanément, et chaque modification est appliquée à la page sans la recharger entièrement : c'est le **rechargement à chaud** (*Hot Module Replacement*, ou HMR).
+- **Pour la production**, il regroupe et optimise l'application dans le dossier `dist/`, avec Rolldown, un outil de regroupement écrit en Rust, depuis la version 8.
+
+<Highlight couleur="ambre">Vite sert les modules tels quels pendant le développement, et les regroupe pour la production.</Highlight>
+
+Vite n'est pas seul. **Webpack**, longtemps la référence, reste très répandu et très configurable. **Turbopack**, écrit en Rust, lui succède dans l'écosystème de Next.js. Au-dessus de ces outils, des **méta-cadriciels** ajoutent le routage par fichiers et le rendu côté serveur : **Nuxt** pour Vue, **Next.js** pour React, et **Astro**, compatible avec plusieurs cadriciels et orienté vers le contenu, comme le site de ce cours.
+
+### Créer un projet Vue avec Vite
+
+L'outil officiel, `create-vue`, crée un projet Vue configuré avec Vite. Dans un terminal, depuis le dossier voulu :
+
+```sh
+npm create vue@latest
+```
+
+L'assistant demande le nom du projet, puis propose des options (TypeScript, Vue Router, Pinia, tests). Pour commencer, on peut n'en cocher aucune. Ensuite :
+
+```sh
+cd mon-app
+npm install
+npm run dev
+```
+
+L'application est servie à l'adresse affichée, en général `http://localhost:5173`.
+
+<MarginNote type="attention" titre="Avec le gabarit de Vite">
+Vite propose aussi ses propres gabarits : `npm create vite@latest mon-app -- --template vue`. Le `--` transmet l'option `--template` à l'outil de création plutôt qu'à npm. Si l'option semble ignorée dans un terminal Windows, la commande sans option lance un assistant interactif, qui demande le cadriciel voulu.
+</MarginNote>
+
+## 5. npm (rappel)
+
+Le **npm** déjà utilisé pour l'API Express sert aussi côté client : c'est lui qui installe Vue et Vite, et qui exécute les scripts du projet (`npm run dev`, `npm run build`).
+
+- `package.json` déclare les dépendances et les scripts.
+- `npm install` télécharge les dépendances dans le dossier `node_modules` du projet, et note leurs versions exactes dans `package-lock.json`.
+- `npm install nom` ajoute une dépendance de l'application, comme `vue` ; `npm install -D nom` ajoute une **dépendance de développement**, utile seulement pour construire l'application, comme `vite`.
+
+<MarginNote type="astuce" titre="node_modules ne se partage pas">
+Le dossier `node_modules` se reconstruit à partir de `package.json` et de `package-lock.json`. On ne le copie pas, on ne le remet pas avec un travail, et on l'exclut du dépôt Git avec `.gitignore`.
+</MarginNote>
+
+## 6. TypeScript
+
+**TypeScript** est un sur-ensemble de JavaScript qui ajoute un **typage statique** : tout JavaScript valide est aussi du TypeScript. Les annotations de types sont vérifiées avant l'exécution, puis effacées : le navigateur reçoit du JavaScript ordinaire.
+
+Le typage permet de repérer certaines erreurs avant l'exécution, comme une valeur du mauvais type ou un champ absent. Il enrichit aussi l'autocomplétion et la documentation dans l'éditeur, et rend les modifications à grande échelle plus sûres. Il est de plus en plus répandu, côté client comme côté serveur.
+
+```ts
+let age: number = 22
+age = 'vingt-deux'   // erreur signalée avant l'exécution
+
+function saluer(nom: string): string {
+  return `Bonjour, ${nom}`
+}
+
+// un type qui décrit la forme d'un objet
+interface Tache {
+  id: string
+  titre: string
+  terminee: boolean
+}
+```
+
+Avec Vue, il suffit de cocher TypeScript dans l'assistant de `npm create vue@latest`. Les fichiers JavaScript deviennent des `.ts`, et le script d'un composant se déclare avec `lang="ts"` :
+
+```vue
+<script setup lang="ts">
+interface Cafe {
+  slug: string
+  name: string
+  is_open: boolean
+}
+
+const props = defineProps<{ cafe: Cafe; favori?: boolean }>()
+</script>
+```
+
+Les types sont contrôlés par l'éditeur et par la commande `vue-tsc`, que le script `npm run build` d'un projet TypeScript lance avant la construction.
+
+<MarginNote type="astuce" titre="Adopter progressivement">
+TypeScript s'adopte par degrés. Un fichier `.ts` accepte du JavaScript ordinaire, ce qui permet de typer peu au début, puis davantage au fil du projet. Ce cours écrit ses exemples en JavaScript.
+</MarginNote>
+
+<MarginNote type="plusloin">
+Le manuel officiel : [TypeScript Handbook](https://www.typescriptlang.org/docs/), et le guide [Utiliser Vue avec TypeScript](https://fr.vuejs.org/guide/typescript/overview).
+</MarginNote>
+
+## 7. Les outils de développement du navigateur
+
+Tous les navigateurs modernes intègrent des **outils de développement** (*DevTools*), qu'on ouvre avec la touche F12, ou par un clic droit sur la page, puis « Inspecter ». Ce sont les instruments quotidiens du développement côté client : examiner et modifier la page en direct, suivre ce que fait le code, et diagnostiquer les problèmes sans quitter le navigateur.
+
+| Panneau (Chrome) | Équivalent Firefox | À quoi il sert |
+|---|---|---|
+| Elements | Inspecteur | inspecter et modifier le DOM et le CSS en direct |
+| Console | Console | lire les messages et les erreurs, exécuter du JavaScript |
+| Sources | Débogueur | poser des points d'arrêt, exécuter le code pas à pas |
+| Network | Réseau | observer les requêtes HTTP : méthode, statut, contenu, durée |
+| Performance | Performances | profiler le rendu et repérer les ralentissements |
+| Application | Stockage | examiner les cookies, `localStorage`, le cache et les service workers |
+
+- **Elements** affiche le DOM **actuel**, y compris les modifications faites par JavaScript ou par Vue. On peut y essayer des changements de HTML ou de CSS sans toucher aux fichiers du projet.
+- **Console** affiche les erreurs JavaScript et les messages de `console.log()`, et exécute des instructions dans le contexte de la page.
+- **Network** montre chaque requête échangée avec un serveur : c'est là qu'on vérifie qu'un appel à l'API est bien parti, avec quelle méthode, et ce qu'il a reçu.
+- **Sources** permet de placer des **points d'arrêt**, d'examiner les variables et d'exécuter le code étape par étape, quand la console ne suffit plus à comprendre ce qui se passe.
+
+<MarginNote type="astuce" titre="Inspecter une application Vue">
+Les **Vue DevTools** ajoutent des panneaux propres à Vue : l'arbre des composants avec leurs props et leur état, la chronologie des événements, et, s'ils sont utilisés, l'état de Pinia et les routes. On les installe comme extension du navigateur (Chrome, Firefox, Edge). Un projet créé par `npm create vue@latest` les intègre aussi directement dans la page, derrière un petit bouton flottant.
+</MarginNote>
+
+<MarginNote type="plusloin">
+Documentation : [Chrome DevTools](https://developer.chrome.com/docs/devtools), [Firefox DevTools](https://firefox-source-docs.mozilla.org/devtools-user/), [Vue DevTools](https://devtools.vuejs.org/).
+</MarginNote>
+
+## 8. Pour aller plus loin
+
+Les outils de cette page permettent de construire des interfaces riches dans le navigateur. Deux technologies prolongent ces bases en donnant aux applications web de nouvelles capacités.
+
+Une **PWA** (*Progressive Web App*) est une application web conçue pour offrir certaines caractéristiques d'une application installée : on peut l'ajouter à l'appareil, l'utiliser en partie ou entièrement hors ligne et, si la plateforme le permet, recevoir des notifications. Elle repose toujours sur HTML, CSS et JavaScript, auxquels s'ajoutent en général un **manifeste**, un fichier JSON qui décrit l'application, et un **service worker**, un script qui peut intercepter les requêtes réseau et gérer une mise en cache.
+
+**WebAssembly** (*Wasm*) est un format binaire qui permet d'exécuter efficacement, dans le navigateur, du code compilé depuis des langages comme C, C++ ou Rust. On l'utilise notamment pour des traitements intensifs : traitement d'images, simulations, jeux. WebAssembly ne remplace pas JavaScript : les deux collaborent, JavaScript gardant notamment l'interaction avec le DOM et les API du navigateur.
+
+## 9. À retenir
+
+| Notion | Point clé |
+|---|---|
+| Les trois couches | client, serveur et base de données, reliés par HTTP et par un pilote |
+| Vue.js | cadriciel progressif par composants ; des gabarits HTML enrichis de directives, et une réactivité automatique |
+| React, Angular | les alternatives les plus répandues : JSX et une bibliothèque d'interface ; un cadriciel tout-en-un en TypeScript |
+| Vite | sert les modules tels quels en développement, avec rechargement à chaud ; regroupe et optimise pour la production |
+| npm | gestionnaire de paquets, côté serveur comme côté client ; `package.json`, `node_modules`, `package-lock.json` |
+| TypeScript | JavaScript typé, vérifié avant l'exécution puis effacé ; option de `npm create vue@latest`, `lang="ts"` |
+| Outils du navigateur | inspecter, déboguer et profiler l'application ; les Vue DevTools pour les composants et leur état |
+
+## Ressources
+
+- [Documentation de Vue.js (en français)](https://fr.vuejs.org/)
+- [Guide de Vite](https://vite.dev/guide/)
+- [Vue Router](https://router.vuejs.org/), [Pinia](https://pinia.vuejs.org/), [Nuxt](https://nuxt.com/)
+- [React (en français)](https://fr.react.dev/), [Angular](https://angular.dev/), [Next.js](https://nextjs.org/), [Astro](https://astro.build/)
+- [Webpack](https://webpack.js.org/), [Turbopack](https://turbo.build/pack)
+- [TypeScript](https://www.typescriptlang.org/)

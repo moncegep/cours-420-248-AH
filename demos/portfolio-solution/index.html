@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inès Gagnon · Développeuse web en formation</title>
+  <link rel="stylesheet" href="style.css">
+  <style>[v-cloak] { display: none; }</style>
+</head>
+<body>
+<div id="app" v-cloak>
+<div class="site" :class="{ sombre: sombre }">
+
+  <header class="entete conteneur">
+    <div class="haut">
+      <span class="marque">IG</span>
+      <button @click="sombre = !sombre">{{ sombre ? 'Mode clair' : 'Mode sombre' }}</button>
+    </div>
+    <h1>{{ profil.nom }}</h1>
+    <p class="titre">{{ profil.titre }}</p>
+    <span v-if="profil.disponible" class="dispo">Disponible pour un stage à l'été 2027</span>
+  </header>
+
+  <main class="conteneur">
+    <section>
+      <h2>À propos</h2>
+      <p>Je construis des sites et des applications web, du serveur jusqu'à l'interface. J'aime les projets utiles, les interfaces claires et le code qu'on peut relire six mois plus tard.</p>
+    </section>
+
+    <section>
+      <h2>Compétences</h2>
+      <ul class="puces">
+        <li v-for="competence in competences" :key="competence">{{ competence }}</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Projets</h2>
+
+      <div class="filtres">
+        <button
+          v-for="techno in technos"
+          :key="techno"
+          :class="{ actif: techno === filtre }"
+          @click="filtre = techno"
+        >{{ techno }}</button>
+      </div>
+
+      <div class="grille">
+        <article v-for="projet in projetsFiltres" :key="projet.titre" class="projet">
+          <h3>{{ projet.titre }}</h3>
+          <p>{{ projet.description }}</p>
+          <div class="technos">
+            <span v-for="techno in projet.technos" :key="techno">{{ techno }}</span>
+          </div>
+          <p v-show="ouverts.includes(projet.titre)" class="appris">Ce que j'ai appris : {{ projet.appris }}</p>
+          <button @click="basculerDetails(projet.titre)">
+            {{ ouverts.includes(projet.titre) ? 'Masquer' : 'Détails' }}
+          </button>
+        </article>
+      </div>
+    </section>
+
+    <section class="contact">
+      <h2>Contact</h2>
+      <p>Écrivez-moi à <a :href="`mailto:${profil.courriel}`">{{ profil.courriel }}</a>.</p>
+    </section>
+  </main>
+
+  <footer class="pied conteneur">{{ profil.nom }} · Montréal</footer>
+</div>
+</div>
+
+<script type="module">
+  import { createApp, ref, computed } from 'https://unpkg.com/vue@3.5/dist/vue.esm-browser.js'
+
+  createApp({
+    setup() {
+      const profil = {
+        nom: 'Inès Gagnon',
+        titre: "Étudiante en techniques de l'informatique, profil développement web",
+        courriel: 'ines.gagnon@exemple.test',
+        disponible: true,
+      }
+
+      const competences = ['HTML', 'CSS', 'JavaScript', 'PHP', 'MySQL', 'Express', 'Vue', 'Git']
+
+      const projets = [
+        { titre: 'Recettes de grand-maman', technos: ['HTML', 'CSS'],
+          description: "Site vitrine de recettes familiales, adapté à toutes les tailles d'écran.",
+          appris: 'les grilles CSS et les requêtes média.' },
+        { titre: 'Quiz des capitales', technos: ['HTML', 'CSS', 'JavaScript'],
+          description: 'Quiz chronométré avec un score final et un tableau des meilleurs résultats.',
+          appris: 'manipuler le DOM et réagir aux événements.' },
+        { titre: "Catalogue de l'érablière", technos: ['PHP', 'MySQL'],
+          description: 'Catalogue de produits avec ajout, modification et suppression.',
+          appris: 'les requêtes préparées et le patron POST-Redirect-GET.' },
+        { titre: 'API de réservations', technos: ['JavaScript', 'Express'],
+          description: 'API REST pour réserver des places de spectacle.',
+          appris: 'les codes de statut et la validation côté serveur.' },
+        { titre: 'Météo du campus', technos: ['JavaScript', 'Vue'],
+          description: 'Tableau de bord météo alimenté par une API publique.',
+          appris: 'la réactivité et les propriétés calculées.' },
+        { titre: 'Ce portfolio', technos: ['HTML', 'CSS', 'Vue'],
+          description: 'Une page HTML statique, rendue interactive avec Vue.',
+          appris: 'monter une application Vue sur une page existante.' },
+      ]
+
+      // État de l'interface
+      const sombre = ref(false)
+      const filtre = ref('Toutes')
+      const ouverts = ref([])   // titres des projets dont les détails sont affichés
+
+      // Les technologies des projets, sans doublon, précédées de « Toutes »
+      const technos = ['Toutes', ...new Set(projets.flatMap((p) => p.technos))]
+
+      const projetsFiltres = computed(() => {
+        if (filtre.value === 'Toutes') return projets
+        return projets.filter((p) => p.technos.includes(filtre.value))
+      })
+
+      function basculerDetails(titre) {
+        if (ouverts.value.includes(titre)) {
+          ouverts.value = ouverts.value.filter((t) => t !== titre)
+        } else {
+          ouverts.value.push(titre)
+        }
+      }
+
+      return { profil, competences, sombre, filtre, technos, projetsFiltres, ouverts, basculerDetails }
+    },
+  }).mount('#app')
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+.todo { font-family: system-ui, sans-serif; color: #1f2430; background: #faf8f6; border: 1px solid #e2e5ec; border-radius: 12px; padding: 14px 16px; margin: 1rem 0; }
+.todo__head h3 { margin: 0 0 10px; }
+.todo__add { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.todo__add input, .todo__add button, .todo-item select { font: inherit; padding: 6px 9px; border: 1px solid #cfd4de; border-radius: 7px; background: #fff; }
+.todo__add input[name=title] { flex: 1 1 200px; }
+.todo__add button { background: #2f6f5e; color: #fff; border-color: #2f6f5e; cursor: pointer; }
+.todo__list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.todo__empty { color: #667085; }
+.todo-item { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 1px solid #e2e5ec; border-left: 4px solid #98a2b3; border-radius: 9px; padding: 10px 12px; }
+.todo-item[data-status=in-progress] { border-left-color: #f79009; }
+.todo-item[data-status=done] { border-left-color: #12b76a; }
+.todo-item__body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.todo-item__title { font-weight: 600; outline-offset: 2px; }
+.todo-item.is-done .todo-item__title { text-decoration: line-through; opacity: .5; }
+.todo-item__meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .85rem; }
+.todo-item__due.is-late { color: #b42318; font-weight: 600; }
+.todo-tag { background: #eef2f6; border-radius: 999px; padding: 1px 8px; margin-right: 4px; }
+.todo-item__actions button { border: 0; background: none; font-size: 1.1rem; cursor: pointer; color: #667085; }
+.todo-item__edit { font: inherit; font-weight: 600; padding: 2px 6px; border: 1px solid #2f6f5e; border-radius: 6px; }
