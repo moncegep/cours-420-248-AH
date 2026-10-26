@@ -7,10 +7,10 @@ const mentions = ref(0)
 
 <template>
   <div class="demo not-content">
-    <p>Ce projet a reçu {{ mentions }} mention(s) « J'aime ».</p>
+    <p>Ce projet a reçu {{ mentions }} kudo(s).</p>
     <div class="ligne">
-      <button @click="mentions++">J'aime</button>
-      <button @click="mentions = 0">Remettre à zéro</button>
+      <button @click="mentions++">👍</button>
+      <button @click="mentions = 0">Réinitialiser</button>
     </div>
   </div>
 </template>

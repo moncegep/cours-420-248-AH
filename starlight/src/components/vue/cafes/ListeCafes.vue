@@ -71,7 +71,7 @@ function reinitialiser() {
 </script>
 
 <template>
-  <main class="not-content">
+  <main class="app not-content">
     <p class="titre">Cafés étudiants de l'UdeM</p>
 
     <section class="filtres" aria-label="Filtres rapides">
@@ -111,16 +111,16 @@ function reinitialiser() {
 </template>
 
 <style scoped>
-main { --bord: #e2e5ec; --gris: #667085; color: #1f2430; font-family: system-ui, sans-serif; }
-main { background: #faf8f6; border: 1px solid #e2e5ec; border-radius: 12px; padding: 16px; margin: 1rem 0; }
-main .titre { margin: 0 0 12px; font-size: 1.3rem; font-weight: 700; }
+.app { --bord: #e2e5ec; --gris: #667085; color: #1f2430; font-family: system-ui, sans-serif; }
+.app { background: #faf8f6; border: 1px solid #e2e5ec; border-radius: 12px; padding: 16px; margin: 1rem 0; }
+.app .titre { margin: 0 0 12px; font-size: 1.3rem; font-weight: 700; }
 .filtres { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; background: #fff; border: 1px solid var(--bord);
   border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
 .filtres input[type='search'] { flex: 1 1 220px; }
-input[type='search'], select, button { font: inherit; padding: 6px 10px; border: 1px solid #cfd4de; border-radius: 8px; background: #fff; }
-button { cursor: pointer; }
-label { display: inline-flex; gap: 6px; align-items: center; }
-.message { color: var(--gris); margin: 0 0 12px; }
-.erreur { color: #b42318; }
-.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.app input[type='search'], select, button { font: inherit; padding: 6px 10px; border: 1px solid #cfd4de; border-radius: 8px; background: #fff; }
+.app button { cursor: pointer; }
+.app label { display: inline-flex; gap: 6px; align-items: center; }
+.app .message { color: var(--gris); margin: 0 0 12px; }
+.app .erreur { color: #b42318; }
+.app .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 </style>

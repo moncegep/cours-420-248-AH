@@ -5,6 +5,7 @@ sidebar:
   order: 14
 ---
 
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import Aside from '../../../components/Aside.astro';
 import MarginNote from '../../../components/MarginNote.astro';
 import Highlight from '../../../components/Highlight.astro';
@@ -16,183 +17,232 @@ import DemoListe from '../../../components/vue/DemoListe.vue';
 import DemoComputed from '../../../components/vue/DemoComputed.vue';
 import DemoConditions from '../../../components/vue/DemoConditions.vue';
 
-Jusqu'ici, le serveur faisait presque tout le travail : PHP produisait le HTML des pages, et l'API Express renvoyait des données en JSON. Cette page passe de l'autre côté du réseau. C'est le navigateur qui construit l'interface, à partir de données, et qui la tient à jour pendant que la personne s'en sert.
+Dans les applications web précédentes (avec PHP), le serveur pouvait produire 
+directement les pages HTML à afficher. Avec une architecture reposant sur des **APIs**, 
+le serveur fournit plutôt des données, tandis que le navigateur prend une plus 
+grande part de responsabilité dans la construction et l'actualisation de l'interface.
+
+Nous pouvons accomplir ce travail avec du JavaScript pur (*Vanilla JavaScript*), mais
+ce serait un travail assez hardu. 
+Dans cette page, nous découvrirons **Vue.js**, un *cadriciel* (*framework*) qui facilite 
+la construction d'interfaces interactives, la gestion de leur état et leur mise à jour 
+lorsque les données changent.
 
 ## Pourquoi un cadriciel côté client
 
-Rendre une page interactive en JavaScript seul est tout à fait possible. Voici un compteur de mentions « J'aime » :
+Rendre une page HTML interactive avec du JavaScript pur est tout à fait possible.  
+Voici une page comprenant un **compteur de mentions d'appréciation (« kudos »)** :
 
 ```html
-<p>Ce projet a reçu <span id="mentions">0</span> mention(s).</p>
-<button id="aimer">J'aime</button>
+<p>Ce projet a reçu <span id="kudos">0</span> kudo(s).</p>
+<button id="btnKudo">👍</button>
 
 <script>
-  let mentions = 0
-  const affichage = document.querySelector('#mentions')
+  let kudos = 0;
+  const affichage = document.querySelector('#kudos');
 
-  document.querySelector('#aimer').addEventListener('click', () => {
-    mentions++
-    affichage.textContent = mentions   // ne pas oublier de mettre l'affichage à jour
+  document.querySelector('#btnKudo').addEventListener('click', () => {
+    kudos++;
+    affichage.textContent = kudos;   // ne pas oublier de mettre l'affichage à jour
   })
 </script>
 ```
 
-Le code fonctionne, mais il porte deux responsabilités : changer la donnée, **et** retrouver puis modifier chaque endroit de la page qui l'affiche. Avec trois compteurs, une liste filtrée et un thème sombre, ces mises à jour manuelles se multiplient, et il suffit d'en oublier une pour que la page affiche une information périmée.
+Le code fonctionne, mais le programme est chargé de deux opérations (responsabilités) : **modifier la donnée** 
+et **actualiser les éléments du DOM qui l'affichent**.  
 
-<Aside type="definition" title="Impératif, déclaratif">
-Un code **impératif** décrit les opérations à effectuer, une à une : trouver l'élément, changer son texte. Un code **déclaratif** décrit le résultat voulu : « ce paragraphe affiche la valeur de `mentions` ». Vue permet d'écrire l'interface de façon déclarative, et se charge des opérations.
-</Aside>
+#### Où est le problème ?
+
+Avec plusieurs compteurs, une liste filtrée et d'autres éléments, ces mises à jour manuelles se multiplient et
+deviennent de plus en plus difficile à suivre et effectuer de manière efficace. 
+Un oubli peut entraîner l'affichage d'une information périmée.
 
 <Aside type="definition" title="Réactivité">
-La **réactivité** est la capacité de Vue à remarquer qu'une donnée a changé, et à mettre à jour, automatiquement, toutes les parties de la page qui en dépendent.
+La **réactivité** permet à Vue de suivre les changements des données réactives et
+de mettre à jour automatiquement les parties de l'interface qui en dépendent.
 </Aside>
 
-<Highlight couleur="ambre">Avec Vue, on décrit l'interface en fonction des données ; quand les données changent, Vue met l'interface à jour.</Highlight>
+<Highlight couleur="ambre">Avec Vue, nous décrivons les (diverses) dépendances entre l'interface et les données (réactives). 
+Lorsque ces données changent, Vue met automatiquement à jour les éléments de l’interface concernés.</Highlight>
 
-Vue n'est pas le seul cadriciel de ce genre : React, Angular et Svelte reposent sur la même idée, avec des syntaxes différentes. Les concepts de cette page se transposent en grande partie de l'un à l'autre.
+Vue n'est pas le seul cadriciel de ce genre : React, Angular et bien d'autres reposent 
+sur la même idée, avec des syntaxes différentes. Les concepts de cette page se transposent 
+en grande partie de l'un à l'autre.
 
 ## Installation et outils
 
 ### Deux façons d'utiliser Vue
 
-| | Vue par CDN | Projet Vite |
-| --- | --- | --- |
-| Installation | aucune : une ligne `import` dans la page | Node.js, puis `npm create vue@latest` |
-| Usage typique | rendre interactive une page HTML existante | construire une application complète |
-| Code | dans la page HTML | dans des fichiers `.vue`, un par composant |
-| Dans ce cours | cette page, avec le portfolio | la page suivante, avec la liste des cafés |
+Vue peut s'utiliser de deux façons courantes, selon les besoins du projet :
+(1) pour augmenter et enrichir une page existante ou (2) pour créer une application 
+monopage.
+
+**Nous verrons d'abord comment utiliser Vue par CDN** pour enrichir une page HTML existante.
+Ensuite, nous introduirons la notion de composants `.vue`, qu'on retrouve dans tout projet Vite. 
+Cette seconde méthode sera introduite dans ce chapitre et développée dans le suivant.
+
+<Tabs>
+<TabItem label="Augmenter une page (via CDN)">
+
+**Quand l'utiliser :** pour rendre interactive une page HTML existante, pour ajouter un comportement coté client à une page PHP.
+Elle ne nécessite aucune installation. Le code Vue s'écrit directement dans la page.
 
 <Aside type="definition" title="CDN">
-Un **CDN**, pour *Content Delivery Network* (réseau de diffusion de contenu), est un réseau de serveurs qui distribue des fichiers publics, comme des bibliothèques JavaScript, depuis un serveur proche de la personne qui les demande. `unpkg.com` diffuse ainsi tous les paquets publiés sur npm.
+Un **CDN**, pour *Content Delivery Network* (réseau de diffusion de contenu), 
+est un réseau de serveurs qui distribue des fichiers publics, comme des bibliothèques JavaScript, 
+depuis un serveur proche de la personne qui les demande. `unpkg.com` diffuse ainsi tous les paquets publiés sur npm.
 </Aside>
 
-### Vue par CDN
+<Steps>
 
-Une page HTML suffit. Le script, de type `module`, importe Vue depuis le CDN, crée une application et la **monte** sur un élément de la page : Vue prend alors en charge tout ce que cet élément contient.
+1. **Créer la page ou ouvrir une page existante.** Récupérer un fichier existant (`.php`, `.html`, `.cshtml`,...) ou créer un fichier.
 
-```html
-<div id="app">
-  <p>{{ message }}</p>
-</div>
+2. **Prévoir l'élément de montage.** Dans le `body`, identifier un élément (traditionnellement `#app`, comme `<div id="app">`) qui servira de contenant pour l'application Vue.  
+Dans l'élément de montage (`#app`), nous utilisons la syntaxe `{{ message }}`, appelée **interpolation**, pour afficher la valeur d'une donnée.
 
-<script type="module">
-  import { createApp, ref } from 'https://unpkg.com/vue@3.5/dist/vue.esm-browser.js'
+   ```html
+   <div id="app">
+     <p>{{ message }}</p>
+   </div>
+   ```
 
-  createApp({
-    setup() {
-      const message = ref('Bonjour de Vue')
-      return { message }   // ce qui est retourné est utilisable dans la page
-    },
-  }).mount('#app')
-</script>
-```
+3. **Importer Vue et monter l'application.** À la fin du `body`, ajouter un script de type `module` qui va importer *Vue* depuis le CDN, 
+créer une application et la **monter** sur `#app` : Vue prendra alors en charge tout ce que cet élément contient.
 
-La fonction `setup()` prépare les données et les fonctions de l'application. Tout ce qu'elle **retourne** devient utilisable dans le HTML monté.
+   ```html
+   <script type="module">
+     import { createApp, ref } from 'https://unpkg.com/vue@3.5/dist/vue.esm-browser.js'
 
-### Créer un projet avec Vite
+     createApp({
+       setup() {
+         const message = ref('Bonjour de Vue')
+         return { message }   // ce qui est retourné est utilisable dans la page
+       },
+     }).mount('#app')
+   </script>
+   ```
 
-<Aside type="definition" title="Vite">
-**Vite** est un outil de développement web. Pendant le développement, il sert l'application et met la page à jour à chaque enregistrement, sans la recharger entièrement. Pour la mise en ligne, il **construit** l'application : il traduit les fichiers `.vue` en JavaScript ordinaire, les regroupe et les allège, dans un dossier `dist/`.
+   La fonction `setup()` prépare les données et les fonctions de l'application. Tout ce qu'elle **retourne** devient utilisable dans le HTML monté.
+
+4. **Ouvrir la page dans le navigateur.** Un double-clic sur `index.html` suffit : la page doit afficher « Bonjour de Vue ».  
+    <Aside type='erreur' title="« Bonjour de Vue » ne s'affiche pas">
+    Si `{{ message }}` reste affiché tel quel, Vue n'a pas démarré. Pour comprendre ce qui se passe, ouvre la console des outils de développement (<kbd>F12</kbd>).
+    </Aside>
+
+</Steps>
+
+</TabItem>
+<TabItem label="Créer une application (Projet Vite)">
+
+**Quand l'utiliser :** pour construire une application complète, 
+découpée en composants. Le code est réparti dans des fichiers `.vue`, 
+un par composant.
+
+<Aside type="definition" title="Rôle de Vite">
+Pendant le développement, **Vite** sert l'application et met la page à jour à chaque enregistrement, 
+sans la recharger entièrement. Pour la mise en ligne, il **construit** l'application : 
+il traduit les fichiers `.vue` en JavaScript (ordinaire), et place le tout dans un dossier `dist/`.
 </Aside>
 
-Il faut Node.js en version 22.18 ou plus récente, déjà installé pour l'API Express. Dans un terminal :
+<Steps>
 
-```bash
-npm create vue@latest
-```
+1. **Vérifier Node.js.** Le générateur de projet Vue exige une version compatible de Node.js (actuellement `^22.18.0 || >=24.12.0`). Si Node.js est déjà installé pour les exercices avec Express, vérifier sa version dans un terminal :
 
-L'assistant pose quelques questions. Pour le projet de la page suivante :
+   ```bash
+   node --version
+   ```
 
-- **nom du projet** : `cafes-udem` ;
-- **fonctionnalités** (TypeScript, Router, Pinia, tests…) : aucune, on valide sans rien cocher ;
-- **code d'exemple** : on choisit de commencer avec un projet vide.
+2. **Créer le projet.** Dans le dossier dans lequel vous souhaitez créer le projet, exécute la commande suivante :
 
-```bash
-cd cafes-udem
-npm install
-npm run dev        # ouvre http://localhost:5173
-```
+   ```bash
+   npm create vue@latest
+   ```
 
-```text
-cafes-udem/
-├── index.html              la seule page HTML : elle contient <div id="app">
-├── package.json
-├── vite.config.js          la configuration de Vite
-├── public/                 fichiers copiés tels quels (images, données)
-└── src/
-    ├── main.js             crée l'application et la monte sur #app
-    ├── App.vue             le composant principal
-    └── components/         les autres composants
-```
+   L'assistant posera quelques questions, comme lorsqu'on exécute `npm init`.
 
-```js
-// src/main.js
-import { createApp } from 'vue'
-import App from './App.vue'
+3. **Installer les dépendances.** Après s'être positionné dans le dossier créé par `npm create vue@latest`, exécuter la commande suivante : `npm install`. Elle télécharge Vue, Vite et les autres paquets nécessaires dans le dossier `node_modules/` du projet.
 
-createApp(App).mount('#app')
-```
+   ```bash
+   cd cafes-udem
+   npm install
+   ```
 
-### Les outils
+4. **Lancer le serveur de développement.**
 
-- **Dans VS Code** : l'extension *Vue (Official)* colore la syntaxe des fichiers `.vue`, complète le code et signale les erreurs.
-- **Dans le navigateur** : les **Vue DevTools** montrent l'arbre des composants, et la valeur de chaque donnée, en direct. Un projet créé par `npm create vue@latest` les intègre déjà : un petit bouton flottant, en bas de la page, les ouvre. Pour une page qui charge Vue par CDN, on installe plutôt l'extension *Vue.js devtools* du navigateur.
+   ```bash
+   npm run dev
+   ```
 
-### Anatomie d'un composant
+   La commande affiche une adresse, en général `http://localhost:5173`, à ouvrir dans le navigateur. Le terminal doit rester ouvert : arrêter la commande, avec <kbd>Ctrl</kbd>+<kbd>C</kbd>, arrête aussi le serveur.
 
-<Aside type="definition" title="Composant">
-Un **composant** est un morceau d'interface réutilisable, qui réunit sa structure, son comportement et son apparence. Dans un projet Vite, chaque composant est un fichier `.vue`, qu'on appelle un **SFC**, pour *Single-File Component* (composant monofichier).
-</Aside>
+5. **Repérer les fichiers du projet.** La plupart du travail se fait dans `src/`.
 
-```vue
-<script setup>
-// 1. Le comportement : données, calculs, fonctions
-import { ref } from 'vue'
+   ```text
+   cafes-udem/
+   ├── index.html              la seule page HTML : elle contient <div id="app">
+   ├── package.json
+   ├── vite.config.js          la configuration de Vite
+   ├── public/                 fichiers copiés tels quels (images, données)
+   └── src/
+       ├── main.js             crée l'application et la monte sur #app
+       ├── App.vue             le composant principal
+       └── components/         les autres composants
+   ```
 
-const message = ref('Bonjour de Vue')
-</script>
+   Le fichier `main.js` joue le même rôle que le script de la version CDN : il crée l'application et la monte sur `#app`.  
+   La différence est que **l'application est maintenant un composant, `App.vue`**.
 
-<template>
-  <!-- 2. La structure : du HTML enrichi par la syntaxe de Vue -->
-  <p>{{ message }}</p>
-</template>
+   ```js
+   // src/main.js
+   import { createApp } from 'vue'
+   import App from './App.vue'
 
-<style scoped>
-/* 3. L'apparence : avec scoped, ces règles ne touchent que ce composant */
-p { font-weight: 600; }
-</style>
-```
+   createApp(App).mount('#app')
+   ```
 
-Avec `<script setup>`, tout ce qui est déclaré dans le script est utilisable directement dans le gabarit (`<template>`), sans `return`.
+</Steps>
 
-<MarginNote type="rappel" titre="Les démonstrations de cette page">
-Chaque concept est illustré par une petite démonstration, que l'on peut manipuler. Elles sont écrites en fichiers `.vue`, avec `<script setup>`. Dans une page qui charge Vue par CDN, comme le portfolio, le même code se place dans `setup()`, avec un `return` final. Leur style est omis de l'affichage.
-</MarginNote>
+</TabItem>
+</Tabs>
 
-## Rendre un portfolio interactif
+### Les outils pour faciliter le développement
 
-Inès, étudiante en développement web, a conçu la page de son portfolio en HTML et en CSS. La page s'affiche bien, mais rien n'y réagit :
+<img style="max-height: 400px" src="https://devtools.vuejs.org/features/overview.png" alt="Vue DevTools" />
 
-- le bouton **Mode sombre** ne fait rien ;
-- les boutons de **filtre** par technologie ne filtrent rien ;
-- les boutons **Détails** des projets n'affichent rien, et le texte qu'ils devraient révéler est déjà visible ;
-- les compétences et les six projets sont écrits à la main dans le HTML : ajouter un projet oblige à recopier un bloc entier.
+- **Dans VS Code** : l'extension **Vue (Official)** colore la syntaxe des fichiers `.vue`, complète le code et signale les erreurs.
+- **Dans le navigateur** : les **Vue DevTools** permettent d'inspecter les composants et leur état. Si leur intégration a été sélectionnée lors de la création du projet Vite, un bouton permet d'ouvrir les outils. Sinon, on peut utiliser l'extension *Vue.js devtools* du navigateur, notamment avec une page qui charge Vue par CDN.
 
-Le dossier de départ contient `index.html` et `style.css`. On le rend interactif en six étapes, sans installer quoi que ce soit.
+---
 
-### Étape 1 : monter Vue sur la page
+## Tutoriel : Portfolio interactif
 
-On entoure le contenu de la page d'un conteneur `#app`, puis on ajoute le script à la fin du `body`. Les informations du profil passent dans le script, et le HTML les affiche par **interpolation**, avec la syntaxe `{{ }}`.
+Inès, étudiante en développement web, a conçu la page de son portfolio en HTML et en CSS. 
+La page s'affiche bien, mais elle aimerait également :
 
-```html
+- un bouton pour activer ou désactiver le **mode sombre** ;
+- des boutons pour **filtrer** les projets par technologie ;
+- des boutons **Détails** pour afficher les apprentissages associés à chaque projet ;
+- une séparation entre les **données** (profil, compétences et projets) et le HTML qui les affiche.
+
+Le dossier de départ contient les fichiers `index.html` et `style.css`. 
+Nous allons progressivement enrichir cette page.  
+**Tout le code du portfolio utilisera Vue par CDN** et la fonction `setup()`.
+
+### Étape 1 : monter Vue sur la page (`createApp`)
+
+On commence par entourer le contenu de la page d'un conteneur `#app`, puis on ajoute le script à la fin du `body`. 
+> Les informations du profil sont définies dans le script, puis affichées dans le HTML par **interpolation**, avec la syntaxe `{{ }}`.  
+> Le profil ne change pas au cours de cet exemple : un objet JavaScript ordinaire suffit.
+
+```html "id="app"" "{{ profil.nom }}" "{{ profil.titre }}" "createApp" "setup()" "mount('#app')" "const profil"
 <div id="app" v-cloak>
   <div class="site">
     <header class="entete conteneur">
-      <!-- … -->
+      <!-- ... -->
       <h1>{{ profil.nom }}</h1>
       <p class="titre">{{ profil.titre }}</p>
     </header>
-    <!-- … le reste de la page -->
+    <!-- ... le reste de la page -->
   </div>
 </div>
 
@@ -214,29 +264,32 @@ On entoure le contenu de la page d'un conteneur `#app`, puis on ajoute le script
 </script>
 ```
 
+> Les fonctions `ref` et `computed` seront utilisées aux étapes suivantes.
+
+<Aside type="tip" title="Attribut v-cloak">
+En **mode CDN**, avant que Vue ne soit chargé, la page affiche brièvement les `{{ }}` bruts.  
+L'attribut `v-cloak`, que Vue retire au montage, permet de masquer le conteneur d'ici là, avec une règle CSS : `[v-cloak] { display: none; }`.
+</Aside>
+
 <Aside type="definition" title="Interpolation">
-L'**interpolation** insère la valeur d'une expression JavaScript dans le texte du HTML : `{{ profil.nom }}` affiche `Inès Gagnon`. Comme `htmlspecialchars()` en PHP, Vue échappe la valeur : une balise contenue dans le texte s'affiche telle quelle, sans être interprétée.
+L'**interpolation** insère le résultat d'une expression JavaScript dans le texte HTML :  
+`{{ profil.nom }}` affiche `Inès Gagnon`. Vue échappe le texte inséré. Donc, une balise présente dans la valeur ne sera pas interprétée comme du HTML, de façon comparable à `htmlspecialchars()` en PHP.
 </Aside>
 
 <Aside type="caution" title="Le conteneur lui-même n'est pas compilé">
-Vue utilise le **contenu** de `#app` comme gabarit, mais pas l'élément `#app` lui-même. Une directive placée sur `<div id="app">`, comme `:class`, serait ignorée. D'où le second conteneur, `<div class="site">`, qui recevra la classe du thème à l'étape 3.
+Vue utilise le **contenu** de `#app` comme gabarit, mais pas l'élément attaché à `#app` lui-même. Une directive placée sur `<div id="app">`, 
+comme `:class`, serait ignorée. D'où le second conteneur, `<div class="site">`, qui recevra la classe du thème à l'étape 3.
 </Aside>
 
-<MarginNote type="astuce" titre="v-cloak">
-Avant que Vue ne soit chargé, la page affiche brièvement les `{{ }}` bruts. L'attribut `v-cloak`, que Vue retire au montage, permet de masquer le conteneur d'ici là, avec une règle CSS : `[v-cloak] { display: none; }`.
-</MarginNote>
+### Étape 2 : réagir aux clics et directives
 
-<Aside type="caution" title="Ouvrir la page directement">
-Un script de type `module` placé dans la page fonctionne même quand on l'ouvre par un double-clic (`file://`). Si l'on déplace ce script dans un fichier séparé, comme `app.js`, le navigateur refusera de le charger hors d'un serveur ; l'extension *Live Server* de VS Code règle ce problème.
-</Aside>
-
-### Étape 2 : réagir aux clics
-
-Une donnée qui doit changer, et dont les changements doivent apparaître à l'écran, se crée avec `ref()`. Un événement se capte avec `@click`.
+Pour réagir à un événement, on utilise la directive `v-on` ou son raccourci `@`, par exemple `@click` pour un clic.
 
 <DemoCompteur client:visible />
 
-```vue
+> Le code de cette démonstration est présenté dans un composant `.vue`. Dans le portfolio, les déclarations se placent plutôt dans la fonction `setup()` et les variables utilisées dans le HTML doivent être incluses dans le `return`. La réactivité et les directives fonctionnent de la même façon.
+
+```vue "@click"
 <script setup>
 import { ref } from 'vue'
 
@@ -244,21 +297,43 @@ const mentions = ref(0)
 </script>
 
 <template>
-  <div class="demo">
-    <p>Ce projet a reçu {{ mentions }} mention(s) « J'aime ».</p>
+  <div class="demo not-content">
+    <p>Ce projet a reçu {{ mentions }} kudo(s).</p>
     <div class="ligne">
-      <button @click="mentions++">J'aime</button>
-      <button @click="mentions = 0">Remettre à zéro</button>
+      <button @click="mentions++">👍</button>
+      <button @click="mentions = 0">Réinitialiser</button>
     </div>
   </div>
 </template>
 ```
 
-<Aside type="definition" title="ref, directive">
-`ref(valeur)` crée une **donnée réactive** : Vue surveille ses changements. Dans le script, on lit et on modifie sa valeur par `.value` (`mentions.value++`) ; dans le gabarit, Vue le fait pour nous (`{{ mentions }}`, `mentions++`). Une **directive** est un attribut spécial de Vue, qui commence par `v-` : `@click` est le raccourci de `v-on:click`, qui exécute une instruction à chaque clic.
+#### La fonction `ref()`
+
+`ref(valeur)` crée une **référence réactive**. Elle est utilisée lorsque l'information (`valeur`) 
+peut changer pendant l'utilisation et que l'interface en dépend.
+Elle permet à Vue de suivre les changements de la valeur et mettre à jour ce qui en dépend.
+
+**Lorsqu'on utilise `ref`:**
+- Dans le script JS, on accède à la valeur avec `.value` : `mentions.value++`.
+- Dans le gabarit Vue (`<template>` ou HTML monté par Vue), la référence est automatiquement déballée : on écrit `{{ mentions }}` ou `@click="mentions++"`, sans `.value`.
+
+#### Directives
+
+En Vue.js, une **directive** est un attribut spécial que l'on ajoute à un élément HTML, , généralement écrit avec le préfixe `v-`.
+Elle indique à Vue comment cet élément doit se comporter ou être mis à jour en fonction des données de l'application.
+
+<Aside type="definition" title="Quand les utiliser ?">
+Les directives permettent notamment de contrôler l'affichage, de réagir aux événements et de synchroniser des données avec des éléments de l'interface.
 </Aside>
 
-Pour le portfolio, le thème devient une donnée, que le bouton inverse :
+`@click` utilisé plus haut est en réalité le raccourci de `v-on:click` : la directive exécute une expression ou appelle une fonction en réponse à un clic.
+
+
+#### Application dans le portfolio
+
+Dans notre exemple de Portfolio, le thème devient une donnée, que le bouton inverse :
+
+##### Dans `<script>`
 
 ```js
 const sombre = ref(false)
@@ -266,19 +341,106 @@ const sombre = ref(false)
 return { profil, sombre }
 ```
 
+##### Dans `#app` (HTML)
+
 ```html
 <button @click="sombre = !sombre">{{ sombre ? 'Mode clair' : 'Mode sombre' }}</button>
 ```
 
-Le texte du bouton change déjà. La page, elle, garde ses couleurs : rien ne relie encore `sombre` au CSS.
+Il reste encore à définir les règles de style rattachées au mode sombre.
 
-### Étape 3 : lier des attributs
+### Étape 3 : lier des attributs (directive `v-bind`)
 
-La directive `v-bind`, ou son raccourci `:`, donne à un attribut la valeur d'une expression, et la tient à jour. Pour `class`, Vue accepte un objet : chaque classe est appliquée si sa valeur est vraie.
+#### Retour sur la fonction `ref()`
+
+Nous avons vu que la fonction `ref()` permet de créer une donnée réactive : 
+lorsque sa valeur change, Vue peut détecter ce changement et actualiser les parties 
+de l'interface qui en dépendent.
+
+Cependant, **`ref()` ne détermine pas comment cette donnée doit apparaître dans le HTML.** 
+C'est le rôle des expressions et des directives utilisées dans le gabarit (`<template>`).
+
+Jusqu'à présent, nous avons utilisé l'interpolation `{{ }}` pour afficher une valeur
+dans le contenu d'un élément :
+
+```html
+<p>Mode sombre : {{ sombre }}</p>
+```
+
+Mais comment utiliser cette même donnée pour modifier un attribut HTML, comme `src`, `href`, `disabled` ou `class` ?
+
+C'est précisément le rôle de la directive **`v-bind`**.
+
+#### La directive `v-bind`
+
+La directive `v-bind` (ou son raccourci `:`) permet de lier un attribut HTML à une expression JavaScript. 
+Lorsque les données réactives utilisées dans cette expression changent, Vue actualise automatiquement l'attribut.
+
+**Par exemple :**
+
+```html
+<button v-bind:aria-pressed="sombre">
+  Changer de thème
+</button>
+```
+
+**ou (son équivalent):**
+
+```html
+<button :aria-pressed="sombre">
+  Changer de thème
+</button>
+```
+
+L'attribut `aria-pressed` reçoit la valeur de `sombre` et est actualisé lorsque cette valeur change.
+
+##### Le cas particulier de `class`
+
+Pour `class`, Vue accepte un objet : chaque classe est appliquée si sa valeur est vraie.
+Nous pouvons utiliser `:class` pour déterminer dynamiquement les classes d'un élément.
+
+**Par exemple :**
+```html
+<div class="site" :class="sombre ? 'sombre' : ''">
+```
+
+Cette expression ajoute la classe sombre uniquement lorsque la variable sombre vaut `true`.
+
+Cependant, puisque cette opération est très fréquente, Vue propose une syntaxe particulière pour `class` : un objet JavaScript dont les propriétés représentent des classes CSS.
+
+```html
+<div class="site" :class="{ sombre: sombre }">
+```
+
+Décomposons cette expression :
+
+- `{ }` délimite un objet JavaScript.
+- Le premier `sombre` correspond au nom de la classe CSS.
+- Le second `sombre` correspond à la variable JavaScript qui détermine si cette classe doit être appliquée.
+
+Pour chaque propriété de l'objet, Vue examine la valeur associée : si elle est vraie (truthy), la classe est ajoutée; sinon, elle est retirée.
+
+- Si `sombre` est `false` : `class="site"`
+- Si `sombre` est `true` : `class="site sombre"`
+
+<Aside type='tip' title='class et :class se combinent'>
+L'attribut `class` ordinaire et la directive `:class` se combinent. 
+La classe `site` est permanente, tandis que la classe `sombre` dépend de la donnée réactive.
+</Aside>
+
+Il est également possible de gérer plusieurs classes indépendamment :
+
+```html
+<div :class="{ sombre: sombre, actif: estActif, erreur: aErreur }">
+```
+
+Chaque classe est ajoutée ou retirée selon la valeur de l'expression correspondante.
+
+#### Exemple : changer le thème d'une page
 
 <DemoLiaison client:visible />
 
-```vue
+```vue ":class" ":aria-pressed"
 <script setup>
 import { ref } from 'vue'
 
@@ -288,30 +450,33 @@ const sombre = ref(false)
 <template>
   <div class="demo" :class="{ sombre: sombre }">
     <p>Thème actuel : {{ sombre ? 'sombre' : 'clair' }}</p>
-    <button @click="sombre = !sombre" :aria-pressed="sombre">Changer de thème</button>
+    <button @click="sombre = !sombre" :aria-pressed="sombre">
+      Changer de thème
+    </button>
   </div>
 </template>
 ```
 
-Dans le portfolio, la feuille de style prévoit déjà une classe `sombre`. Il suffit de la lier à la donnée :
+#### Application au portfolio
+
+Dans le portfolio, la feuille de style prévoit déjà une classe `sombre`. 
+Il suffit de la lier à la donnée :
 
 ```html
 <div class="site" :class="{ sombre: sombre }">
 ```
 
-L'attribut `class` ordinaire et `:class` se combinent : l'élément garde `site`, et reçoit `sombre` quand la donnée est vraie.
+L'élément conserve sa classe `site`, tandis que la présence de sombre dépend de la variable réactive.
 
-<Checkpoint question="Le bouton fonctionne et son texte change, mais la page ne passe pas en mode sombre. Le :class a été placé sur div id='app'. Que se passe-t-il ?">
-Vue n'utilise comme gabarit que le contenu du conteneur de montage, pas le conteneur lui-même. La directive placée sur `#app` n'est donc jamais traitée. Il faut la déplacer sur un élément intérieur, comme `div.site`.
-</Checkpoint>
+### Étape 4 : afficher des listes (directive `v-for`)
 
-### Étape 4 : afficher des listes
-
-La directive `v-for` répète un élément pour chaque valeur d'un tableau. L'attribut `:key` donne à chaque répétition un identifiant unique, qui permet à Vue de savoir quel élément a été ajouté, retiré ou déplacé.
+La directive `v-for` répète un élément pour chaque valeur d'un tableau.  
+Lorsqu'on l'utilise, l'attribut `:key` donne à chaque répétition un identifiant unique, 
+qui permet à Vue de savoir quel élément a été ajouté, retiré ou déplacé.
 
 <DemoListe client:visible />
 
-```vue
+```vue "v-for" ":key"
 <script setup>
 import { ref } from 'vue'
 
@@ -347,23 +512,25 @@ function retirer(id) {
 </template>
 ```
 
-C'est le même geste que l'extraction des données dans la page sur les pages dynamiques : en PHP, une boucle `foreach` produisait les cartes à partir d'un tableau ; ici, `v-for` le fait dans le navigateur. Dans le portfolio, les compétences et les projets passent dans le script :
+C'est le même travail de *refactoring* que l'extraction des données que nous avions fait sur les [pages dynamiques](/cours/03-page-dynamique) : 
+- En PHP, une boucle `foreach` produisait les cartes à partir d'un tableau \
+- Ici, `v-for` le fait dans le navigateur. Dans le portfolio, les compétences et les projets passent dans le script :
 
 ```js
 const competences = ['HTML', 'CSS', 'JavaScript', 'PHP', 'MySQL', 'Express', 'Vue', 'Git']
 
 const projets = [
-  { titre: 'Recettes de grand-maman', technos: ['HTML', 'CSS'],
+  { id: 1, titre: 'Recettes de grand-maman', technos: ['HTML', 'CSS'],
     description: "Site vitrine de recettes familiales, adapté à toutes les tailles d'écran.",
     appris: 'les grilles CSS et les requêtes média.' },
-  // … les cinq autres projets, sur le même modèle
+  // … les cinq autres projets, avec chacun un id distinct
 ]
 ```
 
 Les six blocs `<article>` écrits à la main se réduisent à un seul, répété :
 
-```html
-<article v-for="projet in projets" :key="projet.titre" class="projet">
+```html "v-for" ":key"
+<article v-for="projet in projets" :key="projet.id" class="projet">
   <h3>{{ projet.titre }}</h3>
   <p>{{ projet.description }}</p>
   <div class="technos">
@@ -375,31 +542,40 @@ Les six blocs `<article>` écrits à la main se réduisent à un seul, répété
 ```
 
 <MarginNote type="rappel" titre="Une clé unique et stable">
-La clé doit être unique parmi les éléments répétés, et rester attachée au même élément : un identifiant, ou ici un titre qui ne se répète pas. La position dans le tableau est une mauvaise clé dès que la liste peut être filtrée ou réordonnée.
+La clé doit être unique parmi les éléments répétés et rester attachée au même élément. Un champ `id` est préférable au titre, qui pourrait être modifié ou dupliqué. La position dans le tableau est également une mauvaise clé lorsque la liste peut être filtrée ou réordonnée.
 </MarginNote>
 
 ### Étape 5 : filtrer avec une propriété calculée
+
+<Aside type="definition" title="Donnée ordinaire, état réactif ou valeur calculée ?">
+- **Donnée ordinaire** : une information fixe pendant l'utilisation de la page, comme le profil ou la liste initiale des projets.
+- **État réactif** (`ref`) : une information qui peut changer pendant l'utilisation et dont l'interface dépend, comme le mode sombre ou le filtre sélectionné.
+- **Valeur calculée** (`computed`) : une information déduite d'autres données réactives, comme la liste des projets correspondant au filtre choisi. Nous l'utiliserons à l'étape 5.
+</Aside>
 
 Le filtre retenu est une donnée, `filtre`. La liste affichée, elle, se **déduit** de cette donnée et des projets : c'est le rôle d'une propriété calculée.
 
 <DemoComputed client:visible />
 
-```vue
+```vue {14-20} "computed"
 <script setup>
 import { ref, computed } from 'vue'
 
 const projets = [
-  { titre: 'Site de recettes', technos: ['HTML', 'CSS'] },
-  { titre: 'Quiz interactif', technos: ['HTML', 'JavaScript'] },
-  { titre: 'Catalogue en ligne', technos: ['PHP', 'MySQL'] },
-  { titre: 'Météo en direct', technos: ['JavaScript', 'Vue'] },
+  { id: 1, titre: 'Site de recettes', technos: ['HTML', 'CSS'] },
+  { id: 2, titre: 'Quiz interactif', technos: ['HTML', 'JavaScript'] },
+  { id: 3, titre: 'Catalogue en ligne', technos: ['PHP', 'MySQL'] },
+  { id: 4, titre: 'Météo en direct', technos: ['JavaScript', 'Vue'] },
 ]
 const technos = ['Toutes', 'HTML', 'CSS', 'JavaScript', 'PHP', 'MySQL', 'Vue']
 
 const filtre = ref('Toutes')
 
 const projetsFiltres = computed(() => {
-  if (filtre.value === 'Toutes') return projets
+  if (filtre.value === 'Toutes') {
+    return projets
+  }
+
   return projets.filter((p) => p.technos.includes(filtre.value))
 })
 </script>
@@ -418,7 +594,7 @@ const projetsFiltres = computed(() => {
     </div>
     <p class="note">{{ projetsFiltres.length }} projet(s)</p>
     <ul>
-      <li v-for="projet in projetsFiltres" :key="projet.titre">
+      <li v-for="projet in projetsFiltres" :key="projet.id">
         {{ projet.titre }} ({{ projet.technos.join(', ') }})
       </li>
     </ul>
@@ -426,9 +602,13 @@ const projetsFiltres = computed(() => {
 </template>
 ```
 
-<Aside type="definition" title="Propriété calculée (computed)">
-`computed(() => …)` crée une valeur déduite d'autres données réactives. Vue la recalcule seulement quand l'une d'elles change, et la garde en mémoire sinon. Comme pour `ref`, on la lit par `.value` dans le script, directement dans le gabarit.
+<Aside type="definition" title="Propriété calculée (`computed`)">
+`computed(() => …)` définit une valeur dérivée. Vue suit les **dépendances réactives** utilisées dans son calcul et conserve le résultat en mémoire tant qu'elles ne changent pas. Comme avec `ref`, on accède au résultat par `.value` dans le script et directement dans le gabarit.
+
+Dans notre exemple, `filtre` est réactif, mais `projets` est un tableau ordinaire : le calcul réagit au changement de filtre, **pas** à une modification ultérieure du tableau `projets`. Si des projets pouvaient être ajoutés, retirés ou chargés depuis une API au cours de l'utilisation, on pourrait aussi les déclarer avec `ref([])`.
 </Aside>
+
+#### Application au portfolio
 
 Pour le portfolio, les boutons de filtre sont eux aussi produits à partir des données : la liste des technologies se déduit des projets, sans doublon.
 
@@ -439,7 +619,10 @@ const filtre = ref('Toutes')
 const technos = ['Toutes', ...new Set(projets.flatMap((p) => p.technos))]
 
 const projetsFiltres = computed(() => {
-  if (filtre.value === 'Toutes') return projets
+  if (filtre.value === 'Toutes') {
+    return projets
+  }
+
   return projets.filter((p) => p.technos.includes(filtre.value))
 })
 ```
@@ -454,20 +637,20 @@ const projetsFiltres = computed(() => {
   >{{ techno }}</button>
 </div>
 
-<article v-for="projet in projetsFiltres" :key="projet.titre" class="projet">
+<article v-for="projet in projetsFiltres" :key="projet.id" class="projet">
 ```
 
 <Checkpoint question="Pourquoi ne pas filtrer directement le tableau projets, avec projets = projets.filter(…), au clic sur un bouton ?">
 Parce que les projets écartés seraient perdus : revenir à « Toutes », ou passer d'une technologie à une autre, n'aurait plus rien à afficher. La propriété calculée laisse intactes les données d'origine, et en déduit à chaque changement la liste à afficher.
 </Checkpoint>
 
-### Étape 6 : afficher sous condition
+### Étape 6 : afficher sous condition (directive `v-if`, `v-show`)
 
 Deux directives affichent un élément sous condition, de deux façons différentes.
 
 <DemoConditions client:visible />
 
-```vue
+```vue "v-if" "v-else" "v-show"
 <script setup>
 import { ref } from 'vue'
 
@@ -490,35 +673,62 @@ const details = ref(false)
 </template>
 ```
 
-- `v-if` crée ou retire réellement l'élément de la page ; il se combine avec `v-else-if` et `v-else`.
-- `v-show` laisse l'élément dans la page, et le masque avec `display: none`.
+- La directive `v-if` crée ou retire réellement l'élément de la page. Elle se combine avec `v-else-if` et `v-else`.
+- La directive `v-show` laisse l'élément dans la page, et le masque avec `display: none`.
 
-Dans l'inspecteur du navigateur, le paragraphe de `v-if` disparaît du HTML, tandis que celui de `v-show` y reste, masqué. `v-show` convient à ce qu'on affiche et masque souvent ; `v-if`, à ce qui dépend d'une condition qui change rarement, ou à ce qui ne doit pas exister du tout.
+> Dans l'inspecteur du navigateur, le paragraphe de `v-if` disparaît du HTML, tandis que celui de `v-show` y reste, masqué. 
 
-Dans le portfolio, le bandeau de disponibilité dépend du profil, et les détails de chaque projet s'affichent à la demande. Les titres des projets ouverts sont retenus dans un tableau :
+- `v-if` est recommandé lorsque l'élément à afficher dépend d'une condition qui change rarement, ou lorsque l'élément ne doit pas exister du tout.
+- `v-show` est recommandé lorsque l'élément est affiché et masqué souvent 
+
+#### Application au portfolio
+
+Dans le portfolio, le bandeau de disponibilité dépend du profil et les détails de chaque projet s'affichent à la demande. 
+Pour ouvrir chaque panneau indépendamment, nous conservons les **identifiants** des projets ouverts dans une référence réactive :
+
+##### Dans `<script>`
 
 ```js
-const ouverts = ref([])   // titres des projets dont les détails sont affichés
+const ouverts = ref([])   // identifiants des projets dont les détails sont affichés
 
-function basculerDetails(titre) {
-  if (ouverts.value.includes(titre)) {
-    ouverts.value = ouverts.value.filter((t) => t !== titre)
+function basculerDetails(id) {
+  if (ouverts.value.includes(id)) {
+    ouverts.value = ouverts.value.filter((projetId) => projetId !== id)
   } else {
-    ouverts.value.push(titre)
+    ouverts.value.push(id)
   }
 }
 ```
 
-```html
+##### Dans `#app`(HTML)
+
+```html "v-if" "v-show"
 <span v-if="profil.disponible" class="dispo">Disponible pour un stage à l'été 2027</span>
 
-<p v-show="ouverts.includes(projet.titre)" class="appris">Ce que j'ai appris : {{ projet.appris }}</p>
-<button @click="basculerDetails(projet.titre)">
-  {{ ouverts.includes(projet.titre) ? 'Masquer' : 'Détails' }}
+<p v-show="ouverts.includes(projet.id)" class="appris">Ce que j'ai appris : {{ projet.appris }}</p>
+<button @click="basculerDetails(projet.id)" :aria-expanded="ouverts.includes(projet.id)">
+  {{ ouverts.includes(projet.id) ? 'Masquer' : 'Détails' }}
 </button>
 ```
 
 Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profil, competences, sombre, filtre, technos, projetsFiltres, ouverts, basculerDetails }`.
+
+### À toi de jouer : améliorer le portfolio
+
+Avant d'ouvrir la version complète, reprends ton portfolio et réalise ces modifications **sans copier de solution** :
+
+1. **Afficher le nombre de projets visibles** à côté du titre « Projets ». Ce nombre doit changer lorsqu'on sélectionne une technologie.
+2. **Ajouter un bouton « Réinitialiser le filtre »** qui apparaît uniquement quand le filtre est différent de « Toutes ».
+3. **Diagnostiquer un problème d'état** : si l'on remplaçait le tableau `ouverts` par une seule référence `const detailsOuverts = ref(false)` utilisée dans toutes les cartes, que se passerait-il ? Pourquoi ?
+4. **Expliquer ses choix** : parmi `projets`, `sombre`, `filtre`, `projetsFiltres` et `ouverts`, lesquels sont des données ordinaires, des états réactifs ou des valeurs calculées ?
+
+<Checkpoint question="Pourquoi une seule variable booléenne partagée entre tous les panneaux de détails ne permettrait-elle pas de les ouvrir indépendamment ?">
+Toutes les cartes liraient le même booléen : un clic ouvrirait ou fermerait leurs panneaux simultanément. Pour distinguer les cartes, il faut conserver un état par projet, par exemple la liste des identifiants ouverts.
+</Checkpoint>
+
+### Version complète de référence
+
+Le fichier suivant réunit les fonctionnalités des six étapes. Il ne contient pas les ajouts demandés dans l'activité précédente, à réaliser par toi-même.
 
 <details>
 <summary>Le fichier index.html complet du portfolio</summary>
@@ -573,15 +783,15 @@ Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profi
       </div>
 
       <div class="grille">
-        <article v-for="projet in projetsFiltres" :key="projet.titre" class="projet">
+        <article v-for="projet in projetsFiltres" :key="projet.id" class="projet">
           <h3>{{ projet.titre }}</h3>
           <p>{{ projet.description }}</p>
           <div class="technos">
             <span v-for="techno in projet.technos" :key="techno">{{ techno }}</span>
           </div>
-          <p v-show="ouverts.includes(projet.titre)" class="appris">Ce que j'ai appris : {{ projet.appris }}</p>
-          <button @click="basculerDetails(projet.titre)">
-            {{ ouverts.includes(projet.titre) ? 'Masquer' : 'Détails' }}
+          <p v-show="ouverts.includes(projet.id)" class="appris">Ce que j'ai appris : {{ projet.appris }}</p>
+          <button @click="basculerDetails(projet.id)" :aria-expanded="ouverts.includes(projet.id)">
+            {{ ouverts.includes(projet.id) ? 'Masquer' : 'Détails' }}
           </button>
         </article>
       </div>
@@ -612,22 +822,22 @@ Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profi
       const competences = ['HTML', 'CSS', 'JavaScript', 'PHP', 'MySQL', 'Express', 'Vue', 'Git']
 
       const projets = [
-        { titre: 'Recettes de grand-maman', technos: ['HTML', 'CSS'],
+        { id: 1, titre: 'Recettes de grand-maman', technos: ['HTML', 'CSS'],
           description: "Site vitrine de recettes familiales, adapté à toutes les tailles d'écran.",
           appris: 'les grilles CSS et les requêtes média.' },
-        { titre: 'Quiz des capitales', technos: ['HTML', 'CSS', 'JavaScript'],
+        { id: 2, titre: 'Quiz des capitales', technos: ['HTML', 'CSS', 'JavaScript'],
           description: 'Quiz chronométré avec un score final et un tableau des meilleurs résultats.',
           appris: 'manipuler le DOM et réagir aux événements.' },
-        { titre: "Catalogue de l'érablière", technos: ['PHP', 'MySQL'],
+        { id: 3, titre: "Catalogue de l'érablière", technos: ['PHP', 'MySQL'],
           description: 'Catalogue de produits avec ajout, modification et suppression.',
           appris: 'les requêtes préparées et le patron POST-Redirect-GET.' },
-        { titre: 'API de réservations', technos: ['JavaScript', 'Express'],
+        { id: 4, titre: 'API de réservations', technos: ['JavaScript', 'Express'],
           description: 'API REST pour réserver des places de spectacle.',
           appris: 'les codes de statut et la validation côté serveur.' },
-        { titre: 'Météo du campus', technos: ['JavaScript', 'Vue'],
+        { id: 5, titre: 'Météo du campus', technos: ['JavaScript', 'Vue'],
           description: 'Tableau de bord météo alimenté par une API publique.',
           appris: 'la réactivité et les propriétés calculées.' },
-        { titre: 'Ce portfolio', technos: ['HTML', 'CSS', 'Vue'],
+        { id: 6, titre: 'Ce portfolio', technos: ['HTML', 'CSS', 'Vue'],
           description: 'Une page HTML statique, rendue interactive avec Vue.',
           appris: 'monter une application Vue sur une page existante.' },
       ]
@@ -635,7 +845,7 @@ Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profi
       // État de l'interface
       const sombre = ref(false)
       const filtre = ref('Toutes')
-      const ouverts = ref([])   // titres des projets dont les détails sont affichés
+      const ouverts = ref([])   // identifiants des projets dont les détails sont affichés
 
       // Les technologies des projets, sans doublon, précédées de « Toutes »
       const technos = ['Toutes', ...new Set(projets.flatMap((p) => p.technos))]
@@ -645,11 +855,11 @@ Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profi
         return projets.filter((p) => p.technos.includes(filtre.value))
       })
 
-      function basculerDetails(titre) {
-        if (ouverts.value.includes(titre)) {
-          ouverts.value = ouverts.value.filter((t) => t !== titre)
+      function basculerDetails(id) {
+        if (ouverts.value.includes(id)) {
+          ouverts.value = ouverts.value.filter((projetId) => projetId !== id)
         } else {
-          ouverts.value.push(titre)
+          ouverts.value.push(id)
         }
       }
 
@@ -667,9 +877,82 @@ Sans oublier d'ajouter au `return` tout ce que le HTML utilise : `return { profi
 Retenir le thème choisi d'une visite à l'autre, dans `localStorage`. Ajouter un champ de recherche qui filtre les projets par mot-clé, en plus de la technologie : il faudra pour cela la directive `v-model`, présentée dans la page suivante.
 </Aside>
 
+## Découvrir les composants `.vue`
+
+Jusqu'ici, le portfolio utilisait une page HTML et un script chargé par CDN. Pour les applications plus importantes, nous pouvons répartir l'interface en **composants réutilisables** dans des fichiers `.vue`, grâce à un projet Vite.
+
+<Aside type="definition" title="Composant et SFC">
+Un **composant** regroupe une partie de l'interface, son comportement et éventuellement ses styles. Un fichier `.vue` est un *Single-File Component* (**SFC**, composant monofichier) : il rassemble ces éléments dans un seul fichier, traité par l'outil de compilation.
+</Aside>
+
+Voici un composant simple :
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const message = ref('Bonjour de Vue')
+</script>
+
+<template>
+  <p>{{ message }}</p>
+</template>
+
+<style scoped>
+p { font-weight: 600; }
+</style>
+```
+
+### `<script setup>` — L'état et le comportement
+
+Cette section contient le code JavaScript du composant : imports, données, état réactif, calculs et fonctions utilisées par l'interface. 
+Les déclarations faites au niveau principal sont directement accessibles dans le gabarit, sans `return` explicite.
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const message = ref('Bonjour de Vue')
+</script>
+```
+
+### `<template>` — La structure (gabarit)
+
+Cette section contient le HTML enrichi par la syntaxe de Vue. 
+On y utilise les valeurs et fonctions déclarées dans `<script setup>` :
+
+```vue
+<template>
+  <p>{{ message }}</p>
+</template>
+```
+
+### `<style scoped>` — L'apparence
+
+Cette section optionnelle définit des règles CSS. Avec `scoped`, Vue limite principalement la portée des sélecteurs aux éléments du composant, plutôt qu'à l'ensemble de l'application.
+
+```vue
+<style scoped>
+p { font-weight: 600; }
+</style>
+```
+
+Les styles globaux peuvent toujours affecter le composant. Les règles de la **cascade CSS** (spécificité, ordre, etc.) continuent de déterminer quels styles s'appliquent : `scoped` ne garantit pas la priorité des règles locales sur toutes les règles globales.
+
+### Deux syntaxes pour les mêmes concepts
+
+| Portfolio par CDN (`setup()`) | Fichier `.vue` (`<script setup>`) |
+| --- | --- |
+| On appelle `createApp({ setup() { … } })` dans un script de la page HTML. | On écrit les déclarations dans la section `<script setup>` du composant. |
+| `setup()` retourne les variables et fonctions à rendre accessibles au HTML. | Les déclarations principales sont accessibles dans `<template>` sans `return`. |
+| Les directives s'écrivent dans le HTML à l'intérieur de `#app`. | Les directives s'écrivent dans `<template>`. |
+| Le navigateur charge directement Vue par CDN. | Vite compile les fichiers `.vue` et sert l'application. |
+
+Les mécanismes `ref`, `computed`, `v-bind`, `v-for`, `v-if` et `@click` restent les mêmes. **On ne place pas un bloc `<script setup>` directement dans une page HTML chargée par CDN** : cette syntaxe doit être compilée comme partie d'un fichier `.vue`.
+
 ## Et ensuite
 
-Le portfolio tient dans une seule page, et tout son code dans un seul script. Une application plus riche se découpe en composants, chacun dans son fichier `.vue`, et va chercher ses données auprès d'une API. C'est l'objet de la page suivante, avec un projet Vite qui affiche les cafés étudiants du campus.
+Dans le prochain cours et pour la suite, nous utiliserons un projet Vite pour construire une interface organisée en composants et consommer des données provenant d'une API.
 
 ## Récapitulatif
 
@@ -683,6 +966,7 @@ Le portfolio tient dans une seule page, et tout son code dans un seul script. Un
 | Propriété calculée | `computed(() => …)` | déduire une valeur d'autres données, sans la recalculer inutilement |
 | Condition | `v-if`, `v-else-if`, `v-else`, `v-show` | afficher un élément sous condition |
 | Montage par CDN | `createApp({ setup() { … return … } }).mount('#app')` | rendre interactive une page existante ; seul le contenu de `#app` sert de gabarit |
+| Composant monofichier | `<script setup>`, `<template>`, `<style scoped>` | organiser une interface en composants `.vue`, compilés avec Vite |
 
 ## Quiz
 

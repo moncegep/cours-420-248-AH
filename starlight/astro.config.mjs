@@ -45,8 +45,8 @@ export default defineConfig({
                         label: 'Développement côté client', 
                         items: [
                             { label: "Développement coté client", slug: 'cours/08-dev-frontend' },
-                            // { label: "Introduction à Vue.js", slug: 'cours/10-vue-intro' },
-                            // { label: "Structurer une application Vue.js", slug: 'cours/11-vue-composant' },
+                            { label: "Introduction à Vue.js", slug: 'cours/10-vue-intro' },
+                            { label: "Structurer une application Vue.js", slug: 'cours/11-vue-composant' },
                             // { label: "Révision", slug: 'cours/09-revision' },
                             // { label: 'MVC', slug: 'cours/10-mvc' },
                             // { label: 'MVC', slug: 'cours/10-mvc' },
