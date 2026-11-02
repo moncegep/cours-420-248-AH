@@ -68,6 +68,7 @@ export default defineConfig({
                 label: 'Travaux',
                 items: [
                     { label: "01. Outil Dex", slug: 'tps/01-outil-dex' },
+                    { label: "02. Application Dex", slug: 'tps/02-app-dex' },
                 ]
             },
             {

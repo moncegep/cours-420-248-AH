@@ -7,16 +7,18 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="site">
-
+<div id="app" class="site">
+  <p>{{ message }}</p>
   <header class="entete conteneur">
     <div class="haut">
       <span class="marque">IG</span>
-      <button>Mode sombre</button>
+      <button @click="sombre = !sombre" v-bind:disabled="sombre">
+        {{ sombre ? 'Mode clair' : 'Mode sombre' }}
+      </button>
     </div>
-    <h1>Inès Gagnon</h1>
-    <p class="titre">Étudiante en techniques de l'informatique, profil développement web</p>
-    <span class="dispo">Disponible pour un stage à l'été 2027</span>
+    <h1>{{profil.nom}}</h1>
+    <p class="titre">>{{profil.titre}}</p>
+    <span class="dispo">>{{profil.dispo}}</span>
   </header>
 
   <main class="conteneur">
@@ -106,11 +108,28 @@
 
     <section class="contact">
       <h2>Contact</h2>
-      <p>Écrivez-moi à <a href="mailto:ines.gagnon@exemple.test">ines.gagnon@exemple.test</a>.</p>
+      <p>Écrivez-moi à <a :href="'mailto:'+profil.courriel">{{profil.courriel}}</a>.</p>
     </section>
   </main>
 
   <footer class="pied conteneur">Inès Gagnon · Montréal</footer>
 </div>
+
+<script type="module">
+  import { createApp, ref } from 'https://unpkg.com/vue@3.5/dist/vue.esm-browser.js'
+
+  createApp({
+    setup() {
+      const sombre = ref (false);
+      const profil = {
+        nom: "Inès Gagnon",
+        titre : "Étudiante en techniques de l'informatique, profil développement web",
+        courriel: 'ines.gagnon@exemple.test',
+        dispo : "Disponible pour un stage à l'été 2027"
+      }
+      return { profil, sombre }   // ce qui est retourné est utilisable dans la page
+    },
+  }).mount('#app')
+</script>
 </body>
 </html>

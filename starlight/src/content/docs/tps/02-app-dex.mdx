@@ -1,0 +1,464 @@
+---
+
+title: "TP2 — Dex : Vue.js, PHP et une API Express"
+description: "Deuxième travail pratique. Dex devient une application complète : une API Node.js avec Express, un site PHP qui fournit le cadre et le routage, une interface Vue.js et une page d'administration protégée."
+sidebar:
+  order: 2
+
+---
+
+import Aside from '../../../components/Aside.astro';
+import Highlight from '../../../components/Highlight.astro';
+import { Steps } from '@astrojs/starlight/components';
+
+Au TP1, nous avons construit Dex sous forme d'application PHP classique, avec un rendu purement coté serveur : chaque clic rechargeait une page entièrement construite par le serveur.
+
+Ce deuxième travail pratique (TP) reprend le même outil, mais répartit le travail entre trois parties :
+
+- une **API** construite avec Express (Node.js). Elle est la seule couche qui communique avec la base de données ;
+- un **site PHP** qui fournit le cadre commun des pages (en-tête, pied de page) et le routage ;
+- une **interface Vue.js** qui affiche les données et gère les interactions utilisateur. C'est elle qui communique avec l'API.
+
+Dans ce travail, **nous ajoutons également une page d'administration protégée** : elle permet à l'enseignant de se connecter pour modifier un travail et ses créneaux.
+
+## Le scénario
+
+Le scénario du TP1 ne change pas : chaque cours possède des travaux, chaque travail propose des créneaux, 
+et les étudiants indiquent les créneaux où ils sont libres.
+Dex met en évidence le ou les créneaux qui conviennent au plus grand nombre.
+
+#### Changements et nouveautés
+
+1. **L'expérience de l'étudiant** : 
+    - Avant le filtrage des travaux, l'enregistrement d'une réponse et la mise à jour de la grille des disponibilités se se faisaient coté serveur (dans le PHP).
+    - Maintenant, ça se fait sans rechargement de page, côté client via Vue.js.
+2. **La mémoire de l'utilisateur courant** : 
+   - Avant le matricule et le nom de l'étudiant étaient retenus dans une session PHP.
+   - Maintenant elles sont retenus dans le navigateur, via `localStorage`
+3. **L'administration (nouveau)** : 
+   - L'enseignant peut se connecter pour modifier un travail (titre, description, dates, état ouvert ou fermé) et gérer ses créneaux.
+
+## Architecture
+
+<table>
+  <thead>
+    <tr>
+      <th>Partie</th>
+      <th>Technologie</th>
+      <th>Adresse de développement</th>
+      <th>Rôle</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td>Base de données</td>
+      <td>MySQL (XAMPP)</td>
+      <td><code>DexAppBD</code></td>
+      <td>Conserve les cours, travaux, créneaux et disponibilités.</td>
+    </tr>
+
+    <tr>
+      <td>API</td>
+      <td>Node.js, Express, mysql2</td>
+      <td><code>http://localhost:3000/api</code></td>
+      <td>Seule partie qui lit et écrit dans <code>DexAppBD</code>. Valide toutes les données reçues.</td>
+    </tr>
+
+    <tr>
+      <td>Site</td>
+      <td>PHP (Apache de XAMPP)</td>
+      <td><code>http://localhost/dex-tp2/site/</code></td>
+      <td>Fournit le cadre HTML des pages, le routage et la page 404. N'accède jamais à la base.</td>
+    </tr>
+
+    <tr>
+      <td>Interface</td>
+      <td>Vue.js 3</td>
+      <td>Chargée par les pages PHP</td>
+      <td>Appelle l'API avec <code>fetch</code> et affiche les données.</td>
+    </tr>
+  </tbody>
+</table>
+
+{/* Le parcours d'une action ressemble donc à ceci :   */}
+{/* `navigateur` → page PHP (cadre) → application Vue → `fetch` → API Express → `DexAppBD`, puis la réponse JSON revient à Vue, qui met la page à jour. */}
+
+{/* ## Fichiers fournis
+
+L'archive de départ contient la structure du projet et le script de la base de données. Les fichiers de code ne contiennent qu'un commentaire qui décrit leur rôle.
+
+```text
+dex-tp2/
+├── init.sql                  Base DexAppBD : tables et jeu de données (fourni, complet)
+├── README.md                 À compléter
+├── api/
+│   ├── package.json          Dépendances de l'API (fourni)
+│   ├── .env.exemple          Modèle de configuration (fourni)
+│   └── src/
+│       ├── serveur.js
+│       ├── bd.js
+│       ├── auth.js
+│       ├── routes-publiques.js
+│       └── routes-admin.js
+└── site/
+    ├── includes/
+    │   ├── entete.php
+    │   └── pied.php
+    ├── index.php
+    ├── travail.php
+    ├── admin.php
+    ├── 404.php
+    ├── css/style.css
+    └── js/
+        ├── config.js
+        ├── api.js
+        ├── accueil.js
+        ├── travail.js
+        ├── admin.js
+        └── composants/
+``` 
+
+Vous pouvez ajouter des fichiers ou en regrouper, à condition de garder la séparation entre `api/` et `site/` et d'expliquer votre organisation dans le README.
+*/}
+
+<Aside type="note" title="Le script init.sql (fourni)">
+Le script `init.sql` crée la base de données `DexAppBD`, distincte de celle du TP1, ses cinq tables et le jeu de données du TP1. 
+Il peut être relancé sans erreur ni doublon. Trois différences avec le TP1 :
+
+- la clé étrangère de `disponibilites` vers `creneaux` utilise `ON DELETE CASCADE` : supprimer un créneau supprime donc automatiquement les disponibilités qui le visent ;
+- une nouvelle table `utilisateurs` contient les comptes des enseignants (voir la partie 2) ;
+- chaque cours appartient à un enseignant (nouvelle colonne `cours.utilisateur_id`).
+
+Pour l'exécuter, importez-le dans phpMyAdmin (onglet *Importer*) ou lancez `mysql -u root < init.sql`.
+</Aside>
+
+## API Express
+
+
+{/* ### Mise en place
+
+<Steps>
+
+1. Dans le dossier `api/`, installez les dépendances avec `npm install`.
+2. Copiez `.env.exemple` sous le nom `.env`. Ce fichier contient la configuration locale (port, accès à la base, origine du site). Il ne doit pas être remis : il figure déjà dans `.gitignore`.
+3. Dans `bd.js`, créez un pool de connexions avec `mysql2/promise` à partir des variables du `.env`, chargées avec `dotenv`.
+4. Dans `serveur.js`, créez l'application Express, activez `express.json()` pour lire les corps de requête en JSON, activez `cors()`, branchez vos routes, puis démarrez le serveur sur le port `PORT`.
+
+</Steps>
+
+<Aside type="note" title="Pourquoi cors() ?">
+Pour un navigateur, une **origine** est la combinaison du protocole, du nom de domaine et du port. Le site PHP (`http://localhost`) et l'API (`http://localhost:3000`) n'ont donc pas la même origine. Par sécurité, un navigateur bloque dans bien des cas les réponses d'une autre origine, sauf si le serveur l'autorise explicitement. C'est le rôle du mécanisme **CORS** (*Cross-Origin Resource Sharing*).
+
+Le paquet `cors` ajoute les en-têtes nécessaires. Limitez l'autorisation à l'origine du site :
+
+```js
+app.use(cors({ origin: process.env.ORIGINE_SITE }));
+```
+</Aside>
+
+<Aside type="note" title="Les dates entre MySQL et JavaScript">
+Par défaut, `mysql2` convertit les colonnes `DATE` et `DATETIME` en objets `Date` de JavaScript, qui sont ensuite envoyés en JSON dans le fuseau UTC. Une heure de 18 h peut alors s'afficher à 22 h. Pour éviter ce décalage, ajoutez `dateStrings: true` à la configuration du pool : les dates sont alors transmises telles qu'elles sont en base, par exemple `"2026-10-05 18:00:00"`.
+
+En entrée, l'API accepte les dates au format produit par un champ `<input type="datetime-local">`, par exemple `"2026-10-05T18:00"`.
+</Aside> */}
+
+### Format des réponses
+
+- Toutes les réponses sont en JSON, sauf les réponses `204`, qui n'ont pas de corps.
+- En cas d'erreur, le corps a toujours la même forme : `{ "erreurs": ["Message 1", "Message 2"] }`.
+- Les codes de statut HTTP suivants sont attendus. 
+
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Signification dans Dex</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr><td><code>200</code></td><td>Succès, avec des données dans la réponse.</td></tr>
+    <tr><td><code>201</code></td><td>Ressource créée (ajout d'un créneau).</td></tr>
+    <tr><td><code>204</code></td><td>Succès, sans contenu à renvoyer.</td></tr>
+    <tr><td><code>400</code></td><td>Données reçues invalides (champ vide, format incorrect, créneau étranger au travail, etc.).</td></tr>
+    <tr><td><code>401</code></td><td>Jeton absent, invalide ou expiré, ou identifiants de connexion incorrects.</td></tr>
+    <tr><td><code>403</code></td><td>Enseignant connecté, mais le travail ou le créneau visé appartient au cours d'un autre enseignant.</td></tr>
+    <tr><td><code>404</code></td><td>Travail ou créneau introuvable.</td></tr>
+    <tr><td><code>409</code></td><td>Action impossible dans l'état actuel (réponse envoyée pour un travail fermé).</td></tr>
+    <tr><td><code>500</code></td><td>Erreur inattendue du serveur. Le message renvoyé reste générique ; le détail est écrit dans la console de l'API.</td></tr>
+  </tbody>
+</table>
+
+### Routes publiques
+
+<table>
+  <thead>
+    <tr>
+      <th>Méthode et chemin</th>
+      <th>Rôle</th>
+      {/* <th>Réponse attendue</th> */}
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>GET /api/cours</code></td>
+      <td>Liste des cours.</td>
+      {/* <td><code>200</code>, tableau de <code>\{ id, titre \}</code>.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>GET /api/travaux</code><br />option : <code>?cours=&lt;id&gt;</code></td>
+      <td>Travaux <strong>ouverts</strong>. Peut être limité à un cours.</td>
+      {/* <td><code>200</code>, tableau de <code>\{ id, cours_id, cours_titre, titre, type, remise \}</code>. <code>400</code> si le cours demandé n'existe pas.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>GET /api/travaux/:id</code></td>
+      <td>Un travail (ouvert ou fermé) et ses créneaux.</td>
+      {/* <td><code>200</code>, <code>\{ id, cours_id, cours_titre, titre, description, type, disponible, remise, ouvert, creneaux: [\{ id, debut, fin \}] \}</code>. <code>404</code> si le travail n'existe pas.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>GET /api/travaux/:id/disponibilites</code></td>
+      <td>Disponibilités agrégées : pour chaque créneau, le nombre d'étudiants disponibles et leurs noms.</td>
+      {/* <td><code>200</code>, tableau de <code>\{ id, debut, fin, nombre, noms: [...] \}</code>, un élément par créneau, y compris ceux sans réponse. <code>404</code> si le travail n'existe pas.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>PUT /api/travaux/:id/disponibilites/:matricule</code><br />corps : <code>\{ nom, creneaux: [...] \}</code></td>
+      <td>Remplace la réponse de cet étudiant pour ce travail.</td>
+      {/* <td><code>200</code>, mêmes données que la route précédente, déjà mises à jour. <code>400</code>, <code>404</code> ou <code>409</code> selon le cas.</td> */}
+    </tr>
+  </tbody>
+</table>
+
+{/* <Aside type="note" title="Pourquoi PUT pour enregistrer une réponse ?">
+La méthode `PUT` signifie « remplacer la ressource désignée par l'adresse ». Ici, la ressource est la réponse d'un étudiant (son matricule) pour un travail. Envoyer deux fois la même requête produit le même résultat, ce qui correspond exactement au comportement du TP1 : une nouvelle soumission remplace la précédente.
+</Aside> */}
+
+{/* À la réception d'un `PUT` sur les disponibilités, l'API doit :
+
+1. vérifier que le travail existe et qu'il est ouvert ;
+2. vérifier que le matricule (dans l'adresse) et le nom (dans le corps) sont des chaînes non vides, d'au plus 20 et 100 caractères ;
+3. vérifier que `creneaux` est un tableau non vide de chaînes, et que chaque identifiant existe et appartient au travail ;
+4. si une seule vérification échoue, ne rien modifier et retourner un message d'erreur ;
+5. sinon, supprimer les anciennes disponibilités de ce matricule pour ce travail et insérer les nouvelles **dans une transaction** ;
+6. renvoyer les disponibilités agrégées à jour.
+
+Toute requête SQL qui contient une valeur reçue doit être une **requête préparée** (avec des `?` et un tableau de valeurs). */}
+
+### Authentification et volet administration
+
+Les comptes des enseignants sont conservés dans la table `utilisateurs` :
+
+<table>
+  <thead>
+    <tr>
+      <th>Colonne</th>
+      <th>Type</th>
+      <th>Rôle</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr><td><code>id</code></td><td><code>INT</code>, auto-incrémenté</td><td>Clé primaire.</td></tr>
+    <tr><td><code>identifiant</code></td><td><code>VARCHAR(50)</code>, unique</td><td>Nom utilisé pour se connecter.</td></tr>
+    <tr><td><code>mot_de_passe_hache</code></td><td><code>VARCHAR(255)</code></td><td>Empreinte bcrypt du mot de passe.</td></tr>
+    <tr><td><code>nom</code></td><td><code>VARCHAR(100)</code></td><td>Nom affiché dans la page d'administration.</td></tr>
+  </tbody>
+</table>
+
+Aucune création de compte n'est demandée : l'application ne fait que lire cette table. 
+Chaque cours appartient à un enseignant (colonne `utilisateur_id` de la table `cours`), 
+et seul cet enseignant peut modifier les travaux du cours et leurs créneaux. 
+
+Le script `init.sql` contient deux comptes de démonstration :
+
+<table>
+  <thead>
+    <tr>
+      <th>Identifiant</th>
+      <th>Mot de passe</th>
+      <th>Nom</th>
+      <th>Cours</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr><td><code>prof</code></td><td><code>dex2026</code></td><td>Claire Dubois</td><td>420-245-AH, 420-248-AH</td></tr>
+    <tr><td><code>prof2</code></td><td><code>web2026</code></td><td>Marc Tremblay</td><td>420-244-AH, 420-253-AH</td></tr>
+  </tbody>
+</table>
+
+{/* <Aside type="note" title="Mot de passe haché">
+Un **hachage** transforme un mot de passe en une empreinte dont on ne peut pas retrouver le mot de passe d'origine. Le serveur ne conserve que l'empreinte et compare, à la connexion, le mot de passe reçu à cette empreinte avec `bcrypt.compare()` (paquet `bcryptjs`). Pour ajouter un compte, générez l'empreinte dans le dossier `api/` avec `node -e "console.log(require('bcryptjs').hashSync('motDePasse', 10))"`, puis insérez une ligne dans `utilisateurs`.
+</Aside> */}
+
+### Connexion et jeton
+
+<table>
+  <thead>
+    <tr>
+      <th>Méthode et chemin</th>
+      <th>Rôle</th>
+      {/* <th>Réponse attendue</th> */}
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>POST /api/connexion</code><br />corps : <code>\{ identifiant, motDePasse \}</code></td>
+      <td>Cherche l'utilisateur par son identifiant (requête préparée), vérifie le mot de passe et crée un jeton.</td>
+      {/* <td><code>200</code>, <code>\{ jeton, expiration, nom \}</code>. <code>401</code> si l'identifiant est inconnu ou si le mot de passe est incorrect, avec le même message dans les deux cas.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>POST /api/deconnexion</code></td>
+      <td>Invalide le jeton envoyé.</td>
+      {/* <td><code>204</code>.</td> */}
+    </tr>
+  </tbody>
+</table>
+
+Un **jeton** est une chaîne aléatoire que le serveur remet après une connexion réussie. Le client la renvoie ensuite avec chaque requête protégée, dans l'en-tête HTTP `Authorization` :
+
+```text
+Authorization: Bearer 3f1c9e2a-...
+```
+
+{/* Dans ce TP, le jeton est **opaque** : il ne contient aucune information, il sert seulement de clé. L'API le génère avec `crypto.randomUUID()` et le conserve en mémoire (par exemple dans un `Map`) avec l'`id` de l'utilisateur et l'heure d'expiration, fixée à 2 heures après la connexion. Redémarrer l'API efface donc tous les jetons, ce qui est acceptable ici. */}
+
+{/* <Aside type="note" title="Et les JWT ?">
+Dans de nombreuses applications, on utilise plutôt un JWT (*JSON Web Token*), un jeton signé qui contient lui-même ses informations. Ce mécanisme sera abordé plus loin dans la session. Le jeton opaque permet d'en comprendre d'abord le principe.
+</Aside> */}
+
+### Routes protégées
+
+Chaque route suivante effectue ses vérifications dans cet ordre :
+
+1. le jeton est présent, connu et non expiré (`401` sinon) ;
+2. le travail ou le créneau visé existe (`404` sinon) ;
+3. il appartient à un cours de l'enseignant connecté (`403` sinon) ;
+4. les données reçues sont valides (`400` sinon).
+
+<Aside type="note" title="Authentification et autorisation">
+Les codes `401` et `403` répondent à deux questions différentes.  
+L'**authentification** vérifie *qui* fait la requête (le jeton correspond-il à un enseignant ?).  
+L'**autorisation** vérifie ce que cette personne a *le droit* de faire (ce travail est-il dans un de ses cours ?). 
+
+Une requête peut donc être authentifiée et quand même refusée.
+</Aside>
+
+<table>
+  <thead>
+    <tr>
+      <th>Méthode et chemin</th>
+      <th>Rôle</th>
+      {/* <th>Réponse attendue</th> */}
+    </tr>
+  </thead>
+
+  <tbody>
+    <tr>
+      <td><code>GET /api/admin/travaux</code></td>
+      <td>Les travaux, ouverts et fermés, des cours de l'enseignant connecté, avec le titre de leur cours.</td>
+      {/* <td><code>200</code>, tableau de travaux.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>PUT /api/travaux/:id</code><br />corps : <code>\{ titre, description, type, disponible, remise, ouvert }</code></td>
+      <td>Modifie un travail. Le cours d'un travail ne peut pas être changé.</td>
+      {/* <td><code>200</code>, le travail modifié. <code>400</code> ou <code>404</code> selon le cas.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>POST /api/travaux/:id/creneaux</code><br />corps : <code>\{ debut, fin \}</code></td>
+      <td>Ajoute un créneau au travail.</td>
+      {/* <td><code>201</code>, le créneau créé <code>\{ id, debut, fin \}</code>. <code>400</code> ou <code>404</code>.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>PUT /api/creneaux/:id</code><br />corps : <code>\{ debut, fin \}</code></td>
+      <td>Modifie les heures d'un créneau. Un créneau ne peut pas changer de travail.</td>
+      {/* <td><code>200</code>, le créneau modifié. <code>400</code> ou <code>404</code>.</td> */}
+    </tr>
+
+    <tr>
+      <td><code>DELETE /api/creneaux/:id</code></td>
+      <td>Supprime un créneau. Ses disponibilités sont supprimées avec lui (cascade).</td>
+      {/* <td><code>204</code>. <code>404</code> si le créneau n'existe pas.</td> */}
+    </tr>
+  </tbody>
+</table>
+
+#### Règles de validation des routes d'administration :
+
+- `titre` et `description` sont des chaînes de caractères non vides (le titre fait au plus 150 caractères) ;
+- `type` est limité aux valeurs suivantes : `individuel` et `equipe` ;
+- `disponible` est une date valide, `remise` une date et heure valide, et `remise` est postérieure à `disponible` ;
+- `ouvert` est un booléen ;
+- pour un créneau, `debut` et `fin` sont des dates et heures valides, et `fin` est postérieure à `debut` ;
+- l'identifiant d'un nouveau créneau est généré par l'API sous la forme `<id du travail>-NN`, avec le prochain numéro libre sur deux chiffres (par exemple `web2-tp1-04`).
+
+{/* <Aside type="tip" title="Vérifier le jeton : fonction ou middleware">
+La façon la plus directe consiste à écrire une fonction, par exemple `utilisateurConnecte(req)`, qui lit l'en-tête `Authorization` et renvoie l'`id` de l'enseignant, ou `null` si le jeton est absent, inconnu ou expiré. Chaque route protégée l'appelle au début, répond `401` si elle obtient `null` et se sert ensuite de l'`id` pour vérifier le propriétaire du cours.
+
+Vous pouvez aussi écrire un **middleware**, c'est-à-dire une fonction `(req, res, next)` qu'Express exécute avant la route : elle répond `401` ou conserve l'`id` dans `req.utilisateurId` et appelle `next()` pour laisser passer la requête. Ce choix est facultatif et ne donne pas de points supplémentaires.
+</Aside> */}
+{/* 
+<Aside type="caution" title="Cacher une page ne protège rien">
+La page `admin.php` est accessible à tous : n'importe qui peut l'ouvrir. La protection repose entièrement sur l'API. Une requête envoyée sans jeton, par exemple avec `curl -X DELETE http://localhost:3000/api/creneaux/web2-tp1-01`, doit recevoir `401` et ne rien supprimer. La même requête envoyée avec le jeton de `prof2` doit recevoir `403`, puisque `web2-tp1` appartient à un cours de `prof`.
+</Aside> */}
+
+## Site PHP
+
+Le site PHP ne communique plus avec la base de données. Il fournit :
+
+- **le cadre commun** : `includes/entete.php` (début du document, logo ou nom Dex menant à l'accueil, navigation vers l'accueil et l'administration) et `includes/pied.php` (nom de l'outil, votre nom, droits d'auteur), inclus dans chaque page ;
+- **le routage gloabale** : une page PHP par écran (`index.php`, `travail.php`, `admin.php`), chacune avec son titre (`<title>`) et le point de montage de son application Vue ;
+- **un rendu serveur minimal** : la page `travail.php` vérifie que l'identifiant du travail est une chaîne qui respecte le format `^[a-z0-9-]{1,30}$` et transmet l'identifiant à Vue dans un attribut, échappé avec `htmlspecialchars`
+    - Si l'identifiant est absent ou mal formé, `travail.php` répond avec le code `404` (`http_response_code(404)`) et affiche le contenu de `404.php`, avec le même en-tête et le même pied de page.
+
+<Aside type="note" title="Qui vérifie que le travail existe ?">
+PHP vérifie seulement le **format** de l'identifiant. C'est l'API qui peut savoir si le travail existe en communiquant avec la base de données.
+</Aside>
+
+## Interface Vue.js
+
+Vue êst chargé par **CDN** comme module JavaScript, sans étape de compilation :
+
+```html
+<script type="module" src="js/travail.js"></script>
+```
+
+### Exigences communes
+
+- L'adresse de l'API est définie une seule fois, dans un fichier de config (`config.js`).
+- Les appels à l'API sont regroupés dans un fichier `api.js`.
+
+### Page d'un travail (`travail.php`)
+
+- Après un enregistrement réussi, le matricule et le nom sont conservés dans `localStorage` (un espace de stockage du navigateur qui persiste après sa fermeture). À la visite suivante d'un travail, les champs sont préremplis et les créneaux déjà choisis par ce matricule sont cochés.
+
+### Page d'administration (`admin.php`)
+
+- Sans jeton valide, la page affiche un formulaire de connexion. Après une connexion réussie, le jeton est conservé dans `sessionStorage` (comme `localStorage`, mais effacé à la fermeture de l'onglet).
+- Avant de supprimer un créneau, l'application demande une confirmation qui indique le nombre de réponses qui seront supprimées avec lui, par exemple : « Ce créneau a 3 réponses. Elles seront supprimées. Continuer ? ».
+
+## Livrables
+
+Pour ce travail, la remise se fera par *GitHub*.  
+Créez un répertoire et invitez moi à la rejoindre (nom d'utilisateur: **`lelafontant`**).
+
+Assurez vous d'avoir un `README.md` présente le projet et les fonctionnalités et qui explique : l'exécution de `init.sql`, l'installation et le démarrage de l'API, les comptes de démonstration.
+
+## Éthique de travail
+
+- **Travail régulier :** Vous devez faire au moins 5 commits significatifs par semaine.
+- **Compréhension du code :** Vous devez être en mesure d'expliquer et justifier tout ce qui se trouve dans votre code. Une vérification pourra être fait à tout moment dans le projet.
+
+<Aside type="caution" title='Pénalités'>
+Un travail irrégulier ou des difficultés notables à expliquer son code se traduiront par une pénalité attribué au travail.
+</Aside>
