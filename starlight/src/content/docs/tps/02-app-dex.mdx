@@ -30,11 +30,11 @@ Dex met en évidence le ou les créneaux qui conviennent au plus grand nombre.
 #### Changements et nouveautés
 
 1. **L'expérience de l'étudiant** : 
-    - Avant le filtrage des travaux, l'enregistrement d'une réponse et la mise à jour de la grille des disponibilités se se faisaient coté serveur (dans le PHP).
+    - Avant le filtrage des travaux, l'enregistrement d'une réponse et la mise à jour de la grille des disponibilités se faisaient côté serveur (dans le PHP).
     - Maintenant, ça se fait sans rechargement de page, côté client via Vue.js.
 2. **La mémoire de l'utilisateur courant** : 
    - Avant le matricule et le nom de l'étudiant étaient retenus dans une session PHP.
-   - Maintenant elles sont retenus dans le navigateur, via `localStorage`
+   - Maintenant elles sont retenues dans le navigateur, via `localStorage`
 3. **L'administration (nouveau)** : 
    - L'enseignant peut se connecter pour modifier un travail (titre, description, dates, état ouvert ou fermé) et gérer ses créneaux.
 
@@ -417,7 +417,7 @@ La page `admin.php` est accessible à tous : n'importe qui peut l'ouvrir. La pro
 Le site PHP ne communique plus avec la base de données. Il fournit :
 
 - **le cadre commun** : `includes/entete.php` (début du document, logo ou nom Dex menant à l'accueil, navigation vers l'accueil et l'administration) et `includes/pied.php` (nom de l'outil, votre nom, droits d'auteur), inclus dans chaque page ;
-- **le routage gloabale** : une page PHP par écran (`index.php`, `travail.php`, `admin.php`), chacune avec son titre (`<title>`) et le point de montage de son application Vue ;
+- **le routage global** : une page PHP par écran (`index.php`, `travail.php`, `admin.php`), chacune avec son titre (`<title>`) et le point de montage de son application Vue ;
 - **un rendu serveur minimal** : la page `travail.php` vérifie que l'identifiant du travail est une chaîne qui respecte le format `^[a-z0-9-]{1,30}$` et transmet l'identifiant à Vue dans un attribut, échappé avec `htmlspecialchars`
     - Si l'identifiant est absent ou mal formé, `travail.php` répond avec le code `404` (`http_response_code(404)`) et affiche le contenu de `404.php`, avec le même en-tête et le même pied de page.
 
@@ -427,7 +427,7 @@ PHP vérifie seulement le **format** de l'identifiant. C'est l'API qui peut savo
 
 ## Interface Vue.js
 
-Vue êst chargé par **CDN** comme module JavaScript, sans étape de compilation :
+Vue est chargé par **CDN** comme module JavaScript, sans étape de compilation :
 
 ```html
 <script type="module" src="js/travail.js"></script>
@@ -450,7 +450,7 @@ Vue êst chargé par **CDN** comme module JavaScript, sans étape de compilation
 ## Livrables
 
 Pour ce travail, la remise se fera par *GitHub*.  
-Créez un répertoire et invitez moi à la rejoindre (nom d'utilisateur: **`lelafontant`**).
+Créez un répertoire et invitez-moi à la rejoindre (nom d'utilisateur: **`lelafontant`**).
 
 Assurez vous d'avoir un `README.md` présente le projet et les fonctionnalités et qui explique : l'exécution de `init.sql`, l'installation et le démarrage de l'API, les comptes de démonstration.
 
@@ -460,5 +460,5 @@ Assurez vous d'avoir un `README.md` présente le projet et les fonctionnalités 
 - **Compréhension du code :** Vous devez être en mesure d'expliquer et justifier tout ce qui se trouve dans votre code. Une vérification pourra être fait à tout moment dans le projet.
 
 <Aside type="caution" title='Pénalités'>
-Un travail irrégulier ou des difficultés notables à expliquer son code se traduiront par une pénalité attribué au travail.
+Un travail irrégulier ou des difficultés notables à expliquer son code se traduiront par une pénalité attribuée au travail.
 </Aside>

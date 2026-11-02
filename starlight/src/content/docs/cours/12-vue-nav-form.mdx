@@ -1,0 +1,972 @@
+---
+title: "Navigation et formulaires"
+description: Construire une application Vue à plusieurs écrans avec Vue Router, appeler une API avec Axios, gérer des formulaires avec v-model et conserver un panier avec localStorage, à travers l'interface de gestion du catalogue de L'Érablière dorée.
+sidebar:
+  order: 16
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Aside from '../../../components/Aside.astro';
+import MarginNote from '../../../components/MarginNote.astro';
+import Highlight from '../../../components/Highlight.astro';
+import Checkpoint from '../../../components/Checkpoint.astro';
+import Quiz from '../../../components/react/Quiz.jsx';
+import DemoRouteur from '../../../components/vue/DemoRouteur.vue';
+import DemoFetchAxios from '../../../components/vue/DemoFetchAxios.vue';
+import DemoModificateurs from '../../../components/vue/DemoModificateurs.vue';
+import DemoChamps from '../../../components/vue/DemoChamps.vue';
+import DemoValidation from '../../../components/vue/DemoValidation.vue';
+import DemoStockage from '../../../components/vue/DemoStockage.vue';
+
+Une application réelle compte souvent plusieurs plusieurs pages et permet de gérer (opérations CRUD) pleinement ces données. 
+Cette page construit une telle application, en réunissant quatre outils :
+
+- **Vue Router**, pour permettre la navigation coté client (sans recharger la page) ;
+- **Axios**, pour faciliter la formulation des requêtes (HTTP) à l'API ;
+- **`v-model`**, qu'on approfondi ici, pour la gestion des formulaires ;
+- **`localStorage`**, pour conserver des données dans le navigateur, d'une visite à l'autre.
+
+Le fil conducteur est l'interface de gestion du catalogue de produits de **L'Érablière dorée**. 
+Elle s'appuie sur l'API Express construite dans la page sur la conception d'une API.
+
+## Ce qu'on construit
+
+L'application compte cinq écrans, chacun associé à une adresse URL :
+
+| Écran | Adresse | Rôle | Appel à l'API |
+| --- | --- | --- | --- |
+| Catalogue | `/produits` | la liste des produits, filtrable par catégorie | `GET /api/produits` |
+| Fiche | `/produits/2` | le détail d'un produit, avec Modifier et Supprimer | `GET`, puis `DELETE /api/produits/2` |
+| Ajout | `/produits/nouveau` | un formulaire vide | `POST /api/produits` |
+| Modification | `/produits/2/modifier` | le même formulaire, prérempli | `GET`, puis `PUT /api/produits/2` |
+
+Toute autre adresse affiche une page « introuvable ».
+
+{/* #### Organisation du code
+
+```text
+erabliere-vue/
+├── index.html
+├── vite.config.js            la configuration de Vite, avec le relais vers l'API
+└── src/
+    ├── main.js               crée l'application, installe le routeur
+    ├── App.vue               l'en-tête, le menu et l'emplacement des écrans
+    ├── router/index.js       la table des routes : une adresse, un écran
+    ├── api.js                tous les appels à l'API, avec Axios
+    ├── catalogue.js          les catégories et le format des prix (fourni)
+    ├── style.css             (fourni)
+    ├── views/                un composant par écran
+    │   ├── ListeProduits.vue
+    │   ├── FicheProduit.vue
+    │   ├── NouveauProduit.vue
+    │   ├── ModifierProduit.vue
+    │   └── PageIntrouvable.vue
+    └── components/
+        └── FormulaireProduit.vue    le formulaire, commun à l'ajout et à la modification
+```
+
+<Aside type="definition" title="Vue (view) et composant">
+Une **vue**, au sens du routeur, est le composant affiché pour une adresse : un écran entier. Les autres composants sont des morceaux réutilisés à l'intérieur des vues, comme le formulaire, qui sert à deux écrans. Les deux sont des fichiers `.vue` ; seul leur rôle diffère. Par convention, les vues vont dans `src/views/`, et les autres dans `src/components/`.
+</Aside>
+
+Trois fichiers JavaScript ordinaires complètent les composants, chacun avec une responsabilité : `router/index.js` sait quel écran correspond à quelle adresse, `api.js` sait parler à l'API. Les vues ne connaissent pas les adresses de l'API. */}
+
+## Préparer le projet
+
+L'application et l'API tournent côte à côte, chacune sur son propre serveur de développement.
+
+<Steps>
+
+1. **Démarrer l'API.** Dans le dossier `erabliere-api`, celui de l'étape 3 de la page sur la conception d'une API :
+
+   ```bash
+   npm install
+   npm run dev        # http://localhost:3000/api/produits
+   ```
+
+   L'adresse `http://localhost:3000/api/produits` doit afficher les six produits en JSON. Ce terminal reste ouvert.
+
+2. **Créer le projet Vue.** Dans un second terminal, hors du dossier de l'API :
+
+   ```bash
+   npm create vue@latest
+   ```
+
+   - **nom du projet** : `erabliere-vue` ;
+   - **fonctionnalités** : cocher seulement **Router**, avec la barre d'espacement, puis valider ;
+   - **code d'exemple** : commencer avec un projet vide.
+
+3. **Installer les dépendances, et Axios.**
+
+   ```bash
+   cd erabliere-vue
+   npm install
+   npm install axios
+   ```
+
+   La seconde commande ajoute Axios à la liste des dépendances de `package.json`.
+
+4. **Ajouter les fichiers fournis.** Copier `style.css` et `catalogue.js` dans `src/`, puis importer la feuille de style dans `src/main.js`, que l'assistant a déjà préparé pour le routeur :
+
+   ```js
+   // src/main.js
+   import { createApp } from 'vue'
+   import App from './App.vue'
+   import router from './router'
+   import './style.css'
+
+   const app = createApp(App)
+
+   app.use(router)      // installe Vue Router dans l'application
+
+   app.mount('#app')
+   ```
+
+   Le dossier de départ `erabliere-vue` fourni correspond au résultat de ces quatre étapes, sans Axios : il reste alors à lancer `npm install`, puis `npm install axios`.
+
+5. **Relier l'application à l'API.** Dans `vite.config.js`, ajouter un relais, ou **proxy**, pour les adresses qui commencent par `/api` :
+
+   ```js
+   // vite.config.js
+   import { fileURLToPath, URL } from 'node:url'
+   import { defineConfig } from 'vite'
+   import vue from '@vitejs/plugin-vue'
+   import vueDevTools from 'vite-plugin-vue-devtools'
+
+   export default defineConfig({
+     plugins: [vue(), vueDevTools()],
+     resolve: {
+       alias: {
+         '@': fileURLToPath(new URL('./src', import.meta.url)),
+       },
+     },
+     server: {
+       // Les requêtes vers /api sont relayées à l'API Express.
+       proxy: {
+         '/api': 'http://localhost:3000',
+       },
+     },
+   })
+   ```
+
+6. **Lancer l'application.**
+
+   ```bash
+   npm run dev        # http://localhost:5173
+   ```
+
+</Steps>
+
+<Aside type="definition" title="Proxy de développement">
+Un **proxy**, ou relais, est un serveur intermédiaire qui reçoit une requête et la transmet à un autre serveur, puis renvoie sa réponse. Ici, le serveur de Vite reçoit `GET /api/produits` et le transmet à `http://localhost:3000/api/produits`. Le navigateur, lui, ne parle qu'à un seul serveur : `localhost:5173`.
+</Aside>
+
+```text
+Navigateur  ──GET /produits──▶   Vite (5173)  : renvoie l'application Vue
+Navigateur  ──GET /api/produits─▶ Vite (5173) ──relais──▶ Express (3000) : renvoie le JSON
+```
+
+Sans ce relais, l'application devrait appeler `http://localhost:3000` directement. Or un navigateur bloque, par défaut, la lecture d'une réponse venue d'une autre **origine** que la page, c'est-à-dire d'un autre protocole, domaine ou port. Le relais évite le problème : pour le navigateur, l'application et l'API ont la même origine.
+
+<Aside type="caution" title="Seulement pendant le développement">
+Le relais est un service du serveur de développement de Vite ; il n'existe plus une fois l'application construite avec `npm run build`. En production, on sert habituellement l'application et l'API depuis la même origine, ou l'API autorise explicitement l'origine de l'application. Cette question sera reprise lors de la mise en ligne.
+</Aside>
+
+<MarginNote type="rappel" titre="L'alias @">
+L'assistant de Vue configure l'alias `@`, qui désigne le dossier `src/`. `import api from '@/api.js'` fonctionne ainsi depuis n'importe quel fichier, sans compter les `../`.
+</MarginNote>
+
+## Naviguer avec Vue Router
+
+<Aside type="definition" title="Route, routeur">
+Une **route** associe une adresse, ou un motif d'adresse, à une vue. Le **routeur** est l'objet qui connaît toutes les routes : quand l'adresse change, il trouve la route correspondante et affiche sa vue, sans demander de nouvelle page au serveur. Vue Router est le routeur officiel de Vue.
+</Aside>
+
+L'idée est familière : un routeur Express associait déjà une méthode et une adresse à un traitement. Celui de Vue associe une adresse à un écran.
+
+### Des routes et un emplacement
+
+<DemoRouteur client:visible />
+
+La table des routes vit dans `src/router/index.js`, que l'assistant a créé vide. On commence par deux écrans :
+
+```js
+// src/router/index.js
+import { createRouter, createWebHistory } from 'vue-router'
+import ListeProduits from '@/views/ListeProduits.vue'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    { path: '/', redirect: '/produits' },
+    { path: '/produits', name: 'produits', component: ListeProduits },
+  ],
+})
+
+export default router
+```
+
+- `path` est l'adresse ; `component`, la vue à afficher ; `name`, un nom facultatif qui permet de désigner la route sans écrire son adresse.
+- `redirect` envoie ailleurs : l'adresse `/` mène au catalogue.
+- `createWebHistory()` donne des adresses ordinaires, comme `/produits`, que le navigateur garde dans son historique : le bouton **Précédent** fonctionne, et l'on peut ajouter une adresse aux favoris.
+
+Pour essayer, deux vues réduites au minimum suffisent, par exemple `<h1>Catalogue</h1>` dans `ListeProduits.vue`.
+
+`App.vue` devient la charpente commune à tous les écrans : l'en-tête et le menu, puis l'emplacement où le routeur affiche la vue de l'adresse courante.
+
+```vue
+<!-- src/App.vue -->
+<script setup>
+import { RouterLink, RouterView } from 'vue-router'
+</script>
+
+<template>
+  <header class="entete">
+    <RouterLink to="/produits" class="marque">L'Érablière dorée</RouterLink>
+    <nav>
+      <RouterLink to="/produits">Catalogue</RouterLink>
+    </nav>
+  </header>
+
+  <main class="conteneur">
+    <RouterView />
+  </main>
+</template>
+```
+
+- `<RouterView />` est l'emplacement de la vue : il change selon l'adresse, alors que l'en-tête reste en place.
+- `<RouterLink to="…">` produit une balise `<a>` ordinaire, mais intercepte le clic : l'adresse change sans que le navigateur recharge la page. L'application garde ainsi son état, par exemple le contenu d'un champ de l'en-tête.
+
+
+**Le lien actif.** `RouterLink` ajoute des classes au lien qui correspond à l'adresse courante, ce qui permet de le mettre en évidence dans le menu :
+
+| Classe | Ajoutée quand |
+| --- | --- |
+| `router-link-active` | l'adresse courante **commence** par celle du lien : sur `/produits/2`, le lien `/produits` l'a aussi |
+| `router-link-exact-active` | l'adresse courante est **exactement** celle du lien |
+
+La feuille de style fournie utilise la seconde, pour qu'un seul lien soit mis en évidence à la fois :
+
+```css
+.entete nav a.router-link-exact-active { background: var(--accent); color: #fff; }
+```
+
+### Des adresses avec paramètres
+
+La fiche d'un produit a une adresse par produit : `/produits/1`, `/produits/2`… Une seule route les couvre toutes, avec un **paramètre**, noté par deux-points, comme dans Express :
+
+```js
+import FicheProduit from '@/views/FicheProduit.vue'
+
+// dans le tableau routes
+{ path: '/produits/:id(\\d+)', name: 'produit', component: FicheProduit, props: true },
+```
+
+- `:id` capte un segment de l'adresse : sur `/produits/2`, `id` vaut `'2'`.
+- `(\\d+)` restreint le paramètre aux chiffres. Sans cette précision, `/produits/abc` afficherait une fiche, qui demanderait le produit `abc` à l'API. Avec elle, cette adresse ne correspond à aucune route.
+- `props: true` transmet les paramètres à la vue **sous forme de props**. La fiche les déclare comme n'importe quelle prop :
+
+```vue
+<!-- src/views/FicheProduit.vue -->
+<script setup>
+const props = defineProps({
+  id: { type: String, required: true },
+})
+</script>
+```
+
+<MarginNote type="rappel" titre="Toujours du texte">
+Comme `req.params` en Express, un paramètre d'adresse est toujours une chaîne de caractères : `'2'`, et non `2`. D'où `type: String` dans `defineProps`.
+</MarginNote>
+
+<Aside type="astuce" title="Sans props: true : useRoute()">
+Une vue peut aussi lire l'adresse courante avec `useRoute()` : `useRoute().params.id`. La forme `props: true` est souvent préférée, parce qu'elle rend la vue indépendante du routeur : elle reçoit un `id`, d'où qu'il vienne, et reste facile à réutiliser et à tester.
+</Aside>
+
+Dans le catalogue, chaque nom de produit devient un lien vers sa fiche. L'adresse est construite avec un gabarit de chaîne, d'où le `:` devant `to` :
+
+```html
+<RouterLink :to="`/produits/${produit.id}`">{{ produit.nom }}</RouterLink>
+```
+
+Les routes de l'ajout et de la modification suivent le même principe :
+
+```js
+{ path: '/produits/nouveau', name: 'nouveau-produit', component: NouveauProduit },
+{ path: '/produits/:id(\\d+)/modifier', name: 'modifier-produit', component: ModifierProduit, props: true },
+```
+
+<MarginNote type="astuce" titre="L'ordre des routes">
+Dans de nombreux cas, l'ordre des routes ne compte pas pour Vue Router : il classe les routes de la plus précise à la plus générale. `/produits/nouveau` l'emporte donc sur `/produits/:id`, où qu'elle soit déclarée. En Express, au contraire, la première route qui correspond répond.
+</MarginNote>
+
+### Naviguer par le code
+
+Certaines navigations ne viennent pas d'un clic sur un lien, mais d'une action terminée : après l'ajout d'un produit, on affiche sa fiche ; après une suppression, on revient au catalogue. La fonction `useRouter()` donne accès au routeur, et à ses méthodes de navigation :
+
+```js
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+router.push(`/produits/${produit.id}`)                     // une adresse
+router.push({ name: 'produit', params: { id: produit.id } }) // ou une route nommée
+router.back()                                                // comme le bouton Précédent
+```
+
+`push` ajoute l'adresse à l'historique, comme un clic sur un lien. `router.replace(…)` remplace plutôt l'adresse courante : utile quand le retour en arrière ne devrait pas ramener à l'écran quitté.
+
+### Une page introuvable
+
+Une adresse qui ne correspond à aucune route n'affiche rien dans `<RouterView>`. On ajoute donc une dernière route, qui attrape toutes les adresses :
+
+```js
+import PageIntrouvable from '@/views/PageIntrouvable.vue'
+
+// dans le tableau routes
+{ path: '/:cheminInconnu(.*)*', name: 'introuvable', component: PageIntrouvable },
+```
+
+Le motif `(.*)*` accepte n'importe quel chemin, même avec plusieurs segments, comme `/une/adresse/inventee`. Comme c'est la route la moins précise, elle ne s'applique qu'en dernier recours.
+
+```vue
+<!-- src/views/PageIntrouvable.vue -->
+<script setup>
+import { RouterLink } from 'vue-router'
+</script>
+
+<template>
+  <section class="carte">
+    <h1>Page introuvable</h1>
+    <p>L'adresse demandée ne correspond à aucune page, ou à aucun produit du catalogue.</p>
+    <p><RouterLink to="/produits">Revenir au catalogue</RouterLink></p>
+  </section>
+</template>
+```
+
+L'adresse `/produits/999` correspond bien à la route de la fiche ; c'est l'API qui répondra 404. La fiche réutilisera alors ce même composant, comme on le verra plus loin.
+
+<Aside type="caution" title="Recharger une adresse de l'application">
+Si l'on recharge `/produits/2`, le navigateur demande cette adresse au serveur. Le serveur de développement de Vite renvoie `index.html`, et le routeur prend le relais. Un serveur de production doit souvent être configuré pour faire de même ; sinon, il répond 404.
+</Aside>
+
+<Checkpoint question="Le menu utilise RouterLink. Que perdrait-on avec de simples balises a href ?">
+Chaque clic rechargerait toute l'application : le navigateur redemanderait la page au serveur, téléchargerait de nouveau le JavaScript, et l'état en mémoire serait perdu, par exemple un filtre choisi ou un formulaire entamé. `RouterLink` change l'adresse et la vue affichée, sans rechargement.
+</Checkpoint>
+
+## Appeler l'API avec Axios
+
+### Pourquoi Axios
+
+<Aside type="definition" title="Axios">
+**Axios** est une bibliothèque JavaScript qui envoie des requêtes HTTP, dans le navigateur comme dans Node.js. Elle remplit le même rôle que `fetch`, avec quelques commodités pour dialoguer avec une API qui parle JSON.
+</Aside>
+
+#### API `fetch` vs Axios
+
+| | `fetch` | Axios |
+| --- | --- | --- |
+| Lire un corps JSON | `await reponse.json()` | déjà fait : `reponse.data` |
+| Envoyer un objet en JSON | `JSON.stringify(…)` et l'en-tête `Content-Type` à la main | on passe l'objet : Axios s'occupe du reste |
+| Réglages communs | à répéter dans chaque appel | une **instance** : adresse de base, délai maximal |
+
+**La différence se voit surtout à l'envoi :**
+
+#### Avec fetch
+
+```js
+const reponse = await fetch('/api/produits', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(produit),
+});
+
+if (!reponse.ok) {
+    throw new Error(`statut ${reponse.status}`);
+}
+
+const nouvProduit = await reponse.json();
+```
+
+#### Avec Axios
+
+```js
+const { data: nouvProduit } = await axios.post('/api/produits', produit)
+```
+
+> `fetch` reste un bon choix, qui n'ajoute aucune dépendance.
+
+### Un module pour l'API
+
+Plutôt que d'appeler Axios dans chaque vue, on réunit tous les appels dans un module (`api.js`). 
+Les vues appellent `listerProduits()` ou `creerProduit(…)`, sans avoir besoin de connaître les adresses de l'API.
+
+**Avantage:** si une adresse change, un seul fichier est à corriger.
+
+```js
+// src/api.js
+import axios from 'axios'
+
+// Une instance d'Axios réservée à l'API du catalogue.
+// Les adresses sont relatives à /api, que le serveur de Vite relaie à l'API Express.
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 5000, // en milliseconde (ms)
+})
+
+export async function listerProduits() {
+  const reponse = await api.get('/produits')
+  return reponse.data
+}
+
+export async function lireProduit(id) {
+  const reponse = await api.get(`/produits/${id}`)
+  return reponse.data
+}
+
+export async function creerProduit(produit) {
+  const reponse = await api.post('/produits', produit)
+  return reponse.data
+}
+
+export async function modifierProduit(id, produit) {
+  const reponse = await api.put(`/produits/${id}`, produit)
+  return reponse.data
+}
+
+export async function supprimerProduit(id) {
+  await api.delete(`/produits/${id}`)
+}
+```
+
+- `axios.create()` crée une **instance** : une copie d'Axios avec ses propres réglages. 
+  - `baseURL` est préfixée à chaque adresse ; 
+  - `timeout` abandonne une requête sans réponse après 5 secondes.
+- Chaque fonction reprend une ligne du tableau des points d'accès de l'API.
+
+<MarginNote type="rappel" titre="Les cinq points d'accès">
+- `GET /api/produits` (200)
+- `GET /api/produits/:id` (200 ou 404)
+- `POST /api/produits` (201 ou 422)
+- `PUT /api/produits/:id` (200, 404 ou 422)
+- `DELETE /api/produits/:id` (204 ou 404)
+</MarginNote>
+
+### Charger le catalogue
+
+Le catalogue reprend la formule de la liste des cafés : trois états, et un chargement dans `onMounted`.
+
+```vue
+<!-- src/views/ListeProduits.vue -->
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { listerProduits } from '@/api.js'
+import { categories, libelleCategorie, formaterPrix } from '@/catalogue.js'
+
+const produits = ref([])
+const chargement = ref(true)
+const erreur = ref('')
+const categorie = ref('')
+
+const produitsAffiches = computed(() =>
+  categorie.value === ''
+    ? produits.value
+    : produits.value.filter((p) => p.categorie === categorie.value)
+)
+
+onMounted(async () => {
+  try {
+    produits.value = await listerProduits()
+  } catch {
+    erreur.value = "Le catalogue n'a pas pu être chargé. L'API est-elle démarrée ?"
+  } finally {
+    chargement.value = false
+  }
+})
+</script>
+
+<template>
+  <h1>Catalogue</h1>
+
+  <p v-if="chargement" class="etat">Chargement du catalogue…</p>
+  <p v-else-if="erreur" class="alerte">{{ erreur }}</p>
+
+  <template v-else>
+    <div class="outils">
+      <label>
+        Catégorie
+        <select v-model="categorie">
+          <option value="">Toutes</option>
+          <option v-for="c in categories" :key="c.valeur" :value="c.valeur">{{ c.libelle }}</option>
+        </select>
+      </label>
+      <span class="etat">{{ produitsAffiches.length }} produit(s)</span>
+    </div>
+
+    <ul class="grille">
+      <li v-for="produit in produitsAffiches" :key="produit.id" class="carte">
+        <h2>
+          <RouterLink :to="`/produits/${produit.id}`">{{ produit.nom }}</RouterLink>
+        </h2>
+        <p class="infos">
+          {{ libelleCategorie(produit.categorie) }} ·
+          <span class="prix">{{ formaterPrix(produit.prix) }}</span>
+        </p>
+        <p v-else class="epuise">Épuisé</p>
+      </li>
+    </ul>
+  </template>
+</template>
+```
+
+### Charger une fiche, et réagir à l'adresse
+
+La fiche charge un seul produit, celui de l'`id` reçu en prop. Elle distingue deux échecs : un produit qui n'existe pas (404), et tout autre problème.
+
+```vue
+<!-- src/views/FicheProduit.vue -->
+<script setup>
+import { ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { lireProduit, supprimerProduit } from '@/api.js'
+import { libelleCategorie, formaterPrix } from '@/catalogue.js'
+import PageIntrouvable from './PageIntrouvable.vue'
+
+const props = defineProps({
+  id: { type: String, required: true },
+})
+
+const router = useRouter()
+
+const produit = ref(null)
+const chargement = ref(true)
+const introuvable = ref(false)
+const erreur = ref('')
+
+async function charger() {
+  chargement.value = true
+  introuvable.value = false
+  erreur.value = ''
+  try {
+    produit.value = await lireProduit(props.id)
+  } catch (err) {
+    if (err.response?.status === 404) {
+      introuvable.value = true
+    } else {
+      erreur.value = "Le produit n'a pas pu être chargé."
+    }
+  } finally {
+    chargement.value = false
+  }
+}
+
+// Le même composant sert pour toutes les fiches : on recharge quand l'id change.
+watch(() => props.id, charger, { immediate: true })
+
+async function supprimer() {
+  if (!confirm(`Supprimer « ${produit.value.nom} » du catalogue ?`)) return
+  try {
+    await supprimerProduit(props.id)
+    router.push('/produits')
+  } catch {
+    erreur.value = 'La suppression a échoué.'
+  }
+}
+</script>
+
+<template>
+  <p v-if="chargement" class="etat">Chargement…</p>
+  <PageIntrouvable v-else-if="introuvable" />
+  <p v-else-if="erreur" class="alerte">{{ erreur }}</p>
+
+  <article v-else class="carte">
+    <h1>{{ produit.nom }}</h1>
+    <p class="infos">{{ libelleCategorie(produit.categorie) }}</p>
+    <p>
+      <span class="prix">{{ formaterPrix(produit.prix) }}</span> ·
+      <span v-if="produit.stock > 0">{{ produit.stock }} en stock</span>
+      <span v-else class="epuise">Épuisé</span>
+    </p>
+
+    <div class="actions">
+      <RouterLink :to="`/produits/${produit.id}/modifier`" class="bouton secondaire">Modifier</RouterLink>
+      <button type="button" class="danger" @click="supprimer">Supprimer</button>
+    </div>
+  </article>
+
+  <p><RouterLink to="/produits">← Retour au catalogue</RouterLink></p>
+</template>
+```
+
+**L'erreur d'Axios.** Quand Axios rejette sa promesse, l'objet reçu dans `catch` décrit ce qui s'est passé :
+
+| Situation | `err.response` |
+| --- | --- |
+| Le serveur a répondu avec un statut d'erreur | un objet : `err.response.status` (404, 422…) et `err.response.data` (le corps JSON) |
+| Aucune réponse : réseau coupé, délai dépassé | `undefined` |
+
+D'où `err.response?.status` : le **chaînage optionnel** `?.` renvoie `undefined` au lieu de lever une erreur quand `err.response` n'existe pas.
+
+**Un produit introuvable.** Sur un 404, la fiche affiche le composant `PageIntrouvable`, en gardant l'adresse demandée : on voit ainsi quelle adresse a échoué.
+
+**Un composant réutilisé.** Si l'on passe de `/produits/2` à `/produits/5`, par exemple avec un lien dans la fiche, le routeur garde le même composant et change seulement sa prop `id`. `onMounted` ne s'exécuterait donc pas une seconde fois. `watch` surveille plutôt la prop, et l'option `immediate: true` lance aussi le premier chargement.
+
+**La suppression.** `confirm()` affiche une boîte de dialogue du navigateur, qui rend `true` ou `false`. Après le `DELETE`, `router.push` ramène au catalogue. Une application soignée remplacera souvent `confirm()` par une boîte de dialogue intégrée à la page, plus facile à adapter.
+
+<Checkpoint question="On arrête l'API, puis on recharge le catalogue. Quel message s'affiche, et pourquoi ?">
+« Le catalogue n'a pas pu être chargé. » Le serveur de Vite reçoit bien la requête, mais ne peut pas la relayer : il répond lui-même une erreur, en général 502 (*Bad Gateway*, passerelle défaillante). Axios rejette la promesse, et le bloc `catch` affiche le message. Seul le 404 reçoit un traitement à part, dans la fiche.
+</Checkpoint>
+
+## Des formulaires avec v-model
+
+La page précédente liait déjà des champs de filtre à des données avec `v-model`. Un formulaire qui envoie des données à une API demande davantage : des valeurs du bon type, des messages d'erreur au bon moment, et la prise en compte de la réponse du serveur.
+
+### Les modificateurs .trim et .number
+
+Un champ de formulaire donne toujours du texte, même un `<input type="number">`. Or l'API attend un nombre pour `prix` et `stock`, et refuse un nom fait seulement d'espaces. Deux **modificateurs** de `v-model` convertissent la valeur au passage :
+
+<DemoModificateurs client:visible />
+
+| Modificateur | Effet | Exemple |
+| --- | --- | --- |
+| `v-model.trim` | retire les espaces au début et à la fin | `'  Tire  '` devient `'Tire'` |
+| `v-model.number` | convertit en nombre, si c'est possible | `'6.25'` devient `6.25` |
+| `v-model.lazy` | met à jour la donnée au changement, plutôt qu'à chaque touche | |
+
+<Aside type="attention" title=".number ne garantit pas un nombre">
+Si le texte ne peut pas être converti, par exemple un champ vide ou `abc`, `.number` laisse la valeur telle quelle : une chaîne. La validation doit donc vérifier le type : `typeof prix === 'number'`.
+</Aside>
+
+### Menus, boutons radio et cases à cocher
+
+`v-model` s'adapte au type de champ. La donnée liée reçoit :
+
+<DemoChamps client:visible />
+
+| Champ | Ce que contient la donnée |
+| --- | --- |
+| `<select>` | la `value` de l'option choisie |
+| boutons radio, avec le même `v-model` | la `value` du bouton coché, ou `''` si aucun ne l'est encore |
+| plusieurs cases à cocher liées au même **tableau** | les `value` des cases cochées |
+| une case à cocher seule, liée à un booléen | `true` ou `false` |
+
+Le formulaire des produits présente les quatre catégories en boutons radio, construits à partir de `catalogue.js` :
+
+```html
+<label v-for="c in categories" :key="c.valeur">
+  <input v-model="produit.categorie" type="radio" name="categorie" :value="c.valeur" />
+  {{ c.libelle }}
+</label>
+```
+
+`:value`, avec le deux-points, lie la valeur à une expression ; sans lui, chaque bouton aurait pour valeur le texte `c.valeur`.
+
+### Envoyer le formulaire
+
+```html
+<form novalidate @submit.prevent="soumettre">
+```
+
+- `@submit` écoute l'envoi du formulaire, que ce soit par un clic sur le bouton ou par la touche <kbd>Entrée</kbd> dans un champ.
+- `.prevent` est un **modificateur d'événement** : il appelle `preventDefault()`, qui empêche le comportement par défaut du navigateur, soit envoyer une requête et recharger la page. L'application garde la main, et envoie elle-même les données avec Axios.
+- `novalidate` désactive les bulles de validation du navigateur, pour afficher nos propres messages, au même endroit que ceux du serveur. On pourrait aussi les garder : elles s'ajoutent à la validation de l'application, sans la remplacer.
+
+### Valider avant d'envoyer, puis écouter le serveur
+
+Le formulaire vérifie les règles de l'API avant d'envoyer quoi que ce soit, ce qui évite un aller-retour inutile et donne une réponse immédiate. Le serveur, lui, vérifie de nouveau, et peut refuser avec un 422. Le formulaire doit donc afficher les deux sortes d'erreurs, au même endroit.
+
+<DemoValidation client:visible />
+
+On retrouve une règle déjà appliquée en PHP : **aucun message au premier affichage**. Les erreurs du client n'apparaissent qu'après une première tentative d'envoi.
+
+Le formulaire sert à l'ajout comme à la modification : on en fait un composant, qui reçoit ses valeurs de départ et les erreurs du serveur en props, et émet un événement quand les données sont prêtes.
+
+```vue
+<!-- src/components/FormulaireProduit.vue -->
+<script setup>
+import { ref, computed } from 'vue'
+import { categories } from '@/catalogue.js'
+
+const props = defineProps({
+  // Les valeurs de départ : vides pour un ajout, celles du produit pour une modification
+  initial: { type: Object, default: () => ({}) },
+  // Les erreurs renvoyées par l'API (422), par champ
+  erreursServeur: { type: Object, default: () => ({}) },
+  envoiEnCours: { type: Boolean, default: false },
+  libelleBouton: { type: String, default: 'Enregistrer' },
+})
+
+const emit = defineEmits(['enregistrer'])
+
+// Une copie locale : le formulaire ne modifie jamais l'objet reçu en prop.
+const produit = ref({
+  nom: props.initial.nom ?? '',
+  categorie: props.initial.categorie ?? '',
+  prix: props.initial.prix ?? '',
+  stock: props.initial.stock ?? 0,
+})
+
+// Les erreurs ne s'affichent qu'après une première tentative d'envoi.
+const tentative = ref(false)
+
+// Les mêmes règles que l'API, vérifiées avant l'envoi.
+const erreursClient = computed(() => {
+  const e = {}
+  const { nom, categorie, prix, stock } = produit.value
+  if (nom === '') e.nom = 'Le nom est obligatoire.'
+  else if (nom.length > 100) e.nom = 'Le nom ne devrait pas dépasser 100 caractères.'
+  if (!categories.some((c) => c.valeur === categorie)) e.categorie = 'Choisissez une catégorie.'
+  if (typeof prix !== 'number' || prix < 0) e.prix = 'Le prix doit être un nombre positif.'
+  if (!Number.isInteger(stock) || stock < 0) e.stock = 'Le stock doit être un entier positif ou nul.'
+  return e
+})
+
+// Ce qu'on affiche : les erreurs du client après une tentative, puis celles du serveur
+const erreurs = computed(() => ({
+  ...(tentative.value ? erreursClient.value : {}),
+  ...props.erreursServeur,
+}))
+
+function soumettre() {
+  tentative.value = true
+  if (Object.keys(erreursClient.value).length > 0) return
+  emit('enregistrer', { ...produit.value })
+}
+</script>
+
+<template>
+  <form class="formulaire" novalidate @submit.prevent="soumettre">
+    <label class="champ">
+      <span>Nom</span>
+      <input v-model.trim="produit.nom" type="text" maxlength="120" />
+      <p v-if="erreurs.nom" class="message-erreur">{{ erreurs.nom }}</p>
+    </label>
+
+    <fieldset>
+      <legend>Catégorie</legend>
+      <div class="choix">
+        <label v-for="c in categories" :key="c.valeur">
+          <input v-model="produit.categorie" type="radio" name="categorie" :value="c.valeur" />
+          {{ c.libelle }}
+        </label>
+      </div>
+      <p v-if="erreurs.categorie" class="message-erreur">{{ erreurs.categorie }}</p>
+    </fieldset>
+
+    <label class="champ">
+      <span>Prix ($)</span>
+      <input v-model.number="produit.prix" type="number" min="0" step="0.01" />
+      <p v-if="erreurs.prix" class="message-erreur">{{ erreurs.prix }}</p>
+    </label>
+
+    <label class="champ">
+      <span>Stock</span>
+      <input v-model.number="produit.stock" type="number" min="0" step="1" />
+      <p v-if="erreurs.stock" class="message-erreur">{{ erreurs.stock }}</p>
+    </label>
+
+    <div class="actions">
+      <button type="submit" :disabled="envoiEnCours">
+        {{ envoiEnCours ? 'Enregistrement…' : libelleBouton }}
+      </button>
+    </div>
+  </form>
+</template>
+```
+
+- **Une copie locale.** Les props appartiennent au parent : le formulaire copie les valeurs reçues dans sa propre donnée `produit`, qu'il est libre de modifier.
+- **Deux sources d'erreurs.** `erreursClient` est recalculée à chaque frappe ; `erreurs` y ajoute celles du serveur. Comme les deux utilisent les mêmes clés que l'API (`nom`, `categorie`, `prix`, `stock`), un seul `<p>` par champ suffit.
+- **Le formulaire n'envoie rien lui-même.** Il émet `enregistrer` avec une copie des données ; c'est la vue qui sait s'il faut un `POST` ou un `PUT`.
+- **Un bouton désactivé pendant l'envoi** évite qu'un double clic crée deux produits.
+
+<MarginNote type="rappel" titre="La décomposition">
+`const { nom, categorie, prix, stock } = produit.value` crée quatre constantes à partir des propriétés du même nom : c'est la **décomposition**, déjà utilisée dans l'API avec `req.body`.
+</MarginNote>
+
+<Checkpoint question="Le formulaire vérifie déjà toutes les règles. Pourquoi l'API doit-elle continuer de valider ?">
+Parce que l'API ne reçoit pas ses requêtes que de ce formulaire. N'importe quel client peut l'appeler directement, avec `curl` ou un autre programme, et le code qui s'exécute dans le navigateur peut être modifié par la personne qui l'utilise. La validation du client améliore l'expérience ; celle du serveur protège les données. Le serveur peut aussi appliquer des règles que le client ignore, par exemple un nom déjà utilisé : d'où l'affichage des erreurs 422.
+</Checkpoint>
+
+### Un formulaire, deux usages
+
+La vue d'ajout place le formulaire, envoie les données avec `creerProduit`, et réagit à la réponse :
+
+```vue
+<!-- src/views/NouveauProduit.vue -->
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { creerProduit } from '@/api.js'
+import FormulaireProduit from '@/components/FormulaireProduit.vue'
+
+const router = useRouter()
+
+const erreurs = ref({})
+const envoiEnCours = ref(false)
+const echec = ref('')
+
+async function enregistrer(donnees) {
+  envoiEnCours.value = true
+  erreurs.value = {}
+  echec.value = ''
+  try {
+    const produit = await creerProduit(donnees)
+    // Le produit existe : on affiche sa fiche.
+    router.push(`/produits/${produit.id}`)
+  } catch (err) {
+    if (err.response?.status === 422) {
+      erreurs.value = err.response.data.erreurs
+    } else {
+      echec.value = "L'enregistrement a échoué. Réessayez dans un instant."
+    }
+  } finally {
+    envoiEnCours.value = false
+  }
+}
+</script>
+
+<template>
+  <h1>Ajouter un produit</h1>
+  <p v-if="echec" class="alerte">{{ echec }}</p>
+  <FormulaireProduit
+    :erreurs-serveur="erreurs"
+    :envoi-en-cours="envoiEnCours"
+    libelle-bouton="Ajouter au catalogue"
+    @enregistrer="enregistrer"
+  />
+</template>
+```
+
+Pour y accéder, on ajoute un lien au menu de `App.vue` : `<RouterLink to="/produits/nouveau">Ajouter un produit</RouterLink>`.
+
+Sur un 422, l'API renvoie `{ "erreurs": { "nom": "…" } }` : ces messages passent au formulaire par la prop `erreursServeur`, et s'affichent sous les champs concernés. Toute autre erreur produit un message général.
+
+<MarginNote type="astuce" titre="Des props en kebab-case">
+Dans un gabarit, on écrit souvent les props avec des traits d'union : `:erreurs-serveur` pour la prop `erreursServeur`. Vue fait la correspondance ; les deux écritures fonctionnent.
+</MarginNote>
+
+La vue de modification ne diffère qu'en quelques points :
+
+| | `NouveauProduit` | `ModifierProduit` |
+| --- | --- | --- |
+| Valeurs de départ | aucune | le produit, chargé avec `lireProduit(id)` |
+| Envoi | `creerProduit(donnees)`, soit `POST` | `modifierProduit(id, donnees)`, soit `PUT` |
+| Après le succès | la fiche du nouveau produit | la fiche du produit modifié |
+| Produit inexistant | sans objet | `PageIntrouvable`, comme la fiche |
+
+```html
+<!-- dans le gabarit de ModifierProduit.vue -->
+<FormulaireProduit
+  v-if="produit"
+  :initial="produit"
+  :erreurs-serveur="erreurs"
+  :envoi-en-cours="envoiEnCours"
+  @enregistrer="enregistrer"
+/>
+```
+
+Le `v-if` compte : le formulaire copie ses valeurs de départ **à sa création**. Il ne doit donc être créé qu'une fois le produit chargé ; sinon, il partirait de valeurs vides.
+
+<Aside type="astuce" title="Quitter un formulaire sans enregistrer">
+Une personne qui clique sur un lien du menu au milieu d'une modification perd ses changements sans avertissement. Vue Router offre des **gardes de navigation**, des fonctions appelées avant un changement d'écran, qui peuvent l'annuler. Dans un composant, `onBeforeRouteLeave` en est une : elle pourrait demander une confirmation si le formulaire a été modifié. On ne l'utilise pas ici, mais l'outil existe.
+</Aside>
+
+## Récapitulatif
+
+| Concept | Syntaxe | Rôle |
+| --- | --- | --- |
+| Route | `{ path: '/produits/:id(\\d+)', component: FicheProduit, props: true }` | associer une adresse à une vue |
+| Emplacement des vues | `<RouterView />` | afficher la vue de l'adresse courante |
+| Lien | `<RouterLink :to="…">` | changer d'écran sans recharger la page |
+| Navigation par le code | `useRouter().push(…)` | changer d'écran après une action |
+| Page introuvable | `path: '/:cheminInconnu(.*)*'` | attraper toutes les adresses inconnues |
+| Instance Axios | `axios.create({ baseURL: '/api' })` | réunir les réglages communs des appels |
+| Erreur Axios | `err.response?.status`, `err.response.data` | distinguer un 404, un 422, ou une absence de réponse |
+| Modificateurs | `v-model.trim`, `v-model.number` | obtenir des valeurs propres et du bon type |
+| Envoi d'un formulaire | `@submit.prevent="…"` | traiter l'envoi sans recharger la page |
+| État partagé | `ref` au niveau d'un module | une même donnée pour plusieurs composants |
+| Stockage local | `localStorage.setItem`, `getItem`, avec JSON | conserver du texte dans le navigateur |
+
+<Highlight couleur="ambre">Le routeur décide quel écran afficher ; `api.js` sait parler à l'API. Les vues se contentent de les utiliser.</Highlight>
+
+- Un formulaire valide avant d'envoyer, n'affiche ses erreurs qu'après une tentative, et affiche aussi celles du serveur.
+- Le `localStorage` sert le confort de la personne, jamais la sécurité : le serveur reste la référence.
+
+## Quiz
+
+<Quiz
+  client:visible
+  question="Dans le menu, pourquoi utiliser RouterLink plutôt qu'une balise a ordinaire ?"
+  options={[
+    { texte: "Parce qu'une balise a ne peut pas pointer vers une adresse de l'application", correct: false },
+    { texte: "Pour changer d'écran sans recharger la page, et donc sans perdre l'état de l'application", correct: true },
+    { texte: "Parce que RouterLink charge les données de l'API", correct: false },
+  ]}
+  retour="Une balise a fait recharger toute la page par le navigateur. RouterLink intercepte le clic : seule la vue affichée dans RouterView change, et l'état en mémoire est conservé."
+/>
+
+<Quiz
+  client:visible
+  question="La route est { path: '/produits/:id(\\d+)', props: true }. Que reçoit la vue sur /produits/12 ?"
+  options={[
+    { texte: "Une prop id qui vaut le nombre 12", correct: false },
+    { texte: "Une prop id qui vaut la chaîne '12'", correct: true },
+    { texte: "Rien : il faut lire l'adresse avec window.location", correct: false },
+  ]}
+  retour="props: true transmet les paramètres comme props. Un paramètre d'adresse est toujours du texte, comme req.params en Express."
+/>
+
+<Quiz
+  client:visible
+  question="L'API répond 422 à une requête envoyée avec Axios. Où retrouve-t-on les messages d'erreur ?"
+  options={[
+    { texte: "Dans reponse.data, après un if (!reponse.ok)", correct: false },
+    { texte: "Dans err.response.data.erreurs, dans le bloc catch", correct: true },
+    { texte: "Nulle part : Axios ignore les réponses 422", correct: false },
+  ]}
+  retour="Axios rejette la promesse pour tout statut 4xx ou 5xx. Dans catch, err.response contient le statut et le corps de la réponse, ici { erreurs: { … } }."
+/>
+
+<Quiz
+  client:visible
+  question="Un champ de prix utilise v-model.number. La personne efface le champ. Que contient la donnée ?"
+  options={[
+    { texte: "0", correct: false },
+    { texte: "null", correct: false },
+    { texte: "Une chaîne vide ''", correct: true },
+  ]}
+  retour="Quand la valeur ne peut pas être convertie, .number la laisse telle quelle. La validation doit donc vérifier que le prix est bien de type number."
+/>
+
+
+## Exercice : passer la commande
+
+Le panier ne sert encore à rien : on ne peut pas commander. Ajoutez à la page du panier un formulaire qui envoie la commande à l'API.
+
+<MarginNote type="prerequis" titre="La ressource des commandes">
+Cet exercice suppose que l'API offre `POST /api/commandes`, l'exercice de la page sur la conception d'une API. Si vous ne l'avez pas terminé, utilisez l'API fournie avec la solution.
+</MarginNote>
+
+1. **Le formulaire.** Sous le tableau du panier, un champ pour le nom de la personne, lié avec `v-model.trim`, et un bouton **Passer la commande**, désactivé pendant l'envoi. Un nom vide affiche un message sous le champ, sans rien envoyer.
+2. **L'envoi.** Ajoutez une fonction `passerCommande(commande)` à `api.js`, et envoyez `POST /api/commandes` avec le corps attendu par l'API :
+
+   ```json
+   {
+     "client": "Ana Tremblay",
+     "lignes": [
+       { "produitId": 2, "quantite": 1 },
+       { "produitId": 5, "quantite": 2 }
+     ]
+   }
+   ```
+
+   Seuls l'identifiant et la quantité de chaque ligne partent : ni le nom, ni le prix.
+3. **Le succès.** Sur une réponse 201, videz le panier, et affichez une confirmation avec le numéro de la commande et le **total renvoyé par le serveur**.
+4. **Les erreurs.** Sur un 422, affichez `erreurs.client` sous le champ, et `erreurs.lignes` au-dessus du tableau. Toute autre erreur affiche un message général, et le panier est conservé.
+
+**Pour aller plus loin** : après le succès, naviguez vers une nouvelle route `/commandes/:id`, dont la vue charge la commande avec `GET /api/commandes/:id` et affiche ses lignes, avec le nom de chaque produit, et son total. Une adresse de commande inconnue affiche la page introuvable.
+
+<Checkpoint question="Le total estimé du panier et le total renvoyé par le serveur peuvent-ils différer ?">
+Oui. Le panier garde le prix de chaque produit au moment où il a été ajouté. Si le prix a changé depuis dans le catalogue, ou si quelqu'un a modifié le `localStorage`, les deux totaux diffèrent. Le total du serveur fait foi : c'est pour cela que l'application affiche celui de la réponse, et non le sien.
+</Checkpoint>

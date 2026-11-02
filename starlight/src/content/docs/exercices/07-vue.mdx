@@ -1,0 +1,206 @@
+---
+title: "Exercices : un créateur de formulaires"
+description: Une série d'exercices qui construit, étape par étape, une application de création de formulaires à la manière de Google Forms, avec une API Express et une interface Vue.
+sidebar:
+  order: 17
+---
+
+import Aside from '../../../components/Aside.astro';
+
+Ces exercices construisent progressivement une application de création de formulaires, à la manière de Google Forms : 
+on compose un formulaire, on le fait remplir, puis on consulte le résumé des réponses. 
+
+L'application sera composée d'une**API Express** et d'une **interface Vue**.
+
+## L'application
+
+| Écran | Adresse | Rôle |
+| --- | --- | --- |
+| Mes formulaires | `/formulaires` | la liste des formulaires : créer, modifier, remplir, voir les réponses, supprimer |
+| Éditeur | `/formulaires/:id/modifier` | le titre, la description et les questions d'un formulaire |
+| Remplir | `/f/:id` | le formulaire, tel que le voit la personne qui y répond |
+| Réponses | `/formulaires/:id/reponses` | le résumé des réponses reçues, question par question |
+
+L'adresse `/` mène à la liste des formulaires.  
+Toute adresse inconnue, ou tout formulaire inexistant, affiche une page « introuvable ».
+
+## Le modèle de données
+
+### Un formulaire
+
+```json
+{
+  "id": 1,
+  "titre": "Sondage sur la cafétéria",
+  "description": "Aidez-nous à améliorer le menu de la cafétéria du collège.",
+  "questions": [
+    { "id": "nom", "type": "texte", "intitule": "Votre prénom", "obligatoire": false },
+    {
+      "id": "frequence",
+      "type": "choix",
+      "intitule": "À quelle fréquence mangez-vous à la cafétéria ?",
+      "obligatoire": true,
+      "options": ["Tous les jours", "Quelques fois par semaine", "Rarement", "Jamais"]
+    }
+  ]
+}
+```
+
+- L'`id` du formulaire est attribué par le serveur.
+- L'`id` d'une question est une chaîne attribuée par le client, unique dans le formulaire. 
+    - Il ne change jamais, même si la question est modifiée ou déplacée : c'est lui qui relie une question à ses réponses. 
+    - L'application en crée un avec `crypto.randomUUID()`.
+
+### Les types de questions
+
+| Type | Libellé affiché | Options | Valeur d'une réponse |
+| --- | --- | --- | --- |
+| `texte` | Réponse courte | non | du texte, au plus 200 caractères |
+| `paragraphe` | Paragraphe | non | du texte, au plus 2000 caractères |
+| `choix` | Choix unique | oui | une des options |
+| `cases` | Cases à cocher | oui | un tableau d'options, sans doublon |
+| `liste` | Liste déroulante | oui | une des options |
+
+Une question sans réponse vaut `''`, ou `[]` pour les cases à cocher.
+
+### Une réponse
+
+```json
+{
+  "id": 5,
+  "formulaireId": 1,
+  "date": "2026-11-02T14:40:00.000Z",
+  "valeurs": {
+    "nom": "Karim",
+    "frequence": "Quelques fois par semaine",
+    "repas": ["Déjeuner", "Dîner"]
+  }
+}
+```
+
+`valeurs` associe l'`id` de chaque question à sa réponse. L'`id`, le `formulaireId` et la `date` sont attribués par le serveur.
+
+## Le contrat de l'API
+
+| Méthode | Adresse | Succès | Erreurs |
+| --- | --- | --- | --- |
+| `GET` | `/api/formulaires` | 200, la liste | |
+| `GET` | `/api/formulaires/:id` | 200, le formulaire | 404 |
+| `POST` | `/api/formulaires` | 201, le formulaire créé, et son adresse dans `Location` | 400, 422 |
+| `PUT` | `/api/formulaires/:id` | 200, le formulaire enregistré | 400, 404, 422 |
+| `DELETE` | `/api/formulaires/:id` | 204 | 404 |
+| `GET` | `/api/formulaires/:id/reponses` | 200, les réponses du formulaire | 404 |
+| `POST` | `/api/formulaires/:id/reponses` | 201, la réponse enregistrée | 400, 404, 422 |
+
+Toute autre méthode, sur une adresse connue, répond 405 avec l'en-tête `Allow`.
+
+## Exercice 1 : l'API des formulaires
+
+Créez le projet `formulaires-api`, avec Express, et la ressource des formulaires.
+
+1. **Données de départ.** Le serveur démarre avec un formulaire d'exemple, qui compte au moins une question de chacun des cinq types.
+2. **Points d'accès**. Ceux liés à la gestion des formulaires, selon le contrat ci-dessus.
+3. **Validation requête (400).** Le corps d'un `POST` ou d'un `PUT` est refusé avec un 400 s'il n'est pas un objet JSON, si `questions` est présent sans être un tableau, si une question n'est pas un objet avec un `id` non vide, ou si deux questions ont le même `id`. Un JSON illisible répond aussi 400.
+4. **Validation contenu (422).**
+   - Le `titre` est obligatoire, et compte au plus 120 caractères.
+   - La `description` est facultative ; si elle est présente, c'est du texte.
+   - Le `type` de chaque question fait partie des cinq types.
+   - L'`intitule` est obligatoire, et compte au plus 200 caractères.
+   - `obligatoire`, s'il est présent, vaut `true` ou `false`.
+   - Une question de type `choix`, `cases` ou `liste` offre au moins deux options, non vides et toutes différentes.
+5. **Nettoyage.** Le serveur n'enregistre que les champs prévus. Il retire les espaces au début et à la fin des textes, met `obligatoire` à `false` s'il est absent, et retire les `options` d'une question qui n'en a pas besoin. Un formulaire créé sans `questions` en reçoit un tableau vide.
+
+## Exercice 2 : l'API des réponses
+
+Ajoutez la gestion des réponses (aux formulaires) à l'API.
+
+1. **Données.** Les réponses sont gardées en mémoire. Le serveur démarre avec quelques réponses au formulaire d'exemple.
+2. **Points d'accès**. Les points d'accès `GET` et `POST /api/formulaires/:id/reponses`, selon le contrat. 
+   - Les deux répondent 404 si le formulaire n'existe pas.
+3. **Validation structure (400).** Le corps est un objet JSON qui contient un objet `valeurs`.
+4. **Validation contenu (422).** Chaque question du formulaire est vérifiée selon son type : une réponse de texte est une chaîne de longueur permise, un choix fait partie des options, des cases cochées forment un tableau d'options sans doublon. Une question obligatoire ne peut pas rester sans réponse.
+5. **Nettoyage.** La réponse enregistrée contient exactement une valeur par question du formulaire : les textes sans espaces superflus, `''` ou `[]` pour une question sans réponse. Les clés de `valeurs` qui ne correspondent à aucune question sont ignorées.
+6. **Liste des formulaires** ajoute à chaque formulaire le nombre de réponses reçues, dans un champ `nombreReponses`.
+7. **Suppression** d'un formulaire supprime aussi ses réponses.
+
+## Exercice 3 : le squelette de l'application
+
+Créez le projet Vue `formulaires-app`, avec Vue Router et Axios.
+
+1. **Le projet.** Créez-le avec `npm create vue@latest`, en cochant seulement Router, puis installez Axios. La feuille de style `style.css` est fournie : elle couvre tous les exercices.
+2. **Le relais.** Le serveur de Vite relaie les adresses `/api` à l'API, sur le port 3000.
+3. **Le module de l'API.** Tous les appels passent par `src/api.js`, qui utilise une instance d'Axios. Les vues n'écrivent jamais d'adresse d'API.
+4. **Les routes** du tableau de l'application. Les paramètres `:id` n'acceptent que des chiffres, et sont transmis aux vues sous forme de props. Pour l'instant, les vues de l'éditeur, du remplissage et des réponses affichent seulement un titre provisoire, avec l'`id` reçu.
+5. **La charpente.** `App.vue` affiche un en-tête, avec un lien vers la liste des formulaires, et l'emplacement des vues.
+6. **La liste des formulaires.** Pour chaque formulaire : le titre, la description s'il y en a une, le nombre de questions et de réponses, et quatre actions.
+   - **Modifier**, **Remplir** et **Réponses** mènent aux écrans correspondants.
+   - **Supprimer** demande une confirmation, qui mentionne le nombre de réponses s'il y en a, puis retire le formulaire de la liste sans la recharger.
+   - La liste prévoit aussi le chargement, l'échec du chargement, et l'absence de formulaire.
+7. **Un nouveau formulaire.** Un bouton **Nouveau formulaire** crée, avec un `POST`, un formulaire intitulé « Formulaire sans titre », puis ouvre son éditeur.
+8. **La page introuvable** propose un lien vers la liste des formulaires.
+
+## Exercice 4 : l'éditeur
+
+Construisez la vue de l'éditeur, d'abord avec des questions de type `texte` seulement.
+
+1. **Le chargement.** L'éditeur charge le formulaire de son `id`. Un formulaire inexistant affiche la page introuvable.
+2. **L'en-tête.** Le titre et la description sont modifiables.
+3. **Les questions.** Chaque question affiche son numéro et un champ pour son intitulé. Un bouton **Ajouter une question** ajoute, à la fin, une question de type `texte`, avec un `id` créé par le navigateur.
+4. **L'enregistrement.** Un bouton **Enregistrer** envoie le formulaire entier avec un `PUT`. Pendant l'envoi, le bouton est désactivé. Après le succès, l'éditeur affiche le formulaire renvoyé par l'API, et un message de confirmation.
+5. **Les erreurs.** Une erreur 422 affiche chaque message sous le champ concerné : le titre, ou la question de l'`id` indiqué, dont le bloc est aussi mis en évidence. Toute autre erreur affiche un message général.
+6. **L'aperçu.** Un lien **Aperçu** mène à l'écran de remplissage du formulaire.
+
+## Exercice 5 : les types de questions
+
+Donnez à l'éditeur tous les types de questions, dans un composant `EditeurQuestion`.
+
+1. **Le composant.** `EditeurQuestion` reçoit la question en prop, avec son numéro et le message d'erreur qui la concerne. Il ne modifie jamais la question reçue : il émet un événement avec une copie modifiée, et c'est la vue de l'éditeur qui la remplace dans le formulaire.
+2. **Le type.** Une liste déroulante permet de choisir parmi les cinq types, avec leur libellé. Passer à un type à options ajoute deux options, « Option 1 » et « Option 2 », si la question n'en avait pas ; passer à un type sans options les retire.
+3. **Les options.** Pour un type à options, chaque option est modifiable et peut être retirée, tant qu'il en reste plus de deux. Un bouton ajoute une option. Un repère précède chaque option : ○ pour un choix unique, ☐ pour des cases à cocher, et un numéro pour une liste déroulante.
+4. **Obligatoire.** Une case à cocher indique si la question est obligatoire.
+5. **L'organisation.** Quatre boutons permettent de monter et de descendre la question, de la dupliquer juste en dessous, avec un nouvel `id`, et de la supprimer. On ne peut pas monter la première question, ni descendre la dernière.
+
+## Exercice 6 : remplir un formulaire
+
+Construisez l'écran que voit la personne qui répond.
+
+1. **L'en-tête.** Le titre et la description du formulaire, et une note qui explique l'astérisque des questions obligatoires.
+2. **Le composant `ChampQuestion`.** Il affiche l'intitulé d'une question, suivi d'un astérisque si elle est obligatoire, puis le champ qui convient à son type : une zone de texte d'une ligne ou de plusieurs, des boutons radio, des cases à cocher, ou une liste déroulante avec un premier choix vide. Il s'utilise avec `v-model`, qui le lie à la valeur de la question (voir `defineModel` dans la documentation de Vue).
+3. **Les valeurs.** La vue garde une valeur par question : `''`, ou `[]` pour les cases à cocher.
+4. **La validation.** Après une première tentative d'envoi, chaque question obligatoire restée sans réponse affiche un message, qui disparaît dès qu'on y répond. Rien n'est envoyé tant qu'il en reste.
+5. **L'envoi.** Un `POST` envoie les valeurs. Une erreur 422 affiche les messages sous les questions concernées ; toute autre erreur, un message général.
+6. **Après le succès.** Le formulaire laisse place à un message de remerciement, avec un bouton **Envoyer une autre réponse** qui affiche de nouveau le formulaire, vide.
+7. **Effacer.** Un bouton **Effacer les réponses** vide toutes les valeurs.
+
+## Exercice 7 : le résumé des réponses
+
+Construisez l'écran des réponses.
+
+1. **Le chargement.** La vue charge le formulaire et ses réponses, avec deux requêtes envoyées en même temps. Un formulaire inexistant affiche la page introuvable.
+2. **L'en-tête.** Le titre, le nombre de réponses reçues, des liens vers l'éditeur et le remplissage, et un bouton **Actualiser** qui recharge les données. Sans aucune réponse, un message le dit.
+3. **Le composant `ResumeQuestion`.** Pour chaque question, le résumé affiche l'intitulé et le nombre de réponses non vides, puis :
+   - pour une question à options, chaque option avec le nombre de réponses qui l'ont choisie, le pourcentage par rapport au nombre total de réponses, et une barre proportionnelle ;
+   - pour une question de texte, la liste des réponses non vides, ou un message s'il n'y en a aucune.
+4. **Les questions modifiées.** Une question ajoutée après coup n'a pas de valeur dans les réponses plus anciennes : le résumé la traite comme une réponse vide.
+
+## Exercice 8 : le brouillon et les formulaires déjà remplis
+
+Utilisez `localStorage` pour améliorer l'écran de remplissage. Tous les accès à `localStorage` passent par un module `src/stockage.js`, et aucun ne doit faire échouer l'application si le stockage est indisponible ou contient une valeur illisible.
+
+1. **Le brouillon.** Chaque modification des réponses en cours est gardée dans `localStorage`, une clé par formulaire. En revenant au formulaire, même après avoir fermé le navigateur, on retrouve ses réponses, avec un message qui le signale.
+2. **Un brouillon prudent.** À la relecture, seules sont reprises les valeurs qui conviennent encore au formulaire : une question qui existe toujours, une valeur du bon type, des options qui existent encore.
+3. **La fin du brouillon.** Le brouillon est effacé après un envoi réussi, et par le bouton **Effacer les réponses**.
+4. **Les formulaires déjà remplis.** Après un envoi réussi, l'`id` du formulaire est ajouté à une liste gardée dans `localStorage`. En ouvrant un formulaire de cette liste, on voit d'abord le message « Vous avez déjà répondu à ce formulaire. », avec un bouton **Répondre de nouveau**.
+
+<Aside type="attention" title="Une commodité, pas une règle">
+La liste des formulaires déjà remplis n'empêche personne de répondre deux fois : il suffit de vider le `localStorage`, ou de changer de navigateur. Pour l'empêcher vraiment, c'est le serveur qui devrait reconnaître les personnes, ce qui suppose une authentification.
+</Aside>
+
+## Pour aller plus loin
+
+Ces défis n'ont pas d'instantané.
+
+- **Une échelle linéaire.** Ajoutez un type `echelle` : une note de 1 à 5, présentée comme une rangée de boutons radio, résumée par le nombre de réponses à chaque note et la moyenne. L'API, l'éditeur, le remplissage et le résumé sont tous à adapter.
+- **Ne rien perdre.** Dans l'éditeur, avertissez avant de quitter l'écran si des modifications n'ont pas été enregistrées, avec `onBeforeRouteLeave`.
+- **Des questions conditionnelles.** Permettez d'afficher une question seulement si une question à choix précédente a reçu une certaine réponse. Une question masquée n'est pas obligatoire, et l'API doit le savoir.
+- **Exporter les réponses.** Ajoutez à l'écran des réponses un bouton qui télécharge un fichier CSV : une ligne par réponse, une colonne par question.

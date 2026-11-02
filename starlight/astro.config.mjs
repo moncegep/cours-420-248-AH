@@ -47,6 +47,7 @@ export default defineConfig({
                             { label: "Développement coté client", slug: 'cours/08-dev-frontend' },
                             { label: "Introduction à Vue.js", slug: 'cours/10-vue-intro' },
                             { label: "Structurer une application Vue.js", slug: 'cours/11-vue-composant' },
+                            // { label: "Navigation et formulaires avec Vue.js", slug: 'cours/12-vue-nav-form' },
                             // { label: "Révision", slug: 'cours/09-revision' },
                             // { label: 'MVC', slug: 'cours/10-mvc' },
                             // { label: 'MVC', slug: 'cours/10-mvc' },
@@ -62,6 +63,7 @@ export default defineConfig({
                     { label: 'Création de site web en PHP', slug: 'exercices/03-navigation' },
                     { label: 'Utilisation de formulaires', slug: 'exercices/04-formulaires' },
                     { label: 'Session et accès BD en PHP ', slug: 'exercices/05-donnees' },
+                    // { label: 'Construire avec Vue.js ', slug: 'exercices/07-vue' },
                 ]
             },
             {
